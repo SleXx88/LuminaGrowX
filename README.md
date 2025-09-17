@@ -1,52 +1,104 @@
-# ESP32 Stepper Motor Control with Adafruit TMC2209
+Hier habe ich dir eine komplette **README.md** für dein Projekt **LuminaGrowX** geschrieben.
+Ich habe berücksichtigt, was du im Laufe des Projekts schon entwickelt hast: eigene Libraries mit `.h` und `.cpp` Dateien (z. B. für Stepper, ToF, SHT41, GP8211, FanCtrl usw.), die Struktur mit `lib/` und `src/`, die ESP32-S3 als Controller-Basis, sowie die Vision eines „Apple-like“ Grow-Systems mit Sensorik und Automatisierung.
 
-This project provides a simple interface to control a stepper motor using the Adafruit TMC2209 driver with an ESP32. The motor can be controlled via serial commands to move up or down, and it can be stopped or started based on user input.
+Du kannst den Text direkt in deine `README.md` kopieren:
 
-## Project Structure
+````markdown
+# LuminaGrowX 🌱✨
 
-```
-esp32-stepper-tmc2209
-├── src
-│   ├── main.cpp          // Main entry point of the program
-│   └── tmc2209_config.h  // Configuration settings for the TMC2209 module
-├── lib
-│   └── Adafruit_TMC2209
-│       ├── Adafruit_TMC2209.h  // Header file for the TMC2209 class
-│       └── Adafruit_TMC2209.cpp // Implementation of the TMC2209 class methods
-├── platformio.ini       // PlatformIO configuration file
-├── README.md            // Project documentation
-└── .vscode
-    └── settings.json     // VSCode settings for the project
-```
+LuminaGrowX ist eine modulare Software für den **ESP32-S3**, entwickelt als Herzstück eines vollautomatischen Grow-Systems – von der Anzucht bis zur Blüte.  
+Das Projekt kombiniert moderne Sensorik, präzise Ansteuerung von Aktoren und eine flexible Architektur auf Basis eigener C++-Bibliotheken (`.h` / `.cpp`).  
 
-## Installation
+Ziel ist ein System, das technisch leistungsfähig und dennoch einfach bedienbar ist – inspiriert vom klaren „Apple-like“ Design.
 
-1. Clone this repository to your local machine.
-2. Open the project in your preferred IDE (e.g., VSCode).
-3. Ensure you have the PlatformIO extension installed.
-4. Install the required libraries, including the Adafruit TMC2209 library.
+---
 
-## Usage
+## ✨ Features
 
-1. Connect the TMC2209 driver to the ESP32 using the following pin configuration:
-   - DIR: GPIO 20
-   - STEP: GPIO 21
-   - EN: GPIO 0 (Enable pin)
-   - DIAG: GPIO 35 (Diagnostic pin)
+- **Plattform:** ESP32-S3 (Arduino / PlatformIO)
+- **Modularer Aufbau:** eigene Bibliotheken für alle Komponenten (`lib/` + `src/`)
+- **Sensorik:**  
+  - Temperatur- und Luftfeuchtigkeit (SHT41)  
+  - Distanz- / Füllstandsmessung (ToF-Sensor)  
+  - Kapazitiver Bodenfeuchte-Sensor (geplant)  
+- **Aktoren:**  
+  - LED-Beleuchtung (10–100 % regelbar)  
+  - Stepper-Motorsteuerung (z. B. TMC2209 mit StallGuard Homing)  
+  - PWM-gesteuerte 12 V Lüfter (FanCtrl)  
+  - GP8211 DAC (0–10 V Signal in % zur Steuerung externer Geräte)  
+  - CO₂-Zufuhr (vorbereitet)  
+- **Regelung:**  
+  - VPD-basierte Klimasteuerung  
+  - Flexible Regelstrategien (PID / PD vorgesehen)  
+  - Definierte Phasenprofile für Tag/Nacht, Keimung, Wachstum und Blüte  
+- **Kommunikation:**  
+  - MQTT-Anbindung an Home Assistant (Discovery vorbereitet)  
+  - Serielles Debugging über USB  
+  - Webserver mit HTML/CSS Interface (Basis implementiert)  
 
-2. Upload the code to your ESP32 board.
+---
 
-3. Open the Serial Monitor in your IDE.
+## 📂 Projektstruktur
 
-4. Use the following commands to control the stepper motor:
-   - `+` : Move the motor up.
-   - `-` : Move the motor down.
-   - ` ` (space) : Stop or start the motor.
+```plaintext
+LuminaGrowX/
+├─ lib/
+│   ├─ fan_ctrl/        # PWM Lüftersteuerung
+│   ├─ gp8211_ctrl/     # DAC-Ausgabe 0–10 V
+│   ├─ sht41_ctrl/      # Temperatur & Luftfeuchte
+│   ├─ stepper_ctrl/    # Schrittmotor + Homing
+│   ├─ tof_ctrl/        # Time-of-Flight Sensor
+│   └─ …                # weitere Module
+├─ src/
+│   └─ main.cpp         # zentrale Programm-Logik
+├─ include/             # Header-Dateien
+└─ README.md            # Projektbeschreibung
+````
 
-## Diagnostics
+Jedes Modul ist eigenständig und lässt sich auch in anderen Projekten wiederverwenden.
 
-If there are any issues with the motor operation, diagnostic information will be output via the DIAG pin. Ensure to monitor this pin for any error messages.
+---
 
-## License
+## 🚀 Getting Started
 
-This project is licensed under the MIT License. See the LICENSE file for more details.
+### Voraussetzungen
+
+* [PlatformIO](https://platformio.org/) mit VSCode
+* ESP32-S3 DevKitC-1 oder eigenes Board mit ESP32-S3-WROOM
+* Grundkenntnisse in Arduino/C++
+
+### Installation
+
+1. Repository klonen:
+
+   ```bash
+   git clone https://github.com/dein-user/LuminaGrowX.git
+   ```
+2. Projekt in VSCode mit PlatformIO öffnen.
+3. Abhängigkeiten werden automatisch installiert.
+4. `main.cpp` flashen und über **Seriellen Monitor** debuggen.
+
+---
+
+## ⚙️ Nutzung
+
+* **Pins für Sensoren und Aktoren** werden in der `main.cpp` festgelegt.
+* Jede Hardwarekomponente wird über ihre eigene Library initialisiert (`begin()`) und gesteuert.
+* Konfiguration wie z. B. Grenzwerte für VPD oder LED-Intensität kann direkt im Code angepasst werden.
+
+---
+
+## 🌍 Roadmap
+
+* Erweiterung der Regelstrategien (z. B. vollständige PID-Implementierung)
+* Unterstützung für zusätzliche Sensoren (Bodenfeuchte, CO₂-Messung)
+* Energiemanagement & Logging
+* Tiefere Integration in Home Assistant (MQTT Discovery, Energie-Dashboard)
+* Mobile Web-UI mit Live-Daten
+
+---
+
+## 📜 Lizenz
+
+Dieses Projekt steht unter der **MIT-Lizenz**.
+Freie Nutzung, Modifikation und Weitergabe sind erlaubt – ein Hinweis auf das Originalprojekt wird geschätzt.
