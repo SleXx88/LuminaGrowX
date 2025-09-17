@@ -1,9 +1,3 @@
-Hier habe ich dir eine komplette **README.md** für dein Projekt **LuminaGrowX** geschrieben.
-Ich habe berücksichtigt, was du im Laufe des Projekts schon entwickelt hast: eigene Libraries mit `.h` und `.cpp` Dateien (z. B. für Stepper, ToF, SHT41, GP8211, FanCtrl usw.), die Struktur mit `lib/` und `src/`, die ESP32-S3 als Controller-Basis, sowie die Vision eines „Apple-like“ Grow-Systems mit Sensorik und Automatisierung.
-
-Du kannst den Text direkt in deine `README.md` kopieren:
-
-````markdown
 # LuminaGrowX 🌱✨
 
 LuminaGrowX ist eine modulare Software für den **ESP32-S3**, entwickelt als Herzstück eines vollautomatischen Grow-Systems – von der Anzucht bis zur Blüte.  
