@@ -427,7 +427,7 @@ int ToFCtrl::readRawMm() {
   return mm;
 }
 
-// Durchschnitt mehrerer Messungen
+// Durchschnitt mehrerer Messungen (optimiert für Geschwindigkeit)
 int ToFCtrl::readAvgMm(uint8_t samples) {
   if (samples == 0) return readRawMm();
   long sum = 0;
@@ -438,7 +438,7 @@ int ToFCtrl::readAvgMm(uint8_t samples) {
       sum += v;
       okCnt++;
     }
-    delay(5);
+    // delayMicroseconds(500); // Optional: sehr kurze Pause, falls nötig
   }
   if (okCnt == 0) return -1;
   return (int)(sum / okCnt);

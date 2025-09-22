@@ -28,7 +28,7 @@
 // Maximale sinnvolle Messreichweite in Zentimetern. Der Sensor kann zwar weiter messen,
 // allerdings werden die Werte jenseits dieses Bereichs als unzuverlässig behandelt.
 #ifndef TOF_MAX_CM
-#define TOF_MAX_CM 100
+#define TOF_MAX_CM 110
 #endif
 
 // Minimale sinnvolle Messdistanz in Zentimetern. Der VL53L0X liefert unterhalb

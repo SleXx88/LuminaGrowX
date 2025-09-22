@@ -174,7 +174,7 @@ private:
   long      softMaxSteps_ = 0;
   long      homingStartSteps_ = 0;
 
-  int       AXIS_UP_DIR_  = -1; // Standard: oben ist Motor-
+  int       AXIS_UP_DIR_  = +1; // Standard: oben ist Motor-
   int       homingDirLogical_ = +1; // Homing in logischer +1 Richtung
   bool      lastOpDone_   = false;
   bool      homingFinished_ = false;
@@ -190,4 +190,6 @@ private:
 
   // intern: Homing-Backoff ohne Mode-Wechsel
   void homeMoveRelativeMM_(float mmLogical, float maxHz);
+  void recomputeSoftLimits_();   // setzt softMinSteps_ / softMaxSteps_ abhängig von AXIS_UP_DIR_
+  void debugPrintLimits() const;
 };

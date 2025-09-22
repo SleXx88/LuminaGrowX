@@ -1,6 +1,3 @@
-
-// ########################################################
-
 #include <Arduino.h>
 #include <Wire.h>
 #include "sht41_ctrl.h"
@@ -10,6 +7,11 @@
 #include "tof_ctrl.h"
 #include "vpd_calc.h"
 #include "env_ctrl.h"
+#include "rtc_ctrl.h"
+
+// ===================== Test-Schalter =====================
+// Auf true setzen, um den vollständigen Stepper‑Selbsttest in setup() auszuführen
+// #define RUN_STEPPER_SELFTEST true
 
 // VPD
 using namespace vpd_calc;
@@ -17,15 +19,14 @@ using namespace vpd_calc;
 using namespace env_ctrl;
 
 // Definiere das aktuelle Wachstumsstadium für die Klassifizierung.
-// Du kannst dies basierend auf deinem Wachstumsplan ändern oder auf Kalenderwochen abbilden.
 static GrowthStage CURRENT_STAGE = GrowthStage::Vegetative;
 
 //  Fan-Pins definieren
 constexpr uint8_t FAN_PWM_PIN = 2;
 
 //  I2C-Pins definieren
-constexpr int I2C_SDA_1 = 8; // SDA des ESP32‑S3
-constexpr int I2C_SCL_1 = 9; // SCL des ESP32‑S3
+constexpr int I2C_SDA_1 = 8;  // SDA des ESP32‑S3
+constexpr int I2C_SCL_1 = 9;  // SCL des ESP32‑S3
 constexpr int I2C_SDA_2 = 20;
 constexpr int I2C_SCL_2 = 19;
 constexpr uint32_t I2C_FREQ_2 = 400000; // 400 kHz
@@ -40,6 +41,90 @@ FanCtrl fan;        // Lüftersteuerung
 ToFCtrl tof;        // Time-of-Flight Distanzsensor
 StepperCtrl step;   // Schrittmotorsteuerung
 EnvCtrl controller; // Umweltsteuerung
+RTC_Ctrl rtc;       // RTC
+
+// ===== Hilfsfunktionen für den Stepper‑Selbsttest =====
+static inline bool approxEq(float a, float b, float eps = 0.02f) {
+  return fabsf(a - b) <= eps;
+}
+
+static void waitUntilStill(StepperCtrl& s, unsigned long stable_ms = 250, unsigned long timeout_ms = 60000) {
+  const float eps = 0.01f; // 0.01 mm als Stillstands-Schwelle
+  unsigned long t0 = millis();
+  float lastPos = s.getPositionMm();
+  unsigned long stableSince = millis();
+
+  for (;;) {
+    s.tick();
+    float p = s.getPositionMm();
+    if (fabsf(p - lastPos) <= eps) {
+      if (millis() - stableSince >= stable_ms) break; // still
+    } else {
+      stableSince = millis();
+      lastPos = p;
+    }
+
+    if (millis() - t0 > timeout_ms) {
+      Serial.println(F("[TEST] Timeout beim Warten auf Stillstand!"));
+      break;
+    }
+    delay(1);
+  }
+}
+
+static void printPos(StepperCtrl& s, const char* tag) {
+  Serial.printf("[POS] %s: %.2f mm\n", tag, s.getPositionMm());
+}
+
+static void runStepperSelfTest() {
+  Serial.println();
+  Serial.println(F("=== Stepper Selbsttest START ==="));
+
+  // Optional: Achsensinn + Weglänge setzen (falls nicht schon in begin() festgelegt)
+  step.setAxisUpDir(+1);         // forward = nach OBEN; +mm (logisch) = nach UNTEN
+  step.setMaxTravelMm(440.0f);   // Arbeitsweg nach unten (an Mechanik anpassen)
+
+  step.enableDebug(true);
+  step.setDebugMoveLogInterval(100); // 100 ms Logintervall
+
+  // HOMING (nach oben). Backoff setzt 0.00 mm als Arbeits-Nullpunkt.
+  Serial.println(F("[TEST] HOMING start"));
+  while (!step.home()) { step.tick(); }
+  Serial.println(F("[TEST] HOMING done"));
+  printPos(step, "nach Homing (erwartet ~0.00)");
+
+  // --- Test 1: Abwärts auf 20.00 mm ---------------------------------------
+  Serial.println(F("[TEST] moveTo(20.00 mm) – abwärts"));
+  step.moveTo(20.0f, 5);   // Level 2 wie in deinen Logs
+  waitUntilStill(step);
+  printPos(step, "soll ~20.00 mm");
+
+  // --- Test 2: Zurück nach oben auf 0.00 mm --------------------------------
+  Serial.println(F("[TEST] moveTo(0.00 mm) – aufwärts"));
+  step.moveTo(0.0f, 5);
+  waitUntilStill(step);
+  printPos(step, "soll ~0.00 mm");
+
+  // --- Test 3: Softlimit OBERES Ende (über 0 hinaus) -----------------------
+  Serial.println(F("[TEST] Softlimit oben: Versuch -5.00 mm (über 0 hinaus)"));
+  step.moveTo(-5.0f, 5);        // ungültig, soll auf 0.00 mm klemmen
+  waitUntilStill(step);
+  printPos(step, "clamp oben, erwartet ~0.00 mm");
+
+  // --- Test 4: Softlimit UNTERES Ende (unter softMin hinaus) ---------------
+  Serial.println(F("[TEST] Softlimit unten: Versuch 1e6 mm (weit unter softMin)"));
+  step.moveTo(1e6f, 5);         // absichtlich zu groß → Clamp auf softMin
+  waitUntilStill(step);
+  printPos(step, "clamp unten, erwartet ~softMin (negativ)");
+
+  // Zurück in sicheren Bereich
+  Serial.println(F("[TEST] zurück in sicheren Bereich: moveTo(10.00 mm)"));
+  step.moveTo(10.0f, 5);
+  waitUntilStill(step);
+  printPos(step, "soll ~10.00 mm");
+
+  Serial.println(F("=== Stepper Selbsttest ENDE ==="));
+}
 
 void setup()
 {
@@ -52,35 +137,38 @@ void setup()
 
   //  Stepper initialisieren
   step.begin();
-  step.setAxisUpDir(-1);
+  // step.setAxisUpDir(-1);
   step.enableDebug(true);            // Debug an
   step.setDebugMoveLogInterval(100); // alle 100 ms Logs
 
   //  Homing beim Start:
-  while (!step.home()) //  Homing beim Start:
-  {
-    step.tick();
-  }
+  while (!step.home()) { step.tick(); }
 
   //  Sensor einschalten und initialisieren
-  if (PIN_XSHUT >= 0)
-  {
+  if (PIN_XSHUT >= 0) {
     pinMode(PIN_XSHUT, OUTPUT);
     digitalWrite(PIN_XSHUT, HIGH);
     delay(3);
   }
   bool ok = tof.begin(Wire, 0x29, PIN_XSHUT);
   Serial.println(ok ? F("[ToF] Init OK") : F("[ToF] Init FAILED"));
-  if (ok)
-  {
+  if (ok) {
     uint8_t model = 0, rev = 0;
-    if (tof.getModelInfo(model, rev))
-    {
+    if (tof.getModelInfo(model, rev)) {
       Serial.print(F("[ToF] Model ID: "));
       Serial.print(model);
       Serial.print(F("  Revision: "));
       Serial.println(rev);
     }
+  }
+
+  // RTC initialisieren
+  if (!rtc.begin(Wire1)) {
+    Serial.println("[RTC] Keine Verbindung zur DS3231 (0x57).");
+  } else {
+    Serial.println("[RTC] Init OK (DS3231 gefunden).");
+    // bool okTime = rtc.writeTimeFromString("18-09-2025 22-30-00");
+    // Serial.printf("[RTC] Setzen: %s\n", okTime ? "OK" : "FEHLER");
   }
 
   // Fan konfigurieren
@@ -93,68 +181,104 @@ void setup()
 
   // Fan initialisieren
   fan.begin(cfg);
-  //  Setze Fan-Geschwindigkeit
   fan.setPercent(50);
 
   // GP8211 initialisieren
-  if (!dac.begin(Wire1))
-  {
+  if (!dac.begin(Wire1)) {
     Serial.println("[GP8211] init FAIL (I2C addr 0x58)");
-    // Weiterlaufen erlaubt, aber keine Ausgabe
-  }
-  else
-  {
+  } else {
     Serial.println("[GP8211] init OK (10V-range set)");
   }
-  // Ausgang auf 2 V / 10%
-  dac.setPercent(10);
+  dac.setPercent(10); // 2 V bei 10 V-Range
 
   // SHT41 initialisieren
   Serial.println(F("[SHT41] Init..."));
-  if (!sht.begin(Wire1, /*softReset=*/true))
-  {
+  if (!sht.begin(Wire1, /*softReset=*/true)) {
     Serial.println(F("[SHT41] Init FAILED (Sensor nicht erreichbar?)"));
-    // Weiterlaufen ist optional; hier brechen wir nicht ab.
-  }
-  else
-  {
+  } else {
     Serial.println(F("[SHT41] Init OK"));
   }
 
-  // Bind hardware to controller
+  // Hardware mit Controller verbinden
   controller.begin(sht, dac, fan);
-  // Set desired growth stage and mode
-  controller.setStage(vpd_calc::GrowthStage::Seedling); // Seedling, Vegetative, Flowering
+  controller.setStage(vpd_calc::GrowthStage::Seedling);
   controller.setMode(DayMode::Day);
-  // Optionally tweak gains
-  controller.setKpFan(20.0f);
-  controller.setKpLed(10.0f);
 
-  Serial.println(F("EnvCtrl demo started"));
+  // Regel-Parameter
+  controller.setKpFan(18.0f);
+  controller.setDeadband(0.06f);
+  controller.setRateLimit(6.0f);
+  controller.setSmoothingAlpha(0.25f);
+  controller.setAdaptiveTest(5.0f, 90000, 7000, 0.08f);
+  controller.setMaxTemperature(30.0f);
+  controller.setOverTempReduction(5.0f);
+  controller.setTempHighFanBoost(31.0f, 15.0f);
+  controller.setHumidityOverride(85.0f, 1.5f, true, 20.0f);
+  controller.setDoorDetection(8.0f, 2.0f, 15000);
+  controller.setModeChangeHold(8000);
+
+  Serial.println(F("EnvCtrl demo startet"));
+
+#if RUN_STEPPER_SELFTEST
+  runStepperSelfTest();
+#endif
+
+  // Falls du ohne Selbsttest direkt fahren willst:
+  // step.moveTo(20.0f, 5);
 }
 
 void loop()
 {
+  step.tick();
 
-  if (controller.update())
-  {
-    Serial.print(F("Temp: "));
-    Serial.print(controller.currentTemp(), 2);
-    Serial.print(F(" C, RH: "));
-    Serial.print(controller.currentRh(), 1);
-    Serial.print(F(" %, VPD: "));
-    Serial.print(controller.currentVpd(), 3);
-    Serial.print(F(" kPa, LED: "));
-    Serial.print(controller.currentLedPercent(), 1);
-    Serial.print(F(" %, Fan: "));
-    Serial.print(controller.currentFanPercent(), 1);
-    Serial.println(F(" %"));
+  static unsigned long lastUpdate = 0;
+  unsigned long now = millis();
+  if (now - lastUpdate >= 1000) {
+    lastUpdate = now;
+    if (controller.update()) {
+      String t = rtc.readTimeString();  // Lese die aktuelle Zeit
+      Serial.print(t);                  // Ausgabe der Zeit
+
+      float tC = NAN, rh = NAN;
+      if (sht.read(tC, rh)) {
+        Serial.print(F(" Temp. "));
+        Serial.print(tC, 1);
+        Serial.print(F(" C, RH: "));
+        Serial.print(rh, 1);
+        Serial.print(F(" %, Taupunkt: "));
+        Serial.print(computeDewPoint(static_cast<double>(tC), static_cast<double>(rh)), 1);
+        Serial.print(F(" C, VPD: "));
+        Serial.print(controller.currentVpd(), 3);
+        Serial.print(F(" kPa, LED: "));
+        Serial.print(controller.currentLedPercent(), 1);
+        Serial.print(F(" %, Fan: "));
+        Serial.print(controller.currentFanPercent(), 1);
+
+        // ToF Entfernung ausgeben
+        int distance = tof.readRawMm(); // Rohwert
+        //int distance = tof.readAvgMm(10); // gemittelt über 10 Samples
+        Serial.print(F(" %, ToF: "));
+        if (distance >= 0) {
+          Serial.print(distance);
+          Serial.print(F(" mm"));
+        } else {
+          Serial.print(F("out of range"));
+        }
+
+        Serial.println();
+      } else {
+        Serial.println(F(" [SHT41] Read FAILED"));
+      }
+    } else {
+      Serial.println(F("Sensor read failed"));
+    }
   }
-  else
-  {
-    Serial.println(F("Sensor read failed"));
-  }
-  delay(2000);
+}
+
+
+  //step.moveTo(20.0f, 2);
+  // step.tick();
+ 
   // static uint32_t tPrev = 0;
   // uint32_t now = millis();
   // if (now - tPrev > 1000)
@@ -209,7 +333,7 @@ void loop()
   //     Serial.printf("[FAN] -> %.1f %%\n", fan.getPercent());
   //   }
   // }
-}
+  // }
 
 // ########################################################
 
