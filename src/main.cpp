@@ -9,7 +9,7 @@
 #include "env_ctrl.h"
 #include "rtc_ctrl.h"
 
-// ===================== Test-Schalter =====================
+// ===================== Test-Stepper =====================
 // Auf true setzen, um den vollständigen Stepper‑Selbsttest in setup() auszuführen
 // #define RUN_STEPPER_SELFTEST true
 
