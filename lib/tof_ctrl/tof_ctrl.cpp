@@ -8,6 +8,9 @@
 // Abfragefunktionen und optionaler XSHUT‑Support.
 
 #include "tof_ctrl.h"
+// LittleFS für Kalibrierungs-Persistenz
+#include <LittleFS.h>
+// #include "tof_calib_config.h" // nicht mehr benötigt
 
 // --- statische Hilfsfunktionen ---
 // Berechnet die Makroperiode (in ns) für die VCSEL‑Periode.
@@ -47,6 +50,8 @@ ToFCtrl::ToFCtrl()
     _maxCm(TOF_MAX_CM), _minCm(TOF_MIN_CM),
     _stopVar(0), _timingBudgetUs(0),
     _offsetMm(0) {}
+
+// (Legacy) Kalibrier-Dateipfad entfernt – es wird nur noch Offset genutzt
 
 // Initialisiert den Sensor. Optional XSHUT-Pin wird vor dem Init aktiviert.
 bool ToFCtrl::begin(TwoWire &wire, uint8_t i2cAddr, int8_t xshutPin) {
@@ -318,9 +323,12 @@ bool ToFCtrl::initSensor(bool longRangeMode) {
   w8(SYSTEM_INTERRUPT_CONFIG_GPIO, 0x04);
   w8(GPIO_HV_MUX_ACTIVE_HIGH, (uint8_t)(r8(GPIO_HV_MUX_ACTIVE_HIGH) & ~0x10));
   w8(SYSTEM_INTERRUPT_CLEAR, 0x01);
-  _timingBudgetUs = getMeasurementTimingBudget();
+  // Default-Messbudget für bessere Genauigkeit im Nahbereich erhöhen
+  // (z. B. 50 ms → weniger Rauschen als Standard)
+  (void)getMeasurementTimingBudget();
+  const uint32_t DefaultBudgetUs = 100000; // 50 ms
   w8(SYSTEM_SEQUENCE_CONFIG, 0xE8);
-  setMeasurementTimingBudget(_timingBudgetUs);
+  setMeasurementTimingBudget(DefaultBudgetUs);
   w8(SYSTEM_SEQUENCE_CONFIG, 0x01);
   if (!performSingleRefCalibration(0x40)) return false;
   w8(SYSTEM_SEQUENCE_CONFIG, 0x02);
@@ -434,16 +442,31 @@ int ToFCtrl::readRawMm() {
 // Durchschnitt mehrerer Messungen (optimiert für Geschwindigkeit)
 int ToFCtrl::readAvgMm(uint8_t samples) {
   if (samples == 0) return readRawMm();
-  long sum = 0;
-  uint8_t okCnt = 0;
-  for (uint8_t i = 0; i < samples; ++i) {
+  // Robustere Mittelung: Trimmed Mean (schneidet Ausreißer ab)
+  const uint8_t N = (samples > 32) ? 32 : samples;
+  int vals[32];
+  uint8_t n = 0;
+  for (uint8_t i = 0; i < N; ++i) {
     int v = readRawMm();
     if (v >= 0) {
-      sum += v;
-      okCnt++;
+      vals[n++] = v;
     }
-    // delayMicroseconds(500); // Optional: sehr kurze Pause, falls nötig
+    delay(2);
   }
-  if (okCnt == 0) return -1;
-  return (int)(sum / okCnt);
+  if (n == 0) return -1;
+  // Sortieren (kleines n)
+  for (uint8_t i = 1; i < n; ++i) {
+    int key = vals[i];
+    int j = i - 1;
+    while (j >= 0 && vals[j] > key) { vals[j+1] = vals[j]; j--; }
+    vals[j+1] = key;
+  }
+  uint8_t trim = (n >= 10) ? (n / 5) : 0; // 20% trim ab n>=10
+  uint8_t start = trim;
+  uint8_t end = (n > trim) ? (uint8_t)(n - trim) : n;
+  if (end <= start) { start = 0; end = n; }
+  long sum = 0; uint8_t cnt = 0;
+  for (uint8_t i = start; i < end; ++i) { sum += vals[i]; cnt++; }
+  if (cnt == 0) return vals[n/2];
+  return (int)((sum + (cnt/2)) / cnt);
 }

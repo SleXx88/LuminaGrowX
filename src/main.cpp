@@ -9,6 +9,8 @@
 #include "env_ctrl.h"
 #include "rtc_ctrl.h"
 
+#include <LittleFS.h>
+
 // ===================== Test-Stepper =====================
 // Auf true setzen, um den vollständigen Stepper‑Selbsttest in setup() auszuführen
 // #define RUN_STEPPER_SELFTEST true
@@ -163,6 +165,43 @@ void setup()
     }
   }
 
+  // LittleFS starten (für Kalibrierdaten)
+  if (!LittleFS.begin(true)) {
+    Serial.println(F("[FS] LittleFS mount/format FAILED"));
+  } else {
+    Serial.println(F("[FS] LittleFS bereit"));
+  }
+
+  // Offset laden oder interaktiv (100 mm) kalibrieren
+  {
+    File f = LittleFS.open("/tof_offset.dat", FILE_READ);
+    if (f) {
+      String s = f.readString();
+      f.close();
+      int val = 0; int n = 0;
+      if (s.length() > 0) n = sscanf(s.c_str(), "%d", &val);
+      if (n == 1) {
+        tof.setOffsetMm((int16_t)val);
+        Serial.printf("[CAL] Offset geladen: %d mm\n", val);
+      }
+    } else {
+      Serial.println(F("[CAL] Kein Offset gefunden – Offset-Kalibrierung jetzt: 50 mm Target halten, dann 'o' senden."));
+      while (!Serial.available()) { delay(5); }
+      while (Serial.available()) { char c = Serial.read(); if (c=='o'||c=='O') break; }
+      int measured = tof.readAvgMm(20);
+      if (measured >= 0) {
+        int target = 50; int off = measured - target; // mm -= off
+        tof.setOffsetMm((int16_t)off);
+        File fw = LittleFS.open("/tof_offset.dat", FILE_WRITE);
+        if (fw) { fw.printf("%d\n", off); fw.close(); }
+        Serial.printf("[CAL] Offset gesetzt: measured=%d target=%d offset=%d mm\n", measured, target, off);
+      } else {
+        Serial.println(F("[CAL] Messung fehlgeschlagen – Offset=0."));
+        tof.setOffsetMm(0);
+      }
+    }
+  }
+
   // RTC initialisieren
   if (!rtc.begin(Wire1)) {
     Serial.println("[RTC] Keine Verbindung zur DS3231 (0x57).");
@@ -273,14 +312,16 @@ void loop()
         Serial.print(controller.currentFanPercent(), 1);
 
         // ToF Entfernung ausgeben
-        int distance = tof.readRawMm(); // Rohwert
-        //int distance = tof.readAvgMm(10); // gemittelt über 10 Samples
+        // Bevorzugt kalibr. Messung (fällt auf Rohwert zurück)
+        int distance = tof.readAvgMm(10);
         Serial.print(F(" % | ToF: "));
         if (distance >= 0) {
           Serial.print(distance);
           Serial.print(F(" mm"));
         } else {
-          Serial.print(F("out of range"));
+          Serial.print(F("out of range - "));
+          Serial.print(distance);
+          Serial.print(F(" mm"));
         }
 
         Serial.println();

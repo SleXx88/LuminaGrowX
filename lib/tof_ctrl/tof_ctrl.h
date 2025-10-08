@@ -95,6 +95,13 @@ public:
   // Optional: liest Modell- und Revisions-ID des Sensors. Liefert false, wenn nicht initialisiert.
   bool getModelInfo(uint8_t &modelId, uint8_t &revisionId);
 
+  // --- Ein-Punkt-Offset-Kalibrierung (additiv) ---
+  // In readRawMm() wird der interne Offset subtrahiert: out_mm = raw_mm - _offsetMm
+  void setOffsetMm(int16_t off_mm) { _offsetMm = off_mm; }
+  int16_t getOffsetMm() const { return _offsetMm; }
+  bool saveOffset();
+  bool loadOffset();
+
 private:
   // --- Helferfunktionen zum Lesen/Schreiben über I²C ---
   uint8_t  r8(uint8_t reg);
@@ -164,4 +171,9 @@ private:
   uint8_t  _stopVar;   // interner Wert aus Sensor-Init
   uint32_t _timingBudgetUs; // gespeichertes Timing-Budget
   int16_t  _offsetMm = 0; // optionaler Offset für Kalibrierung
+
+  // Dateipfad für Offset-Kalibrierung (Definition in .cpp)
+  static const char* kOffsetPath;
+  // (Legacy) Dateipfad für Quadratik-Kalibrierung – deaktiviert
+  // static const char* kCalibPath;
 };
