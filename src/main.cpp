@@ -35,7 +35,8 @@ constexpr uint32_t I2C_FREQ_2 = 400000; // 400 kHz
 constexpr int PIN_XSHUT = 4; // XSHUT‑Pin des VL53L0X (optional)
 
 //  Sensoren und Aktoren initialisieren
-SHT41Ctrl sht;      // Adresse 0x44 (fix)
+SHT41Ctrl sht_in;      // Adresse 0x44 (fix)
+SHT41Ctrl sht_out;  // Adresse 0x44 (fix)
 GP8211Ctrl dac;     // Adresse 0x58 (fix)
 FanCtrl fan;        // Lüftersteuerung
 ToFCtrl tof;        // Time-of-Flight Distanzsensor
@@ -94,10 +95,10 @@ static void runStepperSelfTest() {
   printPos(step, "nach Homing (erwartet ~0.00)");
 
   // --- Test 1: Abwärts auf 20.00 mm ---------------------------------------
-  Serial.println(F("[TEST] moveTo(20.00 mm) – abwärts"));
-  step.moveTo(20.0f, 5);   // Level 2 wie in deinen Logs
-  waitUntilStill(step);
-  printPos(step, "soll ~20.00 mm");
+  // Serial.println(F("[TEST] moveTo(20.00 mm) – abwärts"));
+  // step.moveTo(20.0f, 5);   // Level 2 wie in deinen Logs
+  // waitUntilStill(step);
+  // printPos(step, "soll ~20.00 mm");
 
   // --- Test 2: Zurück nach oben auf 0.00 mm --------------------------------
   Serial.println(F("[TEST] moveTo(0.00 mm) – aufwärts"));
@@ -191,25 +192,34 @@ void setup()
   }
   dac.setPercent(10); // 2 V bei 10 V-Range
 
-  // SHT41 initialisieren
-  Serial.println(F("[SHT41] Init..."));
-  if (!sht.begin(Wire1, /*softReset=*/true)) {
-    Serial.println(F("[SHT41] Init FAILED (Sensor nicht erreichbar?)"));
+  // SHT41 in initialisieren
+  Serial.println(F("[SHT41_in] Init..."));
+  if (!sht_in.begin(Wire1, /*softReset=*/true)) {
+    Serial.println(F("[SHT41_in] Init FAILED (Sensor nicht erreichbar?)"));
   } else {
-    Serial.println(F("[SHT41] Init OK"));
+    Serial.println(F("[SHT41_in] Init OK"));
+  }
+
+  // SHT41 out initialisieren
+  Serial.println(F("[SHT41_out] Init..."));
+  if (!sht_out.begin(Wire, /*softReset=*/true)) {
+    Serial.println(F("[SHT41_out] Init FAILED (Sensor nicht erreichbar?)"));
+  } else {
+    Serial.println(F("[SHT41_out] Init OK"));
   }
 
   // Hardware mit Controller verbinden
-  controller.begin(sht, dac, fan);
-  controller.setStage(vpd_calc::GrowthStage::Seedling);
+  controller.begin(sht_in, sht_out, dac, fan);
+  controller.setStage(vpd_calc::GrowthStage::Vegetative);
   controller.setMode(DayMode::Day);
 
-  // Regel-Parameter
+  // Schlanke Regel-Parameter (Defaults sind brauchbar)
   controller.setKpFan(18.0f);
   controller.setDeadband(0.06f);
   controller.setRateLimit(6.0f);
   controller.setSmoothingAlpha(0.25f);
-  controller.setAdaptiveTest(5.0f, 90000, 7000, 0.08f);
+
+  // Sicherheits-/Robustheits-Parameter
   controller.setMaxTemperature(30.0f);
   controller.setOverTempReduction(5.0f);
   controller.setTempHighFanBoost(31.0f, 15.0f);
@@ -233,31 +243,39 @@ void loop()
 
   static unsigned long lastUpdate = 0;
   unsigned long now = millis();
-  if (now - lastUpdate >= 1000) {
+  if (now - lastUpdate >= 5000) {
     lastUpdate = now;
     if (controller.update()) {
       String t = rtc.readTimeString();  // Lese die aktuelle Zeit
       Serial.print(t);                  // Ausgabe der Zeit
 
-      float tC = NAN, rh = NAN;
-      if (sht.read(tC, rh)) {
-        Serial.print(F(" Temp. "));
-        Serial.print(tC, 1);
+      float tC_in = NAN, tC_out = NAN, rh_in = NAN, rh_out = NAN;
+      if (sht_in.read(tC_in, rh_in) && sht_out.read(tC_out, rh_out)) {
+        // Indoor Werte
+        Serial.print(F(" | [INDOOR] Temp: "));
+        Serial.print(tC_in, 1);
         Serial.print(F(" C, RH: "));
-        Serial.print(rh, 1);
+        Serial.print(rh_in, 1);
         Serial.print(F(" %, Taupunkt: "));
-        Serial.print(computeDewPoint(static_cast<double>(tC), static_cast<double>(rh)), 1);
+        Serial.print(computeDewPoint(static_cast<double>(tC_in), static_cast<double>(rh_in)), 1);
         Serial.print(F(" C, VPD: "));
-        Serial.print(controller.currentVpd(), 3);
-        Serial.print(F(" kPa, LED: "));
+        Serial.print(computeVpd(static_cast<double>(tC_in), static_cast<double>(rh_in)), 3);
+        Serial.print(F(" kPa"));
+
+        // Outdoor Werte
+        Serial.print(F(" | [OUTDOOR] Temp: "));
+        Serial.print(tC_out, 1);
+        Serial.print(F(" C, RH: "));
+        Serial.print(rh_out, 1);
+        Serial.print(F(" % | LED: "));
         Serial.print(controller.currentLedPercent(), 1);
-        Serial.print(F(" %, Fan: "));
+        Serial.print(F(" % | Fan: "));
         Serial.print(controller.currentFanPercent(), 1);
 
         // ToF Entfernung ausgeben
         int distance = tof.readRawMm(); // Rohwert
         //int distance = tof.readAvgMm(10); // gemittelt über 10 Samples
-        Serial.print(F(" %, ToF: "));
+        Serial.print(F(" % | ToF: "));
         if (distance >= 0) {
           Serial.print(distance);
           Serial.print(F(" mm"));
@@ -286,13 +304,13 @@ void loop()
   //   tPrev = now;
   //   Serial.printf("[FAN] %5.1f %%\n", fan.getPercent());
 
-  //   float tC = NAN, rh = NAN;
-  //   if (sht.read(tC, rh))
+  //   float tC_in = NAN, rh_in = NAN;
+  //   if (sht_in.read(tC_in, rh_in))
   //   {
   //     Serial.print(F("[SHT41] T="));
-  //     Serial.print(tC, 2);
+  //     Serial.print(tC_in, 2);
   //     Serial.print(F(" °C  RH="));
-  //     Serial.print(rh, 2);
+  //     Serial.print(rh_in, 2);
   //     Serial.println(F(" %"));
   //   }
   //   else
@@ -301,18 +319,18 @@ void loop()
   //   }
 
   //   // Berechne VPD
-  //   double vpd = computeVpd(static_cast<double>(tC), static_cast<double>(rh));
+  //   double vpd = computeVpd(static_cast<double>(tC_in), static_cast<double>(rh_in));
   //   // Klassifiziere VPD
   //   const char* status = classifyVpd(vpd, CURRENT_STAGE);
 
   //   // Berechne den Taupunkt zur Information
-  //   double dewPoint = computeDewPoint(static_cast<double>(tC), static_cast<double>(rh));
+  //   double dewPoint = computeDewPoint(static_cast<double>(tC_in), static_cast<double>(rh_in));
 
   //   // Ausgabe der Ergebnisse
   //   Serial.print("Temp: ");
-  //   Serial.print(tC);
+  //   Serial.print(tC_in);
   //   Serial.print(" °C, Luftfeuchtigkeit: ");
-  //   Serial.print(rh);
+  //   Serial.print(rh_in);
   //   Serial.print(" %, VPD: ");
   //   Serial.print(vpd, 3);
   //   Serial.print(" kPa, Status: ");

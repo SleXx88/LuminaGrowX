@@ -12,30 +12,38 @@ using vpd_calc::computeDewPoint;
 static inline float midpoint(float a, float b) { return (a + b) * 0.5f; }
 
 EnvCtrl::EnvCtrl() {
-  // Sinnvolle Defaults (können später via Setter überschrieben werden)
-  // Indizes: [Seedling=0, Vegetative=1, Flowering=2][Day=0, Night=1, NightSilent=2]
+  // ------------------------------------------------------------
+  // Defaultwerte für jede Pflanzenphase (Seedling, Vegetative, Flowering)
+  // und Tagesmodus (Day, Night, NightSilent)
+  //
+  // { LED%, FanMin%, FanMax%, VPDmin[kPa], VPDmax[kPa] }
+  // ------------------------------------------------------------
 
-  // Seedling
+  // SEEDLING – hohe Feuchte, wenig Licht
   settings_[0][0] = { 40.0f, 20.0f, 80.0f, 0.40f, 0.80f }; // Day
   settings_[0][1] = {  0.0f, 20.0f, 60.0f, 0.40f, 0.80f }; // Night
   settings_[0][2] = {  0.0f, 10.0f, 40.0f, 0.40f, 0.80f }; // NightSilent
 
-  // Vegetative
-  settings_[1][0] = { 65.0f, 20.0f, 100.0f, 0.80f, 1.20f };
-  settings_[1][1] = {  0.0f, 20.0f,  60.0f, 0.80f, 1.20f };
-  settings_[1][2] = {  0.0f, 10.0f,  40.0f, 0.80f, 1.20f };
+  // VEGETATIVE – stärkeres Wachstum, mehr Licht, trockener
+  settings_[1][0] = { 65.0f, 20.0f, 100.0f, 0.80f, 1.20f }; // Day
+  settings_[1][1] = {  0.0f, 20.0f,  60.0f, 0.80f, 1.20f }; // Night
+  settings_[1][2] = {  0.0f, 10.0f,  40.0f, 0.80f, 1.20f }; // NightSilent
 
-  // Flowering
-  settings_[2][0] = { 90.0f, 30.0f, 100.0f, 1.20f, 1.60f };
-  settings_[2][1] = {  0.0f, 20.0f,  70.0f, 1.20f, 1.60f };
-  settings_[2][2] = {  0.0f, 10.0f,  50.0f, 1.20f, 1.60f };
+  // FLOWERING – maximale Lichtleistung, trockene Luft gegen Schimmel
+  settings_[2][0] = { 90.0f, 30.0f, 100.0f, 1.20f, 1.60f }; // Day
+  settings_[2][1] = {  0.0f, 20.0f,  70.0f, 1.20f, 1.60f }; // Night
+  settings_[2][2] = {  0.0f, 10.0f,  50.0f, 1.20f, 1.60f }; // NightSilent
 }
 
-void EnvCtrl::begin(SHT41Ctrl& sensor, GP8211Ctrl& led, FanCtrl& fan) {
-  sensor_ = &sensor;
-  led_    = &led;
-  fan_    = &fan;
-  lastMs_ = millis();
+void EnvCtrl::begin(SHT41Ctrl& sensorIndoor,
+                    SHT41Ctrl& sensorOutdoor,
+                    GP8211Ctrl& led,
+                    FanCtrl& fan) {
+  sensorIn_  = &sensorIndoor;
+  sensorOut_ = &sensorOutdoor;
+  led_       = &led;
+  fan_       = &fan;
+  lastMs_    = millis();
   lastFanOut_ = fanOut_ = settings_[idxStage(stage_)][idxMode(mode_)].fanMin;
   // LED sofort auf den Basiswert setzen
   ledOut_ = settings_[idxStage(stage_)][idxMode(mode_)].ledPercent;
@@ -68,14 +76,6 @@ void EnvCtrl::setDeadband(float vpd_kPa)         { deadband_ = fabs(vpd_kPa); }
 void EnvCtrl::setRateLimit(float pct_per_s)      { rateLimitPctPerS_ = fabs(pct_per_s); }
 void EnvCtrl::setSmoothingAlpha(float alpha)     { emaAlpha_ = clamp(alpha, 0.0f, 1.0f); }
 
-void EnvCtrl::setAdaptiveTest(float step_percent, uint32_t interval_ms,
-                              uint32_t duration_ms, float min_error_kPa) {
-  testStepPct_     = fabs(step_percent);
-  testIntervalMs_  = interval_ms;
-  testDurationMs_  = duration_ms;
-  minErrorForTest_ = fabs(min_error_kPa);
-}
-
 void EnvCtrl::setMaxTemperature(float tC)        { maxTemp_ = tC; }
 void EnvCtrl::setOverTempReduction(float pct)    { ledReducePct_ = fabs(pct); }
 void EnvCtrl::setTempHighFanBoost(float tC, float boost) { tempHighFanC_ = tC; tempHighFanBoost_ = fabs(boost); }
@@ -106,75 +106,52 @@ float EnvCtrl::limitRate(float tgt, float last, float dt_s) const {
 }
 
 void EnvCtrl::detectDoorOrTransient(float t_now, float rh_now, uint32_t now_ms) {
-  if (!isnan(prevTemp_) && !isnan(prevRh_)) {
-    const float dT  = fabs(t_now - prevTemp_);
-    const float dRh = fabs(rh_now - prevRh_);
+  if (!isnan(prevTIn_) && !isnan(prevRhIn_)) {
+    const float dT  = fabs(t_now - prevTIn_);
+    const float dRh = fabs(rh_now - prevRhIn_);
     if (dT >= doorDeltaT_ || dRh >= doorDeltaRh_) {
       // Tür geöffnet / starker Transient → kurze Haltezeit
       holdUntilMs_ = max(holdUntilMs_, now_ms + doorHoldMs_);
     }
   }
-  prevTemp_ = t_now;
-  prevRh_   = rh_now;
+  prevTIn_ = t_now;
+  prevRhIn_   = rh_now;
 }
 
-void EnvCtrl::maybeStartTest(float error_kPa, uint32_t now_ms) {
-  if (!adaptive_) return;
-  if (testActive_) return;
-  if (fabs(error_kPa) < minErrorForTest_) return;
-  if (now_ms - lastTestMs_ < testIntervalMs_) return;
-
-  // Test starten: kleinen Fan-Step nach oben (innerhalb Grenzen)
-  PhaseModeSettings& ps = cur();
-  testFanSaved_ = fanOut_;
-  const float stepTarget = clamp(fanOut_ + testStepPct_, ps.fanMin, ps.fanMax);
-  if (fabs(stepTarget - fanOut_) < 0.5f) return; // zu klein, lohnt nicht
-
-  fanOut_ = stepTarget;
-  if (fan_) fan_->setPercent(fanOut_);
-
-  testVpdStart_ = vpdFilt_;
-  testActive_   = true;
-  lastTestMs_   = now_ms;
-}
-
-void EnvCtrl::maybeFinishTest(uint32_t now_ms) {
-  if (!testActive_) return;
-  if (now_ms - lastTestMs_ < testDurationMs_) return;
-
-  // Delta-VPD auswerten
-  const double dv = vpdFilt_ - testVpdStart_;
-  if (fabs(dv) > 0.01) { // ausreichend Signal
-    // dv > 0: Fan-Step hat VPD erhöht → dVPD/dFan > 0 → fanSign_ = +1
-    // dv < 0: Fan-Step hat VPD gesenkt → dVPD/dFan < 0 → fanSign_ = -1
-    fanSign_ = (dv > 0.0) ? +1 : -1;
-  }
-  // Fan zurück auf alten Wert
-  fanOut_    = testFanSaved_;
-  if (fan_) fan_->setPercent(fanOut_);
-  testActive_ = false;
+// Vorzeichen aus Taupunktdifferenz bestimmen (Proxy für absolute Feuchte)
+void EnvCtrl::updateFanSignFromDewpoints() {
+  // dpOut << dpIn  => außen trockener => Fan↑ trocknet => VPD↑ => fanSign = +1
+  // dpOut >> dpIn  => außen feuchter  => Fan↑ befeuchtet => VPD↓ => fanSign = -1
+  if (isnan(dpIn_) || isnan(dpOut_)) return;
+  const double gap = dpOut_ - dpIn_;
+  // Hysterese: erst ab ±0.5 °C umschalten
+  if (gap > 0.5)      fanSign_ = -1;
+  else if (gap < -0.5) fanSign_ = +1;
+  // in der Nähe von 0: Sign beibehalten
 }
 
 bool EnvCtrl::update() {
-  if (!sensor_ || !fan_ || !led_) return false;
+  if (!sensorIn_ || !sensorOut_ || !fan_ || !led_) return false;
 
   const uint32_t now = millis();
   const float dt_s = (lastMs_ == 0) ? 0.0f : (float)(now - lastMs_) / 1000.0f;
   lastMs_ = now;
 
-  // 1) Sensor lesen
-  float tC, rh;
-  if (!sensor_->read(tC, rh)) return false;
-  temp_ = (double)tC;
-  rh_   = (double)rh;
+  // 1) Sensoren lesen
+  float tC_in, rh_in, tC_out, rh_out;
+  if (!sensorIn_->read(tC_in, rh_in)) return false;
+  if (!sensorOut_->read(tC_out, rh_out)) return false;
+  tIn_ = tC_in; rhIn_ = rh_in;
+  tOut_ = tC_out; rhOut_ = rh_out;
 
-  // 2) VPD & Taupunkt berechnen und glätten
-  vpd_ = computeVpd(temp_, rh_);
-  if (lastMs_ == now) { /* nichts */ }
-  vpdFilt_ = emaAlpha_ * vpd_ + (1.0 - emaAlpha_) * vpdFilt_;
+  // 2) VPD (innen) & Taupunkte berechnen
+  vpdIn_ = computeVpd(tIn_, rhIn_);
+  dpIn_  = computeDewPoint(tIn_, rhIn_);
+  dpOut_ = computeDewPoint(tOut_, rhOut_);
+  vpdFilt_ = emaAlpha_ * vpdIn_ + (1.0 - emaAlpha_) * vpdFilt_;
 
-  // 3) Transienten erkennen (Tür, Stoßlüften, etc.)
-  detectDoorOrTransient(tC, rh, now);
+  // 3) Transienten erkennen (Tür, Stoßlüften, etc.) nur auf INDOOR
+  detectDoorOrTransient(tIn_, rhIn_, now);
 
   // 4) Basiswerte laden
   PhaseModeSettings& ps = cur();
@@ -183,11 +160,10 @@ bool EnvCtrl::update() {
   float ledTarget       = ps.ledPercent;
 
   // 5) LED Übertemperatur-Reduktion
-  if (temp_ > maxTemp_) {
+  if (tIn_ > maxTemp_) {
     ledTarget = clamp01(ledTarget - ledReducePct_);
   }
   if (led_) {
-    // LED nur aktualisieren, wenn sich der Zielwert sichtbar ändert
     if (fabs(ledTarget - ledOut_) >= 0.5f) {
       ledOut_ = ledTarget;
       led_->setPercent(ledOut_);
@@ -198,11 +174,10 @@ bool EnvCtrl::update() {
 
   // 6) Overrides (Feuchte/Taupunkt/Temperatur) – höchste Priorität
   bool overrideActive = false;
-  const double dp = computeDewPoint(temp_, rh_); // Taupunkt
-  const double dewGap = temp_ - dp;
+  const double dewGapIn = tIn_ - dpIn_; // Abstand zu Taupunkt innen
 
   float fanCmd = baseFan;
-  if (rh_ >= rhHighThr_ || dewGap <= dewGapMinC_) {
+  if (rhIn_ >= rhHighThr_ || dewGapIn <= dewGapMinC_) {
     // Feuchte-Override: Lüfter deutlich anheben
     float maxLimit = ps.fanMax;
     if (mode_ == DayMode::NightSilent && allowSilentOv_) {
@@ -211,29 +186,26 @@ bool EnvCtrl::update() {
     fanCmd = clamp(fmaxf(ps.fanMin + humidBoost_, fanOut_), ps.fanMin, maxLimit);
     overrideActive = true;
   }
-  if (!overrideActive && temp_ >= tempHighFanC_) {
+  if (!overrideActive && tIn_ >= tempHighFanC_) {
     fanCmd = clamp(fmaxf(ps.fanMin + tempHighFanBoost_, fanOut_), ps.fanMin, ps.fanMax);
     overrideActive = true;
   }
 
   // 7) Haltezeiten (Tür/Modus) – mittlere Priorität
   if (!overrideActive && now < holdUntilMs_) {
-    // während Hold nicht aggressiv regeln → moderater Wert
     fanCmd = clamp(baseFan, ps.fanMin, ps.fanMax);
   }
 
   // 8) Proportionale Regelung nur wenn keine Overrides/Hold aktiv
   if (!overrideActive && now >= holdUntilMs_) {
+    // Polarity aus Taupunkten (Außen/Innen) ableiten
+    updateFanSignFromDewpoints();
+
     const float error = (float)vpdFilt_ - vpdTarget;
-    // Deadband
     float e = 0.0f;
     if      (error >  deadband_) e = error - deadband_;
     else if (error < -deadband_) e = error + deadband_;
     else e = 0.0f;
-
-    // Adaptive Polarity Test verwalten
-    maybeFinishTest(now);
-    maybeStartTest(e, now);
 
     // Stellwert berechnen: Δfan = -(sign)*Kp*e
     fanCmd = baseFan - (float)fanSign_ * kpFan_ * e;

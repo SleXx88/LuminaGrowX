@@ -163,4 +163,5 @@ private:
   uint16_t _minCm;     // minimale Messdistanz in cm
   uint8_t  _stopVar;   // interner Wert aus Sensor-Init
   uint32_t _timingBudgetUs; // gespeichertes Timing-Budget
+  int16_t  _offsetMm = 0; // optionaler Offset für Kalibrierung
 };

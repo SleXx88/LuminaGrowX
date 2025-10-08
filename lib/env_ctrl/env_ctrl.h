@@ -1,29 +1,22 @@
 /*
- * env_ctrl.h
+ * env_ctrl.h | env → Environment (Umgebung)
  *
- * Zweck
- * -----
- * Diese Library steuert die Umweltbedingungen einer kompakten Growbox (ESP32).
- * Regelgröße ist der VPD (Vapor Pressure Deficit) im Innenraum, gemessen über
- * Temperatur und rel. Feuchte (SHT41). Geregelt wird ausschließlich der LÜFTER.
- * Die LED hat pro Phase/Modus einen festen Wert und wird nur bei Übertemperatur
- * temporär etwas abgesenkt.
+ * Ziel
+ * ----
+ * Regelung des VPD (nur über Lüfter) mit **zwei SHT41**:
+ *  - INDOOR: Temperatur/Feuchte in der Box (Regelgröße)
+ *  - OUTDOOR: Temperatur/Feuchte außerhalb (bestimmt Lüfter-Wirkungsrichtung)
  *
- * Praxis-Tücken & Robustheit
- * --------------------------
- * - Außenluft kann mal trockener, mal feuchter sein → Wirkung „mehr Lüften“
- *   auf den VPD ist NICHT immer gleich. Daher: *Adaptive Polarity*.
- * - Plötzliche Änderungen (Tür öffnen, Tag/Nacht-Umschaltung) → Transienten.
- *   Daher: Haltezeiten (Hold), sanfte Rampen & Rate-Limiter.
- * - Schimmel-/Kondensationsgefahr → Feuchte-/Taupunkt-Override hebt Lüfter
- *   kurzzeitig an (auch in Silent).
+ * LED ist pro Phase/Modus fix und wird nur bei Übertemperatur leicht reduziert.
+ * Vergleich von **Taupunkten** (bzw. absoluter Feuchte) innen/außen bestimmt:
+ *   - Taupunkt_out  << Taupunkt_in  → Außenluft trockener  → Fan↑ macht VPD↑
+ *   - Taupunkt_out  >> Taupunkt_in  → Außenluft feuchter   → Fan↑ macht VPD↓
  *
- * Einbindung
- * ----------
- *  SHT41Ctrl  liest T/RH   → vpd_calc::computeVpd()/dewPoint() rechnen VPD/Taupunkt
- *  GP8211Ctrl setzt LED %   → fester LED-Basiswert je Phase/Modus (+ Übertemp-Reduktion)
- *  FanCtrl    setzt Lüfter% → Proportionalregelung auf VPD + Rate-Limit + Overrides
- *
+ * Robustheit:
+ *  - Deadband um den Soll-VPD
+ *  - Rate-Limiter für sanfte Stelländerung
+ *  - Tür-/Transienten-Hold (Vermeidung von Eskalation bei plötzlichen Sprüngen)
+ *  - Feuchte-/Taupunkt-Override und Temperatur-Override
  */
 
 #pragma once
@@ -53,7 +46,10 @@ public:
   EnvCtrl();
 
   // Hardware binden (Objekte müssen extern bereits initialisiert sein)
-  void begin(SHT41Ctrl& sensor, GP8211Ctrl& led, FanCtrl& fan);
+  void begin(SHT41Ctrl& sensorIndoor,
+             SHT41Ctrl& sensorOutdoor,
+             GP8211Ctrl& led,
+             FanCtrl& fan);
 
   // Phase/Modus setzen
   void setStage(vpd_calc::GrowthStage stage);
@@ -64,19 +60,15 @@ public:
                             float ledPercent, float fanMin, float fanMax,
                             float vpdMin, float vpdMax);
 
-  // Stellgrößen- und Robustheits-Parameter
+  // --- schlanke Regel-Parameter ---
   void setKpFan(float kp);                        // Proportionalfaktor Lüfter
   void setDeadband(float vpd_kPa);                // Totband um Soll (kPa)
   void setRateLimit(float pct_per_s);             // max. % Änderung pro Sekunde
   void setSmoothingAlpha(float alpha);            // 0..1, EMA für VPD
 
-  // Adaptive Polarity (Fan↑ → VPD↑ oder ↓ automatisch ermitteln)
-  void setAdaptiveTest(float step_percent, uint32_t interval_ms,
-                       uint32_t duration_ms, float min_error_kPa);
-
   // Temperatur-Überwachung (LED/ Lüfter-Schutz)
   void setMaxTemperature(float tempC);            // LED ab hier reduzieren
-  void setOverTempReduction(float pct_points);    // um wieviel %-Punkte LED runter
+  void setOverTempReduction(float pct_points);    // %-Punkte LED runter
   void setTempHighFanBoost(float tempC, float boostPercent);
 
   // Feuchte-/Taupunkt-Override
@@ -93,21 +85,26 @@ public:
   bool update();
 
   // Zustände abfragen
-  double currentVpd()  const { return vpd_; }
-  double currentTemp() const { return temp_; }
-  double currentRh()   const { return rh_; }
+  double currentVpd()  const { return vpdIn_; }
+  double currentTemp() const { return tIn_; }
+  double currentRh()   const { return rhIn_; }
   double currentVpdFiltered() const { return vpdFilt_; }
 
   float  currentLedPercent() const { return ledOut_; }
   float  currentFanPercent() const { return fanOut_; }
 
-  // Debug/Status
-  int8_t learnedFanPolarity() const { return fanSign_; } // +1: Fan↑→VPD↑, -1: Fan↑→VPD↓
+  // Außenwerte
+  double currentTempOut() const { return tOut_; }
+  double currentRhOut()   const { return rhOut_; }
+
+  // Abgeleitete Werte
+  double dewPointIn()  const { return dpIn_; }
+  double dewPointOut() const { return dpOut_; }
+  int8_t fanVpdSign()  const { return fanSign_; } // +1: Fan↑→VPD↑, -1: Fan↑→VPD↓
+
   bool   isHoldActive() const { return millis() < holdUntilMs_; }
-  bool   isTestActive() const { return testActive_; }
 
 private:
-  // Indizes für Arrays
   static int idxStage(vpd_calc::GrowthStage s) {
     switch (s) {
       case vpd_calc::GrowthStage::Seedling:   return 0;
@@ -137,9 +134,8 @@ private:
   // Intern: Tür-/Transienten-Erkennung
   void detectDoorOrTransient(float t_now, float rh_now, uint32_t now_ms);
 
-  // Intern: Adaptive Polarity Test
-  void maybeStartTest(float error_kPa, uint32_t now_ms);
-  void maybeFinishTest(uint32_t now_ms);
+  // Intern: Polarity aus Taupunkten ableiten
+  void updateFanSignFromDewpoints();
 
 private:
   // Phase/Modus
@@ -149,24 +145,11 @@ private:
   // Tabellen mit Defaultwerten [3][3]
   PhaseModeSettings settings_[3][3];
 
-  // Regelparameter
-  float kpFan_              = 20.0f;
-  float deadband_           = 0.05f;     // kPa
-  float rateLimitPctPerS_   = 5.0f;      // % pro Sekunde
+  // Regelparameter (schlank gehalten)
+  float kpFan_              = 18.0f;
+  float deadband_           = 0.06f;     // kPa
+  float rateLimitPctPerS_   = 6.0f;      // % pro Sekunde
   float emaAlpha_           = 0.25f;     // Glättung VPD
-
-  // Adaptive Polarity
-  bool     adaptive_        = true;
-  float    testStepPct_     = 5.0f;
-  uint32_t testIntervalMs_  = 90000;
-  uint32_t testDurationMs_  = 7000;
-  float    minErrorForTest_ = 0.08f;
-  uint32_t lastTestMs_      = 0;
-  bool     testActive_      = false;
-  float    testFanSaved_    = 0.0f;
-  double   testVpdStart_    = 0.0;
-  int8_t   fanSign_         = +1; // Start-Annahme: Fan↑ → VPD↑ (trocken)
-  float    fanSignBlend_    = 1.0f; // für spätere Glättung (optional)
 
   // Temperaturgrenzen / LED-Schutz / Lüfter-Boost
   float maxTemp_            = 30.0f;
@@ -187,13 +170,17 @@ private:
   uint32_t modeHoldMs_      = 8000;
 
   // Zustände / Messwerte
-  SHT41Ctrl*  sensor_   = nullptr;
-  GP8211Ctrl* led_      = nullptr;
-  FanCtrl*    fan_      = nullptr;
+  SHT41Ctrl*  sensorIn_  = nullptr;
+  SHT41Ctrl*  sensorOut_ = nullptr;
+  GP8211Ctrl* led_       = nullptr;
+  FanCtrl*    fan_       = nullptr;
 
-  double temp_ = 0.0, rh_ = 0.0, vpd_ = 0.0;
-  double vpdFilt_ = 0.0, prevTemp_ = NAN, prevRh_ = NAN;
+  double tIn_ = NAN, rhIn_ = NAN, vpdIn_ = NAN, dpIn_ = NAN;
+  double tOut_ = NAN, rhOut_ = NAN, dpOut_ = NAN;
+  double vpdFilt_ = 0.0, prevTIn_ = NAN, prevRhIn_ = NAN;
+
   float  ledOut_ = 0.0f, fanOut_ = 0.0f, lastFanOut_ = 0.0f;
+  int8_t fanSign_ = +1; // +1: Fan↑→VPD↑ (trockener); -1: Fan↑→VPD↓ (feuchter)
 
   // Zeitverwaltung
   uint32_t lastMs_ = 0;

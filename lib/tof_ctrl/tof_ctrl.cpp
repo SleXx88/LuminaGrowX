@@ -45,7 +45,8 @@ static const uint8_t DefTuning[] PROGMEM = {
 ToFCtrl::ToFCtrl()
   : _w(&Wire), _addr(0x29), _xshut(-1), _ok(false),
     _maxCm(TOF_MAX_CM), _minCm(TOF_MIN_CM),
-    _stopVar(0), _timingBudgetUs(0) {}
+    _stopVar(0), _timingBudgetUs(0),
+    _offsetMm(0) {}
 
 // Initialisiert den Sensor. Optional XSHUT-Pin wird vor dem Init aktiviert.
 bool ToFCtrl::begin(TwoWire &wire, uint8_t i2cAddr, int8_t xshutPin) {
@@ -413,6 +414,9 @@ int ToFCtrl::readRawMm() {
   }
   int mm = readRangeContinuousMillimeters();
   if (mm < 0) return -1;
+
+  // Software-Offset
+  mm -= _offsetMm;
 
   // Prüfen auf Unterschreitung der minimalen Messdistanz. _minCm == 0 deaktiviert die Prüfung.
   if (_minCm > 0) {
