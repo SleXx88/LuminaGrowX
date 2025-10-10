@@ -1,3 +1,6 @@
+// ==============================
+// File: include/env_ctrl.h
+// ==============================
 /*
  * env_ctrl.h | env → Environment (Umgebung)
  *
@@ -15,8 +18,10 @@
  * Robustheit:
  *  - Deadband um den Soll-VPD
  *  - Rate-Limiter für sanfte Stelländerung
- *  - Tür-/Transienten-Hold (Vermeidung von Eskalation bei plötzlichen Sprüngen)
+ *  - Tür-/Transienten-Hold (Vermeidung von Eskalation bei Sprüngen)
  *  - Feuchte-/Taupunkt-Override und Temperatur-Override
+ *  - (NEU) PI-Regler mit kleinem Integrator + Anti-Windup
+ *  - (NEU) Block „außen feuchter ⇒ Lüfter aus“ (Taupunkt-Hysterese)
  */
 
 #pragma once
@@ -62,6 +67,7 @@ public:
 
   // --- schlanke Regel-Parameter ---
   void setKpFan(float kp);                        // Proportionalfaktor Lüfter
+  void setKiFan(float ki) { kiFan_ = fabsf(ki); } // (%/s)/kPa – sehr klein
   void setDeadband(float vpd_kPa);                // Totband um Soll (kPa)
   void setRateLimit(float pct_per_s);             // max. % Änderung pro Sekunde
   void setSmoothingAlpha(float alpha);            // 0..1, EMA für VPD
@@ -80,6 +86,14 @@ public:
 
   // Haltezeit nach Moduswechsel
   void setModeChangeHold(uint32_t hold_ms);
+
+  // (NEU) Außen feuchter ⇒ Lüfter blockieren
+  void setOutsideHumidBlock(bool enable, float hysteresisC = 0.5f) {
+    blockOutsideHumid_ = enable; dpHumidHyst_ = hysteresisC;
+  }
+
+  // Optional: zentrale Konfig aus lumina_config anwenden
+  void applyLuminaConfig();
 
   // Zyklisch aufrufen; gibt false zurück, wenn Sensorlesung fehlschlägt
   bool update();
@@ -145,11 +159,12 @@ private:
   // Tabellen mit Defaultwerten [3][3]
   PhaseModeSettings settings_[3][3];
 
-  // Regelparameter (schlank gehalten)
+  // Regelparameter
   float kpFan_              = 18.0f;
-  float deadband_           = 0.06f;     // kPa
-  float rateLimitPctPerS_   = 6.0f;      // % pro Sekunde
-  float emaAlpha_           = 0.25f;     // Glättung VPD
+  float kiFan_              = 0.015f;   // (%/s)/kPa – sehr klein!
+  float deadband_           = 0.06f;    // kPa
+  float rateLimitPctPerS_   = 6.0f;     // % pro Sekunde
+  float emaAlpha_           = 0.25f;    // Glättung VPD
 
   // Temperaturgrenzen / LED-Schutz / Lüfter-Boost
   float maxTemp_            = 30.0f;
@@ -162,6 +177,10 @@ private:
   float dewGapMinC_         = 1.5f;
   bool  allowSilentOv_      = true;
   float humidBoost_         = 20.0f;  // %-Punkte oberhalb fanMin
+
+  // (NEU) Block: außen feuchter ⇒ Lüfter aus
+  bool  blockOutsideHumid_  = true;
+  float dpHumidHyst_        = 0.5f;   // °C Hysterese
 
   // Tür-/Transientenerkennung
   float doorDeltaRh_        = 8.0f;   // %RH Sprung
@@ -182,8 +201,9 @@ private:
   float  ledOut_ = 0.0f, fanOut_ = 0.0f, lastFanOut_ = 0.0f;
   int8_t fanSign_ = +1; // +1: Fan↑→VPD↑ (trockener); -1: Fan↑→VPD↓ (feuchter)
 
-  // Zeitverwaltung
-  uint32_t lastMs_ = 0;
+  // PI-Zustand & Zeitverwaltung
+  float    iTermFan_  = 0.0f;  // %-Punkte, auf BaseFan addiert
+  uint32_t lastMs_    = 0;
   uint32_t holdUntilMs_ = 0;
 };
 

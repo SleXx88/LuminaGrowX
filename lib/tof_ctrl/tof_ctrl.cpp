@@ -10,6 +10,9 @@
 #include "tof_ctrl.h"
 // LittleFS für Kalibrierungs-Persistenz
 #include <LittleFS.h>
+
+// Persistenzpfad f�r Offset-Kalibrierung
+const char* ToFCtrl::kOffsetPath = "/tof_offset.dat";
 // #include "tof_calib_config.h" // nicht mehr benötigt
 
 // --- statische Hilfsfunktionen ---
@@ -470,3 +473,5 @@ int ToFCtrl::readAvgMm(uint8_t samples) {
   if (cnt == 0) return vals[n/2];
   return (int)((sum + (cnt/2)) / cnt);
 }
+
+
