@@ -8,13 +8,13 @@
 #include "stepper_ctrl.h"
 #include "tof_ctrl.h"
 #include "vpd_calc.h"
-#include "env_ctrl.h"
+#include "plant_ctrl.h"
 #include "rtc_ctrl.h"
 #include "lumina_config.h"
 #include <LittleFS.h>
 
 using namespace vpd_calc;
-using namespace env_ctrl;
+using namespace plant_ctrl;
 
 static GrowthStage CURRENT_STAGE = GrowthStage::Flowering;
 
@@ -48,7 +48,7 @@ static StepperPins makeStepPins() {
   return p;
 }
 static StepperCtrl step(makeStepPins());
-EnvCtrl controller;
+PlantCtrl controller;
 RTC_Ctrl rtc;
 
 static inline bool approxEq(float a, float b, float eps = 0.02f) {
@@ -192,13 +192,16 @@ void setup()
     }
   }
 
-  // Controller verbinden und konfigurieren
-  controller.begin(sht_in, sht_out, dac, fan);
+  // Controller verbinden und konfigurieren (inkl. Stepper/ToF/RTC/Tuer)
+  controller.begin(sht_in, sht_out, dac, fan, step, tof, &rtc, lumina::plant::DOOR_SWITCH_PIN);
   controller.setStage(vpd_calc::GrowthStage::Flowering);
   controller.setMode(DayMode::Day);
   controller.applyLuminaConfig();
 
-  Serial.println(F("EnvCtrl demo startet"));
+  // Nach Homing: blockierende Annäherung an Mindestabstand
+  controller.runStartupApproachBlocking();
+
+  Serial.println(F("PlantCtrl demo startet"));
 }
 
 void loop()

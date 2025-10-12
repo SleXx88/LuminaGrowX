@@ -1,0 +1,235 @@
+// ==============================
+// File: lib/plant_ctrl/plant_ctrl.h
+// ==============================
+/*
+ * plant_ctrl.h | Pflanzensteuerung (Umgebung + Abstand)
+ *
+ * Ziele
+ * - Beibehalten der bisherigen VPD-Steuerung (LED/Lüfter) aus env_ctrl
+ * - Hinzufügen der LED-zu-Pflanze-Abstandsregelung mit ToF + Steppermotor
+ * - Tür-/Zeitplan-Logik für sichere Absenkungen
+ */
+
+#pragma once
+
+#include <Arduino.h>
+#include "sht41_ctrl.h"
+#include "gp8211_ctrl.h"
+#include "fan_ctrl.h"
+#include "vpd_calc.h"
+#include "stepper_ctrl.h"
+#include "tof_ctrl.h"
+#include "rtc_ctrl.h"
+
+namespace plant_ctrl {
+
+// Tagesmodi
+enum class DayMode : uint8_t { Day=0, Night=1, NightSilent=2 };
+
+// Konfiguration pro Phase & Modus
+struct PhaseModeSettings {
+  float ledPercent;   // fester LED-Prozentwert (0..100)
+  float fanMin;       // Lüfter Mindestprozentsatz
+  float fanMax;       // Lüfter Höchstprozentsatz
+  float vpdMin;       // VPD-Zielbereich untere Grenze (kPa)
+  float vpdMax;       // VPD-Zielbereich obere Grenze (kPa)
+};
+
+class PlantCtrl {
+public:
+  PlantCtrl();
+
+  // Hardware binden (Objekte müssen extern initialisiert werden)
+  void begin(SHT41Ctrl& sensorIndoor,
+             SHT41Ctrl& sensorOutdoor,
+             GP8211Ctrl& led,
+             FanCtrl& fan,
+             StepperCtrl& stepper,
+             ToFCtrl& tof,
+             RTC_Ctrl* rtc = nullptr,
+             int doorPin = -1);
+
+  // Phase/Modus
+  void setStage(vpd_calc::GrowthStage stage);
+  void setMode(DayMode mode);
+
+  // Überschreiben pro Phase/Modus
+  void setStageModeSettings(vpd_calc::GrowthStage st, DayMode md,
+                            float ledPercent, float fanMin, float fanMax,
+                            float vpdMin, float vpdMax);
+
+  // Regelungsparameter
+  void setKpFan(float kp);
+  void setKiFan(float ki) { kiFan_ = fabsf(ki); } // (%/s)/kPa
+  void setDeadband(float vpd_kPa);
+  void setRateLimit(float pct_per_s);
+  void setSmoothingAlpha(float alpha);
+
+  // Temperaturschutz
+  void setMaxTemperature(float tempC);
+  void setOverTempReduction(float pct_points);
+  void setTempHighFanBoost(float tempC, float boostPercent);
+
+  // Feuchte/Taupunkt-Überschreibung
+  void setHumidityOverride(float rh_high_percent, float dewpoint_gap_minC,
+                           bool allow_silent_override, float extraBoostPercent);
+
+  // Tür-/Transientenerkennung
+  //
+  // Erkennung: Falls sich die Innenluftfeuchte (oder Temperatur) innerhalb einer
+  // sehr kurzen Zeit abrupt ändert (z.B. Tür auf/menschliche Aktivität), soll
+  // das System transienten Verhalten erkennen und Steuerungsaktionen kurzzeitig
+  // unterdrücken. Die Methode setDoorDetection legt die Sensitivität fest:
+  //  - deltaRh_percent: minimale Änderung der relativen Luftfeuchte (%), die
+  //      als Tür / Transient gilt
+  //  - deltaT_C: minimale Temperaturänderung (°C) als zusätzliches Kriterium
+  //  - hold_ms: Wie lange nach Erkennung Steuerungen gedämpft/gesperrt bleiben
+  //
+  // Zusätzlich gibt es einen optionalen digitalen Tür-Eingang (doorPin),
+  // wobei LOW = Tür geschlossen (gegen GND).
+  void setDoorDetection(float deltaRh_percent, float deltaT_C, uint32_t hold_ms);
+
+  // Haltezeit nach Moduswechsel
+  void setModeChangeHold(uint32_t hold_ms);
+
+  // Außen feuchter -> Lüfter sperren
+  void setOutsideHumidBlock(bool enable, float hysteresisC = 0.5f) {
+    blockOutsideHumid_ = enable; dpHumidHyst_ = hysteresisC;
+  }
+
+  // Zentrale Konfiguration anwenden
+  void applyLuminaConfig();
+
+  // Periodisches Update; gibt false zurück, wenn Sensorabfrage fehlgeschlagen
+  bool update();
+
+  // Start: blockierendes Heranfahren auf Mindestabstand (nach Homing)
+  void runStartupApproachBlocking();
+
+  // Zustand
+  double currentVpd()  const { return vpdIn_; }
+  double currentTemp() const { return tIn_; }
+  double currentRh()   const { return rhIn_; }
+  double currentVpdFiltered() const { return vpdFilt_; }
+
+  float  currentLedPercent() const { return ledOut_; }
+  float  currentFanPercent() const { return fanOut_; }
+
+  double currentTempOut() const { return tOut_; }
+  double currentRhOut()   const { return rhOut_; }
+
+  double dewPointIn()  const { return dpIn_; }
+  double dewPointOut() const { return dpOut_; }
+  int8_t fanVpdSign()  const { return fanSign_; }
+
+  bool   isHoldActive() const { return millis() < holdUntilMs_; }
+
+private:
+  static int idxStage(vpd_calc::GrowthStage s) {
+    switch (s) {
+      case vpd_calc::GrowthStage::Seedling:   return 0;
+      case vpd_calc::GrowthStage::Vegetative: return 1;
+      case vpd_calc::GrowthStage::Flowering:  return 2;
+      default: return 0;
+    }
+  }
+  static int idxMode(DayMode m) {
+    switch (m) {
+      case DayMode::Day:         return 0;
+      case DayMode::Night:       return 1;
+      case DayMode::NightSilent: return 2;
+      default: return 0;
+    }
+  }
+
+  PhaseModeSettings& cur() { return settings_[idxStage(stage_)][idxMode(mode_)]; }
+
+  static float clamp01(float p) { if (p<0) return 0; if (p>100) return 100; return p; }
+  static float clamp(float x, float a, float b) { return x<a? a : (x>b? b : x); }
+
+  float limitRate(float tgt, float last, float dt_s) const;
+  void detectDoorOrTransient(float t_now, float rh_now, uint32_t now_ms);
+  void updateFanSignFromDewpoints();
+
+  // Abstand/ToF/Stepper
+  void distanceTick_(uint32_t now);
+  bool isDoorClosed_();
+  bool allowDownAdjustNow_(uint32_t now);
+  float targetDistanceMm_() const;
+
+private:
+  // Phase/Modus
+  vpd_calc::GrowthStage stage_ = vpd_calc::GrowthStage::Seedling;
+  DayMode mode_ = DayMode::Day;
+
+  // Standardtabelle [3][3]
+  PhaseModeSettings settings_[3][3];
+
+  // Regelungsparameter
+  float kpFan_              = 18.0f;
+  float kiFan_              = 0.015f;   // (%/s)/kPa
+  float deadband_           = 0.06f;    // kPa
+  float rateLimitPctPerS_   = 6.0f;     // % per second
+  float emaAlpha_           = 0.25f;    // VPD Glättung
+
+  // Temperaturgrenzen / LED-Schutz / Lüfter-Boost
+  float maxTemp_            = 30.0f;
+  float ledReducePct_       = 5.0f;
+  float tempHighFanC_       = 31.0f;
+  float tempHighFanBoost_   = 15.0f;
+
+  // Feuchte/Taupunkt-Überschreibung
+  float rhHighThr_          = 85.0f;
+  float dewGapMinC_         = 1.5f;
+  bool  allowSilentOv_      = true;
+  float humidBoost_         = 20.0f;
+
+  // Sperren wenn außen feuchter
+  bool  blockOutsideHumid_  = true;
+  float dpHumidHyst_        = 0.5f;
+
+  // Tür/Transiente
+  float doorDeltaRh_        = 8.0f;
+  float doorDeltaT_         = 2.0f;
+  uint32_t doorHoldMs_      = 15000;
+  uint32_t modeHoldMs_      = 8000;
+
+  // IO / Zustand
+  SHT41Ctrl*  sensorIn_  = nullptr;
+  SHT41Ctrl*  sensorOut_ = nullptr;
+  GP8211Ctrl* led_       = nullptr;
+  FanCtrl*    fan_       = nullptr;
+  StepperCtrl* step_     = nullptr;
+  ToFCtrl*     tof_      = nullptr;
+  RTC_Ctrl*    rtc_      = nullptr;
+  int          doorPin_  = -1; // LOW = Tür zu (gegen GND)
+
+  double tIn_ = NAN, rhIn_ = NAN, vpdIn_ = NAN, dpIn_ = NAN;
+  double tOut_ = NAN, rhOut_ = NAN, dpOut_ = NAN;
+  double vpdFilt_ = 0.0, prevTIn_ = NAN, prevRhIn_ = NAN;
+
+  float  ledOut_ = 0.0f, fanOut_ = 0.0f, lastFanOut_ = 0.0f;
+  int8_t fanSign_ = +1; // +1: Lüfter erhöht VPD; -1: Lüfter senkt VPD
+
+  // PI Zustand & Zeit
+  float    iTermFan_  = 0.0f;
+  uint32_t lastMs_    = 0;
+  uint32_t holdUntilMs_ = 0;
+
+  // Abstand / ToF / Stepper Laufzeit
+  bool     initialApproachDone_ = false;
+  uint32_t lastTofReadMs_ = 0;
+  int      lastTofMm_ = -1; // -1 ungültig / außerhalb Messbereich, -2 zu nah
+  bool     lastDoorClosed_ = true;
+  uint32_t doorLastChangeMs_ = 0;
+
+  // Zeitplan-Auslöser (einmal pro Ereignis/Tag)
+  int      lastSunriseToken_ = -1; // yyyymmddHHMM
+  int      lastSunsetToken_  = -1;
+
+  // Nachregel-Fenster nach Events (Tür zu / Sunrise / Sunset)
+  bool     adjustActive_ = false;
+  uint32_t adjustUntilMs_ = 0;
+};
+
+} // namespace plant_ctrl

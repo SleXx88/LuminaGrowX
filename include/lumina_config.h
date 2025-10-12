@@ -1,14 +1,15 @@
 // ==============================
 // File: include/lumina_config.h
 // ==============================
-// LuminaGrowX – Zentrale Projektkonfiguration
+// LuminaGrowX - Zentrale Projektkonfiguration
 // Pins, Phasen/Modi-Defaults, Licht-Zeitpläne, Regelparameter
 
 #pragma once
 
 #include <Arduino.h>
 #include "vpd_calc.h"
-#include "env_ctrl.h" // nur für DayMode/PhaseModeSettings-Typ (leicht gekoppelt)
+#include "plant_ctrl.h"
+// #include "env_ctrl.h" // war: nur für DayMode/PhaseModeSettings; ersetzt durch plant_ctrl
 
 namespace lumina
 {
@@ -46,7 +47,7 @@ namespace lumina
 
   // --- Phasen & Modi ---
   using PlantPhase = vpd_calc::GrowthStage; // Seedling, Vegetative, Flowering
-  using DayMode = env_ctrl::DayMode;        // Day, Night, NightSilent
+  using DayMode = plant_ctrl::DayMode;      // Day, Night, NightSilent
 
   // --- Licht-Zeitpläne (optional) ---
   struct TimeHM
@@ -74,7 +75,7 @@ namespace lumina
   namespace defaults
   {
     // { LED%, FanMin%, FanMax%, VPDmin[kPa], VPDmax[kPa] }
-    constexpr env_ctrl::PhaseModeSettings PHASE_MODE[3][3] = {
+    constexpr plant_ctrl::PhaseModeSettings PHASE_MODE[3][3] = {
         // SEEDLING
         {
             {40.0f, 20.0f, 80.0f, 0.40f, 0.80f}, // Day
@@ -89,10 +90,42 @@ namespace lumina
         },
         // FLOWERING (Ziel 1.2–1.4 kPa, passive Feuchtequellen)
         {
-            {100.0f, 10.0f, 70.0f, 1.20f, 1.40f}, // Day ← FanMin runter, FanMax runter
+            {90.0f, 10.0f, 70.0f, 1.20f, 1.40f}, // Day  – FanMin reduziert, FanMax reduziert
             {0.0f, 20.0f, 70.0f, 1.20f, 1.40f},  // Night
             {0.0f, 10.0f, 50.0f, 1.20f, 1.40f}   // NightSilent
         }};
+  }
+
+  // --- Plant distance / door / ToF parameters ---
+  namespace plant
+  {
+    // Türschalter-Pin (LOW = Tür zu, gegen GND). -1 deaktiviert und nimmt "immer zu" an.
+    // Erklärung Türerkennung:
+    // - door_dRh: Anteilige Veränderung der relativen Luftfeuchte [%] zwischen zwei Messungen,
+    //   die als Hinweis auf ein Türereignis gewertet wird (z. B. plötzlicher Feuchtigkeitsanstieg).
+    // - door_dT: Temperaturänderung [°C] zwischen zwei Messungen, die ein Türereignis bestätigt.
+    // - door_hold_ms: Zeitdauer [ms], für die das System nach Erkennung eines Türereignisses in
+    //   einem besonderen Haltezustand verbleibt (z. B. keine Moduswechsel, geänderte Reglereinstellungen).
+    constexpr int DOOR_SWITCH_PIN = 5;
+
+    // Minimale LED-zu-Pflanze Abstände pro Phase (mm)
+    // Keimling=50mm, Vegetativ=80mm, Blüte=120mm
+    constexpr float MIN_DIST_MM[3] = {50.0f, 80.0f, 120.0f};
+
+    // ToF-Sensor sitzt 10 mm unter der LED -> diesen Offset zur ToF-Messung hinzurechnen
+    constexpr int TOF_LED_OFFSET_MM = 10;
+
+    // ToF-Leseintervall und Mittelung
+    constexpr uint32_t TOF_READ_INTERVAL_MS = 50;   // Sicherheitsabstand für Sensor-Timing
+    constexpr uint8_t  TOF_AVG_SAMPLES      = 10;   // Mittelung pro Messung
+
+    // Verhalten der Distanzanpassung
+    constexpr float    ADJUST_HYST_MM = 2.0f;       // Totband um Ziel
+    constexpr float    ADJUST_STEP_MM = 1.0f;       // pro Anpassungsschritt
+    constexpr uint8_t  SPEED_LEVEL    = 5;          // Index in der Steppertabelle
+    // Zeitfenster für Nachregelung nach Events (ms)
+    constexpr uint32_t ADJUST_WINDOW_MS = 30000;
+    constexpr float    STARTUP_STEP_MM = 5.0f;      // größere Schritte beim ersten Heranfahren
   }
 
   // --- Zentrale Regelparameter (hier veränderst du ALLES) ---
@@ -100,20 +133,20 @@ namespace lumina
   {
     struct Params
     {
-      // Regelung (VPD → Fan)
+      // Regelung (VPD -> Fan)
       float Kp;               // [%/kPa] Proportional
       float Ki;               // [(%/s)/kPa] Integrator (sehr klein)
       float deadband_kPa;     // Totband um Soll-VPD
       float rate_limit_pct_s; // max. % pro Sekunde (sanft)
       float ema_alpha;        // 0..1 (0 = sehr träge, 1 = ungefiltert)
 
-      // Außen feuchter ⇒ Lüfter blockieren
+      // Außen feuchter -> Lüfter blockieren
       bool outside_humid_block; // true: blocken wenn dp_out > dp_in + Hyst
       float dp_hysteresis_C;    // °C
 
       // Overrides
       float rh_high_thr;          // %RH, ab der Feuchte-Override greift
-      float dew_gap_min_C;        // °C, Abstand Temp – Taupunkt innen (Kondens)
+      float dew_gap_min_C;        // °C, Mindestabstand Temp – Taupunkt innen (Kondensation)
       bool allow_silent_override; // NightSilent darf bei Notlage lauter werden
       float humid_boost_pct;      // %-Punkte über fanMin bei Feuchte-Override
 
@@ -124,8 +157,8 @@ namespace lumina
       float temp_high_fan_boost; // %-Punkte über fanMin
 
       // Tür / Transienten / Holds
-      float door_dRh; // %RH Sprung
-      float door_dT;  // °C  Sprung
+      float door_dRh; // %RH Sprung, der als Türereignis interpretiert werden kann
+      float door_dT;  // °C  Sprung, der Türereignis unterstützt
       uint32_t door_hold_ms; // Haltezeit nach Türöffnung [ms]
       uint32_t mode_hold_ms; // Haltezeit nach Moduswechsel [ms]
     };
@@ -161,7 +194,7 @@ namespace lumina
   namespace calib
   {
     constexpr int TOF_CAL_TARGET_MM = 100;
-    constexpr uint8_t TOF_CAL_SAMPLES = 20;
+    constexpr uint8_t TOF_CAL_SAMPLES = 10;
   }
 
 } // namespace lumina
