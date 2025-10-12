@@ -89,7 +89,7 @@ namespace lumina
         },
         // FLOWERING (Ziel 1.2–1.4 kPa, passive Feuchtequellen)
         {
-            {100.0f, 10.0f, 70.0f, 1.40f, 1.45f}, // Day ← FanMin runter, FanMax runter
+            {100.0f, 10.0f, 70.0f, 1.20f, 1.40f}, // Day ← FanMin runter, FanMax runter
             {0.0f, 20.0f, 70.0f, 1.20f, 1.40f},  // Night
             {0.0f, 10.0f, 50.0f, 1.20f, 1.40f}   // NightSilent
         }};

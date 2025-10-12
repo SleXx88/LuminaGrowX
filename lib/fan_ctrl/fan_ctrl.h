@@ -18,6 +18,7 @@ public:
     uint32_t pwmFreq = 25000;    // 25 kHz laut Intel-Spec
     uint8_t resolutionBits = 8;  // 8 Bit = 0..255 Duty
     bool invert = false;          // active-low (meist TRUE)
+    float minPercent = 10.0f;     // Minimum effective percent from datasheet (0..100).
   };
 
   FanCtrl() = default;

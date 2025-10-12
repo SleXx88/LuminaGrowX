@@ -100,14 +100,22 @@ void setup()
   fan.begin(cfg);
   fan.setPercent(0);
 
+  // LED Initialisierung (GP8211)
+  if (!dac.begin(Wire1)) {
+    Serial.println("[GP8211] init FAIL (I2C addr 0x58)");
+  } else {
+    Serial.println("[GP8211] init OK (10V-range set)");
+  }
+  dac.setPercent(10);
+
   // Stepper
   step.begin();
   step.enableDebug(true);
   step.setDebugMoveLogInterval(100);
   while (!step.home()) { step.tick(); }
 
-  step.moveTo(180.0f, 5); // --------------------------------------------------------------- Nur für den Anfang, damit die LED näher an der Pflanze ist
-  waitUntilStill(step);
+  // step.moveTo(180.0f, 5); // --------------------------------------------------------------- Nur für den Anfang, damit die LED näher an der Pflanze ist
+  // waitUntilStill(step);
 
   // ToF aktivieren und starten
   if (PIN_XSHUT >= 0) {
@@ -157,14 +165,6 @@ void setup()
   } else {
     Serial.println("[RTC] Init OK (DS3231 gefunden).");
   }
-
-  // DAC
-  if (!dac.begin(Wire1)) {
-    Serial.println("[GP8211] init FAIL (I2C addr 0x58)");
-  } else {
-    Serial.println("[GP8211] init OK (10V-range set)");
-  }
-  dac.setPercent(10);
 
   // SHT41
   Serial.println(F("[SHT41_in] Init..."));

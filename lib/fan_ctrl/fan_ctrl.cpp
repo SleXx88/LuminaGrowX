@@ -28,9 +28,25 @@ void FanCtrl::setPercent(float percent) {
   if (percent < 0) percent = 0;
   if (percent > 100) percent = 100;
 
+  // Store the user-requested percent (0..100)
   currentPercent_ = percent;
 
-  uint32_t duty = (uint32_t)lroundf((percent / 100.0f) * (float)maxDuty());
+  // Remap percent to account for fan's minimum effective PWM from datasheet:
+  // - 0 stays 0 (fan off)
+  // - 1..100 maps linearly to cfg_.minPercent .. 100
+  float effectivePercent = 0.0f;
+  if (percent == 0.0f) {
+    effectivePercent = 0.0f;
+  } else {
+    // Clamp minPercent to valid range
+    float minP = cfg_.minPercent;
+    if (minP < 0.0f) minP = 0.0f;
+    if (minP > 100.0f) minP = 100.0f;
+    // Map [1..100] -> [minP..100]
+    effectivePercent = minP + (percent - 1.0f) * ((100.0f - minP) / 99.0f);
+  }
+
+  uint32_t duty = (uint32_t)lroundf((effectivePercent / 100.0f) * (float)maxDuty());
   if (cfg_.invert) {
     duty = maxDuty() - duty;
   }
