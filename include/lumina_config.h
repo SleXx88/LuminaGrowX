@@ -78,21 +78,21 @@ namespace lumina
     constexpr plant_ctrl::PhaseModeSettings PHASE_MODE[3][3] = {
         // SEEDLING
         {
-            {40.0f, 20.0f, 80.0f, 0.40f, 0.80f}, // Day
+            {40.0f, 20.0f, 80.0f, 0.40f, 0.80f}, // Day (VPD 0.40–0.80)
             {0.0f, 20.0f, 60.0f, 0.40f, 0.80f},  // Night
             {0.0f, 10.0f, 40.0f, 0.40f, 0.80f}   // NightSilent
         },
         // VEGETATIVE
         {
-            {65.0f, 20.0f, 100.0f, 0.80f, 1.20f}, // Day
-            {0.0f, 20.0f, 60.0f, 0.80f, 1.20f},   // Night
-            {0.0f, 10.0f, 40.0f, 0.80f, 1.20f}    // NightSilent
+            {65.0f, 20.0f, 100.0f, 0.80f, 1.10f}, // Day (VPD 0.80–1.10)
+            {0.0f, 20.0f, 60.0f, 0.80f, 1.10f},   // Night
+            {0.0f, 10.0f, 40.0f, 0.80f, 1.10f}    // NightSilent
         },
         // FLOWERING (Ziel 1.2–1.4 kPa, passive Feuchtequellen)
         {
-            {90.0f, 10.0f, 70.0f, 1.20f, 1.40f}, // Day  – FanMin reduziert, FanMax reduziert
-            {0.0f, 20.0f, 70.0f, 1.20f, 1.40f},  // Night
-            {0.0f, 10.0f, 50.0f, 1.20f, 1.40f}   // NightSilent
+            {90.0f, 20.0f, 70.0f, 1.10f, 1.40f}, // Day (VPD 1.10–1.40), FanMin 15, FanMax 70
+            {0.0f, 20.0f, 70.0f, 1.10f, 1.40f},  // Night, Fan 20/70
+            {0.0f, 10.0f, 50.0f, 1.10f, 1.40f}   // NightSilent, Fan 10/50
         }};
   }
 
@@ -161,15 +161,42 @@ namespace lumina
       float door_dT;  // °C  Sprung, der Türereignis unterstützt
       uint32_t door_hold_ms; // Haltezeit nach Türöffnung [ms]
       uint32_t mode_hold_ms; // Haltezeit nach Moduswechsel [ms]
+
+      // Schimmelprävention – RH-Caps je Phase (+ Hysterese) und Taupunktabstände
+      float seedling_rh_cap;        // %RH
+      float vegetative_rh_cap;      // %RH
+      float flowering_rh_cap;       // %RH (späte Blüte optional 45)
+      float rh_cap_hyst;            // %RH Hysterese (allgemein)
+      float flowering_rh_cap_hyst;  // %RH Hysterese für Flowering (empf. 2)
+
+      float seedling_dp_gap_min_C;  // °C Mindestabstand Temp – Taupunkt
+      float vegetative_dp_gap_min_C;// °C
+      float flowering_dp_gap_min_C; // °C
+
+      // Mindesttemperaturen je Phase (Nacht-Floor) und FanMax-Deckel bei Untertemp
+      float seedling_min_tempC;     // °C
+      float vegetative_min_tempC;   // °C
+      float flowering_min_tempC;    // °C
+      float minTemp_fanMax_scale;   // 0..1, Deckel-Faktor auf FanMax bei Untertemp
+
+      // Strikte Priorität: RH/Taupunkt überstimmt VPD
+      bool humidity_priority_strict;
+
+      // Optional: späte Blüte engerer RH-Cap
+      bool  use_flowering_late_cap; // wenn true, setze flowering_rh_cap auf flowering_late_rh_cap
+      float flowering_late_rh_cap;  // 45 % empfohlen
+
+      // HP-Exit Cooldown
+      uint32_t hp_cooldown_ms;     // Mindestverweilzeit nach HP-Exit
     };
 
-    // Träge, stabile Defaults passend zu passiver Befeuchtung
+    // Sanftere, schnellere Defaults für höhere Update-Rate, plus Schimmelpräventions-Parameter
     constexpr Params PARAMS{
-        /*Kp*/ 6.0f,
-        /*Ki*/ 0.050f,             // deutlich größer als vorher (0.010)
-        /*deadband_kPa*/ 0.12f,    // größer = ruhiger, vermeidet Nachjagen
-        /*rate_limit_pct_s*/ 1.5f, // sehr sanfte Stelländerungen
-        /*ema_alpha*/ 0.20f,       // träge Messwertfilterung
+        /*Kp*/ 8.0f,
+        /*Ki*/ 0.030f,             // (%/s)/kPa
+        /*deadband_kPa*/ 0.08f,
+        /*rate_limit_pct_s*/ 3.0f,
+        /*ema_alpha*/ 0.30f,
 
         /*outside_block*/ true,         // Lüfter blockieren wenn außen feuchter
         /*dp_hyst_C*/ 0.5f,             // Hysterese für Taupunktvergleich
@@ -187,7 +214,77 @@ namespace lumina
         /*door_dRh*/ 8.0f,              // RH-Sprung für Türerkennung
         /*door_dT*/ 2.0f,               // T-Sprung für Türerkennung
         /*door_hold_ms*/ 15000,         // Haltezeit nach Türöffnung [ms]
-        /*mode_hold_ms*/ 8000};         // Haltezeit nach Moduswechsel [ms]
+        /*mode_hold_ms*/ 8000,          // Haltezeit nach Moduswechsel [ms]
+
+        /*seedling_rh_cap*/       80.0f,
+        /*vegetative_rh_cap*/     65.0f,
+        /*flowering_rh_cap*/      55.0f,
+        /*rh_cap_hyst*/            3.0f,
+        /*flowering_rh_cap_hyst*/  2.0f,
+
+        /*seedling_dp_gap_min_C*/  2.0f,
+        /*vegetative_dp_gap_min_C*/5.0f,
+        /*flowering_dp_gap_min_C*/ 7.0f,
+
+        /*seedling_min_tempC*/    20.0f,
+        /*vegetative_min_tempC*/  20.5f,
+        /*flowering_min_tempC*/   20.0f,
+        /*minTemp_fanMax_scale*/   0.6f,
+
+        /*humidity_priority_strict*/ true,
+
+        /*use_flowering_late_cap*/   false,
+        /*flowering_late_rh_cap*/    45.0f,
+        /*hp_cooldown_ms*/           30000
+    };
+  }
+
+  // Dokumentierte Klimaziele je Phase (nicht direkt in Regelung genutzt)
+  namespace climate
+  {
+    struct TempRange { float minC; float maxC; };
+    struct PhaseClimateTargets {
+      TempRange day;
+      TempRange night;
+      float     minTempC;
+      float     rh_target_min;
+      float     rh_target_max;
+      float     rh_cap;
+      float     rh_hyst;
+      float     vpd_min;
+      float     vpd_max;
+      float     dp_gap_min_C;
+    };
+
+    constexpr PhaseClimateTargets SEEDLING{
+      /*day*/   {24.0f, 26.0f},
+      /*night*/ {21.0f, 22.0f},
+      /*minTempC*/ 20.0f,
+      /*RH target*/ 70.0f, 80.0f,
+      /*RH cap + hyst*/ 80.0f, 3.0f,
+      /*VPD*/ 0.40f, 0.80f,
+      /*DP gap*/ 2.0f
+    };
+
+    constexpr PhaseClimateTargets VEGETATIVE{
+      {25.0f, 27.0f},
+      {21.0f, 23.0f},
+      20.5f,
+      55.0f, 65.0f,
+      65.0f, 3.0f,
+      0.80f, 1.10f,
+      5.0f
+    };
+
+    constexpr PhaseClimateTargets FLOWERING{
+      {24.0f, 26.0f},
+      {20.0f, 22.0f},
+      20.0f,
+      40.0f, 55.0f,
+      55.0f, 2.0f,
+      1.10f, 1.40f,
+      7.0f
+    };
   }
 
   // --- Sensor-/Kalibrier-Defaults ---

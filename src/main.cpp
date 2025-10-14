@@ -206,53 +206,55 @@ void setup()
 
 void loop()
 {
+  // Keep stepper ticking every frame
   step.tick();
 
-  static unsigned long lastUpdate = 0;
+  // Run controller at high rate every loop iteration
+  controller.update();
+
+  // Debug print every ~3s without throttling the control loop
+  static unsigned long lastLogMs = 0;
   unsigned long now = millis();
-  if (now - lastUpdate >= 3000) {
-    lastUpdate = now;
-    if (controller.update()) {
-      String t = rtc.readTimeString();
-      Serial.print(t);
+  if (now - lastLogMs >= 3000) {
+    lastLogMs = now;
 
-      float tC_in = NAN, tC_out = NAN, rh_in = NAN, rh_out = NAN;
-      if (sht_in.read(tC_in, rh_in) && sht_out.read(tC_out, rh_out)) {
-        Serial.print(F(" | [INDOOR] Temp: "));
-        Serial.print(tC_in, 1);
-        Serial.print(F(" C, RH: "));
-        Serial.print(rh_in, 1);
-        Serial.print(F(" %, Taupunkt: "));
-        Serial.print(computeDewPoint(static_cast<double>(tC_in), static_cast<double>(rh_in)), 1);
-        Serial.print(F(" C, VPD: "));
-        Serial.print(computeVpd(static_cast<double>(tC_in), static_cast<double>(rh_in)), 3);
-        Serial.print(F(" kPa"));
+    String t = rtc.readTimeString();
+    Serial.print(t);
 
-        Serial.print(F(" | [OUTDOOR] Temp: "));
-        Serial.print(tC_out, 1);
-        Serial.print(F(" C, RH: "));
-        Serial.print(rh_out, 1);
-        Serial.print(F(" % | LED: "));
-        Serial.print(controller.currentLedPercent(), 1);
-        Serial.print(F(" % | Fan: "));
-        Serial.print(controller.currentFanPercent(), 1);
+    float tC_in = NAN, tC_out = NAN, rh_in = NAN, rh_out = NAN;
+    if (sht_in.read(tC_in, rh_in) && sht_out.read(tC_out, rh_out)) {
+      Serial.print(F(" | [INDOOR] Temp: "));
+      Serial.print(tC_in, 1);
+      Serial.print(F(" C, RH: "));
+      Serial.print(rh_in, 1);
+      Serial.print(F(" %, Taupunkt: "));
+      Serial.print(computeDewPoint(static_cast<double>(tC_in), static_cast<double>(rh_in)), 1);
+      Serial.print(F(" C, VPD: "));
+      Serial.print(computeVpd(static_cast<double>(tC_in), static_cast<double>(rh_in)), 3);
+      Serial.print(F(" kPa"));
 
-        int distance = tof.readAvgMm(10);
-        Serial.print(F(" % | ToF: "));
-        if (distance >= 0) {
-          Serial.print(distance);
-          Serial.print(F(" mm"));
-        } else {
-          Serial.print(F("out of range - "));
-          Serial.print(distance);
-          Serial.print(F(" mm"));
-        }
-        Serial.println();
+      Serial.print(F(" | [OUTDOOR] Temp: "));
+      Serial.print(tC_out, 1);
+      Serial.print(F(" C, RH: "));
+      Serial.print(rh_out, 1);
+      Serial.print(F(" % | LED: "));
+      Serial.print(controller.currentLedPercent(), 1);
+      Serial.print(F(" % | Fan: "));
+      Serial.print(controller.currentFanPercent(), 1);
+
+      int distance = tof.readRawMm();
+      Serial.print(F(" % | ToF: "));
+      if (distance >= 0) {
+        Serial.print(distance);
+        Serial.print(F(" mm"));
       } else {
-        Serial.println(F(" [SHT41] Read FAILED"));
+        Serial.print(F("out of range - "));
+        Serial.print(distance);
+        Serial.print(F(" mm"));
       }
+      Serial.println();
     } else {
-      Serial.println(F("Sensor read failed"));
+      Serial.println(F(" [SHT41] Read FAILED"));
     }
   }
 }

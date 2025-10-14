@@ -11,7 +11,7 @@
 // LittleFS für Kalibrierungs-Persistenz
 #include <LittleFS.h>
 
-// Persistenzpfad f�r Offset-Kalibrierung
+// Persistenzpfad für Offset-Kalibrierung
 const char* ToFCtrl::kOffsetPath = "/tof_offset.dat";
 // #include "tof_calib_config.h" // nicht mehr benötigt
 
@@ -329,7 +329,7 @@ bool ToFCtrl::initSensor(bool longRangeMode) {
   // Default-Messbudget für bessere Genauigkeit im Nahbereich erhöhen
   // (z. B. 50 ms → weniger Rauschen als Standard)
   (void)getMeasurementTimingBudget();
-  const uint32_t DefaultBudgetUs = 100000; // 50 ms
+  const uint32_t DefaultBudgetUs = 20000; // 50 ms
   w8(SYSTEM_SEQUENCE_CONFIG, 0xE8);
   setMeasurementTimingBudget(DefaultBudgetUs);
   w8(SYSTEM_SEQUENCE_CONFIG, 0x01);

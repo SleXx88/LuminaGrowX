@@ -1,4 +1,4 @@
-// ==============================
+﻿// ==============================
 // File: lib/plant_ctrl/plant_ctrl.h
 // ==============================
 /*
@@ -230,6 +230,18 @@ private:
   // Nachregel-Fenster nach Events (Tür zu / Sunrise / Sunset)
   bool     adjustActive_ = false;
   uint32_t adjustUntilMs_ = 0;
+
+  // Schimmelprävention / Per-Phase-Grenzen
+  float rhCap_[3]         = {80.0f, 65.0f, 50.0f};
+  float rhCapHyst_[3]     = {3.0f,  3.0f,  2.0f};
+  float dpGapMin_[3]      = {2.0f,  5.0f,  7.0f};
+  float minTempPhase_[3]  = {20.0f, 20.5f, 20.0f};
+  float minTempFanMaxScale_ = 0.6f;  // Deckel-Faktor für FanMax bei Untertemperatur
+  bool  humidityPriorityStrict_ = true;
+  bool  humidityPriorityActive_ = false;
+  // Humidity-Priority Cooldown
+  uint32_t hpCooldownMs_ = 30000;
+  uint32_t hpCooldownUntilMs_ = 0;
 };
 
 } // namespace plant_ctrl
