@@ -48,7 +48,7 @@ void PlantCtrl::begin(SHT41Ctrl& sensorIndoor,
   lastFanOut_ = fanOut_ = settings_[idxStage(stage_)][idxMode(mode_)].fanMin;
   // LED auf Basiswert setzen
   ledOut_ = settings_[idxStage(stage_)][idxMode(mode_)].ledPercent;
-  if (led_) led_->setPercent(ledOut_);
+  if (led_) { led_->setPercent(ledOut_); ledApplied_ = ledOut_; }
   initialApproachDone_ = false;
 }
 
@@ -194,22 +194,83 @@ bool PlantCtrl::update() {
   // 3) T�r-/Transienten-Erkennung
   detectDoorOrTransient(tIn_, rhIn_, now);
 
-  // 4) Basiswerte laden
+  // 4) Tageszeit + Sunrise/Sunset-Rampen => LED-Ziel + Moduswahl (Day/Night)
+  float ledTarget = 0.0f;
+  {
+    bool haveRtc = (rtc_ != nullptr);
+    const lumina::LightSchedule* sch = nullptr;
+    using vpd_calc::GrowthStage;
+    switch (stage_) {
+      case GrowthStage::Seedling:   sch = &lumina::schedule::SEEDLING; break;
+      case GrowthStage::Vegetative: sch = &lumina::schedule::VEGETATIVE; break;
+      case GrowthStage::Flowering:  sch = &lumina::schedule::FLOWERING; break;
+      default: sch = &lumina::schedule::VEGETATIVE; break;
+    }
+    if (haveRtc && sch) {
+      uint16_t y; uint8_t mo, d, hh, mi, ss;
+      if (rtc_->readComponents(y, mo, d, hh, mi, ss)) {
+        auto toSec = [](uint8_t H, uint8_t M, uint8_t S) -> int { return ((int)H * 60 + (int)M) * 60 + (int)S; };
+        const int nowSec = toSec(hh, mi, ss);
+        const int onSec  = toSec(sch->on.hour, sch->on.minute, 0);
+        const int offSec = toSec(sch->off.hour, sch->off.minute, 0);
+        bool dayActive;
+        if (onSec <= offSec) dayActive = (nowSec >= onSec) && (nowSec < offSec);
+        else                 dayActive = (nowSec >= onSec) || (nowSec < offSec);
+
+        DayMode desired = dayActive ? DayMode::Day : DayMode::Night;
+        if (desired != mode_) {
+          setMode(desired);
+        }
+        const PhaseModeSettings& dayPs = settings_[idxStage(stage_)][idxMode(DayMode::Day)];
+        const float dayLedBase = clamp01(dayPs.ledPercent);
+
+        if (!dayActive) {
+          ledTarget = 0.0f;
+        } else {
+          const uint16_t riseMin = sch->sunrise_minutes;
+          const uint16_t setMin  = sch->sunset_minutes;
+          const int riseSecTotal = (int)riseMin * 60;
+          const int setSecTotal  = (int)setMin  * 60;
+          int sinceOnSec = (nowSec - onSec); if (sinceOnSec < 0) sinceOnSec += 24*3600;
+          int toOffSec   = (offSec - nowSec); if (toOffSec   < 0) toOffSec   += 24*3600;
+          bool inRise = (riseSecTotal > 0) && (sinceOnSec >= 0) && (sinceOnSec <  riseSecTotal);
+          bool inSet  = (setSecTotal  > 0) && (toOffSec   > 0) && (toOffSec   <= setSecTotal);
+          if (inRise) {
+            float f = (float)sinceOnSec / (float)riseSecTotal; if (f < 0) f = 0; if (f > 1) f = 1;
+            ledTarget = dayLedBase * f;
+          } else if (inSet) {
+            float f = (float)toOffSec / (float)setSecTotal; if (f < 0) f = 0; if (f > 1) f = 1;
+            ledTarget = dayLedBase * f;
+          } else {
+            ledTarget = dayLedBase;
+          }
+        }
+      } else {
+        // RTC-Leseproblem -> fallback auf aktuellen Moduswert
+        ledTarget = clamp01(cur().ledPercent);
+      }
+    } else {
+      // Ohne RTC: Modus bleibt unverändert -> statischer LED-Wert des Modus
+      ledTarget = clamp01(cur().ledPercent);
+    }
+  }
+
+  // 4b) Basiswerte für Regelung laden (nach evtl. Mode-Autowechsel)
   PhaseModeSettings& ps = cur();
   const float vpdTarget = midpoint(ps.vpdMin, ps.vpdMax);
   const float baseFan   = ps.fanMin;
-  float ledTarget       = ps.ledPercent;
 
   // 5) LED-Reduktion bei �bertemperatur
   if (tIn_ > maxTemp_) {
     ledTarget = clamp01(ledTarget - ledReducePct_);
   }
   if (led_) {
-    if (fabsf(ledTarget - ledOut_) >= 0.5f) {
-      ledOut_ = ledTarget;
-      led_->setPercent(ledOut_);
-    } else {
-      ledOut_ = ledTarget;
+    // Ziel immer speichern
+    ledOut_ = ledTarget;
+    // Auf Basis des zuletzt angewendeten Wertes entscheiden, ob wir schreiben
+    if (isnan(ledApplied_) || fabsf(ledTarget - ledApplied_) >= 0.5f) {
+      ledApplied_ = ledTarget;
+      led_->setPercent(ledApplied_);
     }
   }
 

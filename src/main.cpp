@@ -106,6 +106,8 @@ void setup()
   } else {
     Serial.println("[GP8211] init OK (10V-range set)");
   }
+  // LED/DAC-Minimalspannung anpassen (Anzeige: 1% entspricht dieser Spannung)
+  dac.setMinVoltAt1Percent(lumina::ledcfg::MIN_V_AT_1PCT);
   dac.setPercent(10);
 
   // Stepper
@@ -238,7 +240,7 @@ void loop()
       Serial.print(F(" C, RH: "));
       Serial.print(rh_out, 1);
       Serial.print(F(" % | LED: "));
-      Serial.print(controller.currentLedPercent(), 1);
+      Serial.print(controller.currentLedPercentEffective(), 1);
       Serial.print(F(" % | Fan: "));
       Serial.print(controller.currentFanPercent(), 1);
 

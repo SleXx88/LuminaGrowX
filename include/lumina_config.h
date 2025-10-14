@@ -49,6 +49,14 @@ namespace lumina
   using PlantPhase = vpd_calc::GrowthStage; // Seedling, Vegetative, Flowering
   using DayMode = plant_ctrl::DayMode;      // Day, Night, NightSilent
 
+  // --- LED/DAC-Konfiguration ---
+  namespace ledcfg
+  {
+    // Spannung (Volt), die bei 1% LED ausgegeben wird.
+    // 1.0f = Standard (1% -> 1V); kann z.B. auf 0.6f gestellt werden (1% -> 0.6V)
+    constexpr float MIN_V_AT_1PCT = 1.0f;
+  }
+
   // --- Licht-Zeitpläne (optional) ---
   struct TimeHM
   {
@@ -66,9 +74,9 @@ namespace lumina
   namespace schedule
   {
     // Hinweis: Beispiel – identisch für alle Phasen
-    constexpr LightSchedule SEEDLING{{8, 0}, {18, 0}, 20, 20};
-    constexpr LightSchedule VEGETATIVE{{8, 0}, {18, 0}, 20, 20};
-    constexpr LightSchedule FLOWERING{{8, 0}, {18, 0}, 20, 20};
+    constexpr LightSchedule SEEDLING{{6, 0}, {2, 0}, 20, 20};
+    constexpr LightSchedule VEGETATIVE{{6, 0}, {0, 0}, 20, 20};
+    constexpr LightSchedule FLOWERING{{6, 0}, {18, 0}, 20, 20};
   }
 
   // --- Default-Parameter je Phase & Modus ---

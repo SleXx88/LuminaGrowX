@@ -26,13 +26,45 @@ public:
   }
 
   // Prozent 0..100 -> 0..10V
+  // Mapping entsprechend Anforderung:
+  //   - 0%  -> 0V (AUS)
+  //   - 1..100% -> Vmin..10V linear (1% == Vmin, 100% == 10V)
+  //     Vmin ist konfigurierbar (default 1.0V, z.B. 0.6V möglich)
   bool setPercent(float percent) {
     if (!isfinite(percent)) percent = 0;
-    if (percent < 0) percent = 0;
-    if (percent > 100) percent = 100;
-    const uint16_t code = static_cast<uint16_t>(lroundf(percent * 32767.0f / 100.0f));
+    if (percent <= 0.0f) {
+      return setRaw(0); // 0V
+    }
+    if (percent > 100.0f) percent = 100.0f;
+    // Erzwinge Mindestwert 1% => Vmin
+    float p = percent;
+    if (p < 1.0f) p = 1.0f;
+    const float vmin = clampVmin_(minVoltAt1Pct_);
+    // Linear 1..100% -> Vmin..10V
+    const float volts = vmin + (p - 1.0f) * ((10.0f - vmin) / 99.0f);
+    const uint16_t code = static_cast<uint16_t>(lroundf((volts / 10.0f) * 32767.0f));
     return setRaw(code);
   }
+
+  // Effektiver Prozentwert (Anzeige):
+  //  - 0% bleibt 0%
+  //  - 0% < x < 1% wird als 1% angezeigt (weil min. Vmin ausgegeben wird)
+  //  - 1..100% unverändert
+  float effectivePercent(float requestedPercent) const {
+    if (!isfinite(requestedPercent) || requestedPercent <= 0.0f) return 0.0f;
+    if (requestedPercent < 1.0f) return 1.0f;
+    if (requestedPercent > 100.0f) return 100.0f;
+    return requestedPercent;
+  }
+
+  // Konfiguriere die Spannung, die bei 1% ausgegeben werden soll (Vmin)
+  // Bereich: 0.0V .. <10V (sinnvoll 0.4V..2.0V). Wird intern geklemmt.
+  void setMinVoltAt1Percent(float volts) {
+    if (!isfinite(volts)) return;
+    minVoltAt1Pct_ = clampVmin_(volts);
+  }
+
+  float getMinVoltAt1Percent() const { return minVoltAt1Pct_; }
 
   // Direkter Spannungswert in Volt (0..10)
   bool setVoltage(float volts) {
@@ -63,6 +95,14 @@ public:
 
 private:
   TwoWire* _wire;
+  float    minVoltAt1Pct_ = 1.0f; // Default: 1.0V bei 1%
+
+  static float clampVmin_(float v) {
+    if (!isfinite(v)) return 1.0f;
+    if (v < 0.0f) v = 0.0f;
+    if (v > 9.9f) v = 9.9f; // <10V
+    return v;
+  }
 
   bool writeReg1Byte(uint8_t reg, uint8_t val) {
     // Datasheet 3.3.4 Range-Set:

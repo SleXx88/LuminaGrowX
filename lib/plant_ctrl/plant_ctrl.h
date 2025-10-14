@@ -1,4 +1,4 @@
-﻿// ==============================
+// ==============================
 // File: lib/plant_ctrl/plant_ctrl.h
 // ==============================
 /*
@@ -75,18 +75,6 @@ public:
                            bool allow_silent_override, float extraBoostPercent);
 
   // Tür-/Transientenerkennung
-  //
-  // Erkennung: Falls sich die Innenluftfeuchte (oder Temperatur) innerhalb einer
-  // sehr kurzen Zeit abrupt ändert (z.B. Tür auf/menschliche Aktivität), soll
-  // das System transienten Verhalten erkennen und Steuerungsaktionen kurzzeitig
-  // unterdrücken. Die Methode setDoorDetection legt die Sensitivität fest:
-  //  - deltaRh_percent: minimale Änderung der relativen Luftfeuchte (%), die
-  //      als Tür / Transient gilt
-  //  - deltaT_C: minimale Temperaturänderung (°C) als zusätzliches Kriterium
-  //  - hold_ms: Wie lange nach Erkennung Steuerungen gedämpft/gesperrt bleiben
-  //
-  // Zusätzlich gibt es einen optionalen digitalen Tür-Eingang (doorPin),
-  // wobei LOW = Tür geschlossen (gegen GND).
   void setDoorDetection(float deltaRh_percent, float deltaT_C, uint32_t hold_ms);
 
   // Haltezeit nach Moduswechsel
@@ -113,6 +101,12 @@ public:
   double currentVpdFiltered() const { return vpdFilt_; }
 
   float  currentLedPercent() const { return ledOut_; }
+  // Effektive Anzeige (auf Basis des zuletzt angewendeten LED-Werts)
+  float  currentLedPercentEffective() const {
+    float p = !isnan(ledApplied_) ? ledApplied_ : ledOut_;
+    if (!led_) return (p <= 0.0f ? 0.0f : (p < 1.0f ? 1.0f : (p > 100.0f ? 100.0f : p)));
+    return led_->effectivePercent(p);
+  }
   float  currentFanPercent() const { return fanOut_; }
 
   double currentTempOut() const { return tOut_; }
@@ -209,6 +203,7 @@ private:
   double vpdFilt_ = 0.0, prevTIn_ = NAN, prevRhIn_ = NAN;
 
   float  ledOut_ = 0.0f, fanOut_ = 0.0f, lastFanOut_ = 0.0f;
+  float  ledApplied_ = NAN; // zuletzt an den DAC geschrieben
   int8_t fanSign_ = +1; // +1: Lüfter erhöht VPD; -1: Lüfter senkt VPD
 
   // PI Zustand & Zeit
