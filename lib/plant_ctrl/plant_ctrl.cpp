@@ -185,7 +185,9 @@ bool PlantCtrl::update() {
   dpIn_  = computeDewPoint(tIn_, rhIn_);
   dpOut_ = computeDewPoint(tOut_, rhOut_);
   // Robustes EMA: bei Alpha au�erhalb [0,1] Filter umgehen
-  if (emaAlpha_ <= 0.0f || emaAlpha_ >= 1.0f) {
+  if (isnan(vpdFilt_)) {
+    vpdFilt_ = vpdIn_;
+  } else if (emaAlpha_ <= 0.0f || emaAlpha_ >= 1.0f) {
     vpdFilt_ = vpdIn_;
   } else {
     vpdFilt_ = emaAlpha_ * vpdIn_ + (1.0f - emaAlpha_) * vpdFilt_;
@@ -267,8 +269,11 @@ bool PlantCtrl::update() {
   if (led_) {
     // Ziel immer speichern
     ledOut_ = ledTarget;
-    // Auf Basis des zuletzt angewendeten Wertes entscheiden, ob wir schreiben
-    if (isnan(ledApplied_) || fabsf(ledTarget - ledApplied_) >= 0.5f) {
+    // BUGFIX: Beim Wechsel auf 0% (Sonnenuntergang) darf keine Totzone verhindern,
+    //         dass 0% gesetzt wird. Sonst bleibt die LED z.B. bei 0.3% -> effektiv 1% stehen.
+    const bool forceOff = (!isnan(ledApplied_) && ledTarget <= 0.0f && ledApplied_ > 0.0f);
+    // Nur schreiben, wenn sich der Wert deutlich geändert hat ODER wir 0% erzwingen müssen
+    if (isnan(ledApplied_) || forceOff || fabsf(ledTarget - ledApplied_) >= 0.5f) {
       ledApplied_ = ledTarget;
       led_->setPercent(ledApplied_);
     }
@@ -325,7 +330,9 @@ bool PlantCtrl::update() {
   // applying any other overrides.  If the condition is met we ramp the fan
   // toward zero using the configured rate limit and return immediately.  This
   // allows the box to retain its drier air even when indoor RH is high.
-  if (blockOutsideHumid_ && (!isnan(dpIn_) && !isnan(dpOut_)) && (dpOut_ >= dpIn_ + dpHumidHyst_)) {
+  // FIX: Heat-Emergency BEFORE humid-block - bei Hitze trotzdem kuehlen
+  const bool heatEmergency = (tIn_ > (maxTemp_ + 0.5f));
+  if (!heatEmergency && blockOutsideHumid_ && (!isnan(dpIn_) && !isnan(dpOut_)) && (dpOut_ >= dpIn_ + dpHumidHyst_)) {
     float fanCmd = 0.0f;
     fanCmd = limitRate(fanCmd, lastFanOut_, dt_s);
     lastFanOut_ = fanOut_ = fanCmd;
@@ -412,7 +419,7 @@ bool PlantCtrl::update() {
     fanCmd = clamp(fmaxf(ps.fanMin + humidBoost_, fanOut_), ps.fanMin, maxLimit);
     overrideActive = true;
   }
-  if (!overrideActive && tIn_ >= tempHighFanC_) {
+  if (!overrideActive && (tIn_ >= tempHighFanC_ || heatEmergency)) {
     fanCmd = clamp(fmaxf(ps.fanMin + tempHighFanBoost_, fanOut_), ps.fanMin, fanMaxEff);
     overrideActive = true;
   }
@@ -495,8 +502,13 @@ bool PlantCtrl::isDoorClosed_() {
   return digitalRead(doorPin_) == LOW;
 }
 
-static inline int makeTokenYMDHM(int y, int m, int d, int hh, int mm) {
-  return (((y*100 + m)*100 + d)*100 + hh)*100 + mm;
+static inline unsigned long long makeTokenYMDHM(int y, int m, int d, int hh, int mm) {
+  unsigned long long Y = (unsigned long long)y;
+  unsigned long long M = (unsigned long long)m;
+  unsigned long long D = (unsigned long long)d;
+  unsigned long long H = (unsigned long long)hh;
+  unsigned long long Min = (unsigned long long)mm;
+  return (((Y*100ULL + M)*100ULL + D)*100ULL + H)*100ULL + Min;
 }
 
 bool PlantCtrl::allowDownAdjustNow_(uint32_t now) {
@@ -526,7 +538,7 @@ bool PlantCtrl::allowDownAdjustNow_(uint32_t now) {
         default: sch = &lumina::schedule::VEGETATIVE; break;
       }
       if (sch) {
-        int token = makeTokenYMDHM(y, mo, d, hh, mi);
+        unsigned long long token = makeTokenYMDHM(y, mo, d, hh, mi);
         if (hh == sch->on.hour  && mi == sch->on.minute  && token != lastSunriseToken_) { lastSunriseToken_ = token; Serial.println(F("[SCHEDULE] Sunrise adjust")); return true; }
         if (hh == sch->off.hour && mi == sch->off.minute && token != lastSunsetToken_)  { lastSunsetToken_  = token; Serial.println(F("[SCHEDULE] Sunset adjust"));  return true; }
       }

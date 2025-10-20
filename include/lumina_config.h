@@ -17,11 +17,11 @@ namespace lumina
   // --- Hardware-Pins ---
   namespace pins
   {
-    // I2C-Bus 1 (Innen)
+    // I2C-Bus 1
     constexpr int I2C1_SDA = 8;
     constexpr int I2C1_SCL = 9;
 
-    // I2C-Bus 2 (Außen / weitere Geräte)
+    // I2C-Bus 2
     constexpr int I2C2_SDA = 20;
     constexpr int I2C2_SCL = 19;
     constexpr uint32_t I2C2_FREQ = 400000; // 400 kHz
@@ -118,7 +118,7 @@ namespace lumina
 
     // Minimale LED-zu-Pflanze Abstände pro Phase (mm)
     // Keimling=50mm, Vegetativ=80mm, Blüte=120mm
-    constexpr float MIN_DIST_MM[3] = {50.0f, 80.0f, 120.0f};
+    constexpr float MIN_DIST_MM[3] = {100.0f, 100.0f, 140.0f};
 
     // ToF-Sensor sitzt 10 mm unter der LED -> diesen Offset zur ToF-Messung hinzurechnen
     constexpr int TOF_LED_OFFSET_MM = 10;

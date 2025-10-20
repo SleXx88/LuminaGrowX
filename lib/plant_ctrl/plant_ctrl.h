@@ -200,7 +200,7 @@ private:
 
   double tIn_ = NAN, rhIn_ = NAN, vpdIn_ = NAN, dpIn_ = NAN;
   double tOut_ = NAN, rhOut_ = NAN, dpOut_ = NAN;
-  double vpdFilt_ = 0.0, prevTIn_ = NAN, prevRhIn_ = NAN;
+  double vpdFilt_ = NAN, prevTIn_ = NAN, prevRhIn_ = NAN;
 
   float  ledOut_ = 0.0f, fanOut_ = 0.0f, lastFanOut_ = 0.0f;
   float  ledApplied_ = NAN; // zuletzt an den DAC geschrieben
@@ -218,9 +218,9 @@ private:
   bool     lastDoorClosed_ = true;
   uint32_t doorLastChangeMs_ = 0;
 
-  // Zeitplan-Auslöser (einmal pro Ereignis/Tag)
-  int      lastSunriseToken_ = -1; // yyyymmddHHMM
-  int      lastSunsetToken_  = -1;
+  // Zeitplan-Auslöser (einmal pro Ereignis/Tag) – 64-bit, um Überläufe zu vermeiden
+  unsigned long long lastSunriseToken_ = 0ULL; // yyyymmddHHMM
+  unsigned long long lastSunsetToken_  = 0ULL;
 
   // Nachregel-Fenster nach Events (Tür zu / Sunrise / Sunset)
   bool     adjustActive_ = false;
