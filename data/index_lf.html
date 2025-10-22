@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lisa Pro – Growbox</title>
+  <link rel="stylesheet" href="/pico.min.css" />
+  <style>
+    :root {
+      --accent: #ef4444;
+      --accent-2: #dc2626;
+      --glass: rgba(20,20,22,0.42);
+      --glass-strong: rgba(20,20,22,0.62);
+      --muted: rgba(255,255,255,0.06);
+      --border: rgba(255,255,255,0.18);
+      --text: #e5e7eb;
+      --text-dim: #cbd5e1;
+      --ok: #22c55e; --warn: #f59e0b; --err: #ef4444;
+      --radius: 18px; /* runder für ALLE Buttons/Karten */
+      --pico-background-color: transparent;
+      --pico-card-background-color: transparent;
+    }
+
+    html, body { height: 100%; }
+    body { position: relative; color: var(--text); background: transparent; }
+    body::before { content: ""; position: fixed; inset: 0; background:
+        linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.55)),
+        url('/bg.jpg') center/cover no-repeat #0b0b0c; z-index: -1; will-change: transform; }
+
+    header.hero, article, footer.site, dialog.modal article {
+      background: var(--glass); border: 1px solid var(--border); border-radius: var(--radius); backdrop-filter: blur(3px);
+    }
+    article > header { background: var(--glass-strong); border-bottom: 1px solid var(--border); border-radius: var(--radius) var(--radius) 0 0; padding: .75rem 1rem; }
+
+    a, h1, h2, h3, h4, h5 { color: var(--text); }
+    .grid { gap: 1rem; }
+
+    header.hero h1.brand { font-size: clamp(2.2rem, 6vw, 3.3rem); letter-spacing: .04em; margin: .25rem 0 0; position: relative; display: inline-flex; align-items: flex-start; gap: .25rem; }
+    .brand-word { color: #ffffff; font-weight: 800; }
+    .brand-pro  { color: var(--accent); font-weight: 800; font-size: .55em; line-height: 1; vertical-align: super; position: relative; top: -0.25em; }
+
+    header.hero { padding: 1rem; }
+    header.hero p.subtitle { margin: .25rem 0 0; opacity: .85; color: var(--text-dim); }
+
+    .badge { display:inline-flex; align-items:center; gap:.5rem; font-size:.9rem; padding:.3rem .6rem; border-radius:999px; background: var(--glass-strong); border: 1px solid var(--border); }
+    .dot { width:.55rem; height:.55rem; border-radius:50%; background:#9ca3af; display:inline-block; }
+    .dot.ok { background: var(--ok); } .dot.warn { background: var(--warn); } .dot.err { background: var(--err); }
+
+    .mono { font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .hidden { display:none !important; }
+
+    /* Einheitlicher Button-Stil Landing + Dialog */
+    input, select, button, [role="button"], .button { border-radius: var(--radius); }
+    input, select { background: rgba(255,255,255,0.02) !important; color: var(--text) !important; border: 1px solid var(--border) !important; }
+    button, [role="button"], .button {
+      background: rgba(255,255,255,0.02);
+      color: var(--text);
+      border: 1px solid var(--border);
+      font-weight: 700;
+      font-size: 1rem;               /* <- einheitliche Schriftgröße */
+      border-radius: var(--radius) !important;
+    }
+    button:hover { background: rgba(255,255,255,0.06); }
+    button:active, button.primary, .primary { background: var(--accent) !important; color: #fff !important; border-color: var(--accent) !important; }
+    input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
+
+    footer.site { padding: .9rem 1.1rem; }
+
+    .grow-title { font-size: clamp(1.4rem, 3.5vw, 2rem); margin: 0; }
+    .grow-meta { display:flex; gap:1rem; flex-wrap:wrap; color: var(--text-dim); }
+    .progress { height: 10px; background: rgba(255,255,255,0.12); border-radius: 999px; overflow: hidden; border: 1px solid var(--border); }
+    .progress > span { display:block; height:100%; width:0%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+  </style>
+</head>
+<body>
+  <header class="hero container">
+    <nav>
+      <ul>
+        <li><h1 class="brand"><span class="brand-word">LISA</span><span class="brand-pro">pro</span></h1></li>
+      </ul>
+      <ul>
+        <li><span class="badge" title="Internetverbindung"><span id="liveDot" class="dot"></span> <span id="liveText">Offline</span></span></li>
+        <li><span class="badge" title="Zustand der Box"><span id="healthDot" class="dot"></span> <span id="healthText">Unbekannt</span></span></li>
+      </ul>
+    </nav>
+    <p class="subtitle">Automatisierte Growbox</p>
+  </header>
+
+  <main class="container">
+    <div class="grid" style="margin-top:1rem;">
+
+      <!-- GROW -->
+      <article>
+        <header><h2>Grow</h2></header>
+        <div class="content" style="padding: 1rem; display: grid; gap: .8rem;">
+          <h3 id="growTitle" class="grow-title">Noch nicht gestartet</h3>
+          <div class="grow-meta">
+            <span>Gesamt: <strong><span id="totalDays">90</span> Tage</strong></span>
+            <span>Start: <strong><span id="growStart">—</span></strong></span>
+          </div>
+          <div class="progress" aria-label="Grow-Fortschritt"><span id="growProgress" style="width:0%"></span></div>
+
+          <div id="seedRow" class="grid" style="margin-top:.4rem;">
+            <label for="seed">Samen-Sorte
+              <select id="seed" name="seed" required>
+                <option value="Northern Lights">Northern Lights</option>
+                <option value="White Widow">White Widow</option>
+                <option value="Amnesia Haze">Amnesia Haze</option>
+                <option value="Blue Dream">Blue Dream</option>
+                <option value="Gorilla Glue #4">Gorilla Glue #4</option>
+              </select>
+            </label>
+          </div>
+
+          <footer style="display:flex; align-items:center; gap:1rem; padding-top:.4rem;">
+            <button id="toggleGrow" class="primary">START</button>
+            <small>Aktuelle Sorte: <span id="seedNow">—</span></small>
+          </footer>
+        </div>
+      </article>
+
+      <!-- ZUBEHÖR -->
+      <article>
+        <header><h2>Zubehör</h2></header>
+        <div class="content" style="padding: 1rem; display: grid; gap:.6rem;">
+          <div>
+            <button id="btnAddon" class="primary" type="button">Zubehör hinzufügen</button>
+          </div>
+          <div>
+            <h3 style="margin:.4rem 0;">Aktiv</h3>
+            <ul id="addonList"><li class="mono" id="addonEmpty">kein Zubehör verbunden</li></ul>
+          </div>
+        </div>
+      </article>
+
+      <!-- LIVE STATUS -->
+      <article>
+        <header><h2>Live Status</h2></header>
+        <div class="content" style="padding: 1rem;">
+          <div class="grid">
+            <div>
+              <h3>System</h3>
+              <ul>
+                <li>Uptime: <span class="mono" id="stUp">—</span></li>
+                <li>Uhrzeit: <span class="mono" id="stNtp">—</span></li>
+              </ul>
+            </div>
+            <div>
+              <h3>Umgebung</h3>
+              <ul>
+                <li>Temp: <span class="mono" id="stT">—</span> °C</li>
+                <li>rF: <span class="mono" id="stH">—</span> %</li>
+                <li>VPD: <span class="mono" id="stVpd">—</span> kPa</li>
+              </ul>
+            </div>
+            <div>
+              <h3>Aktoren</h3>
+              <ul>
+                <li>Licht: <span id="stLight">—</span></li>
+                <li>Lüfter: <span id="stFan">—</span></li>
+                <li>Pumpe: <span id="stPump">—</span></li>
+              </ul>
+            </div>
+          </div>
+          <footer style="padding-top:.5rem;">
+            <small>Letztes Update: <span id="stTs">—</span> · FW <span id="fw">—</span></small>
+          </footer>
+        </div>
+      </article>
+
+      <!-- NETZWERK -->
+      <article>
+        <header><h2>Netzwerk</h2></header>
+        <div class="content" style="padding: 1rem;">
+          <ul>
+            <li>IP: <span class="mono" id="stIp">—</span> (<span id="stNet">—</span>)</li>
+            <li>RSSI: <span class="mono" id="stRssi">—</span> dBm</li>
+          </ul>
+          <footer style="display:flex; justify-content:flex-end; padding-top:.5rem;">
+            <button id="btnOpenNet" class="primary">Einstellungen</button>
+          </footer>
+        </div>
+      </article>
+
+    </div>
+  </main>
+
+  <footer class="site container">
+    <small>© 2025 Martin Teske · Lisa Pro · "Grow smart, not hard."</small>
+    <small><span id="apInfo" class="mono"></span></small>
+  </footer>
+
+  <!-- EINSTELLUNGEN (Netzwerk + Benachrichtigungen) -->
+  <dialog id="dlgNet" class="modal">
+    <article>
+      <header>
+        <h3>Einstellungen</h3>
+        <button aria-label="Schließen" rel="prev" onclick="document.getElementById('dlgNet').close()">✕</button>
+      </header>
+      <div class="content" style="padding: 1rem; display:grid; gap:1rem;">
+        <form id="netForm">
+          <h4>WLAN</h4>
+          <div class="grid">
+            <label>SSID <input id="ssid" name="ssid" placeholder="MeinWiFi" /></label>
+            <label>Passwort <input id="pass" name="pass" type="password" placeholder="••••••••" /></label>
+          </div>
+          <div class="grid">
+            <label><input type="checkbox" id="useStatic" name="useStatic" /> Statische IP-Adresse verwenden</label>
+          </div>
+          <div id="staticBlock" class="grid hidden">
+            <label>IP-Adresse <input id="ip" name="ip" placeholder="192.168.1.50" /></label>
+            <label>Subnetzmaske <input id="mask" name="mask" placeholder="255.255.255.0" /></label>
+            <label>Gateway <input id="gw" name="gw" placeholder="192.168.1.1" /></label>
+            <label>DNS (optional) <input id="dns" name="dns" placeholder="1.1.1.1" /></label>
+          </div>
+
+          <footer style="display:flex; justify-content:flex-end; gap:.5rem; padding-top:.5rem;">
+            <button type="button" id="btnNetSave" class="primary">Speichern (WLAN)</button>
+          </footer>
+
+          <hr />
+          <h4>Benachrichtigungen (WhatsApp via CallMeBot)</h4>
+          <label><input type="checkbox" id="notifyEnabled" /> Benachrichtigungen aktivieren</label>
+          <div id="notifyBlock" class="grid hidden">
+            <label>Telefonnummer (mit Ländervorwahl) <input id="notifyPhone" placeholder="+49XXXXXXXXXX" /></label>
+            <label>API-Key <input id="notifyKey" placeholder="abcdef" /></label>
+            <div style="display:flex; gap:.5rem;">
+              <button id="btnNotifySave" type="button" class="primary">Speichern (Benachr.)</button>
+              <button id="btnNotifyTest" type="button">Testnachricht senden</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </article>
+  </dialog>
+
+  <dialog id="toast" class="modal">
+    <article>
+      <header><strong>Status</strong></header>
+      <div class="content" style="padding: 1rem;">
+        <p id="toastMsg">—</p>
+      </div>
+      <footer style="display:flex; justify-content:flex-end; padding:.75rem 1rem;">
+        <button onclick="document.getElementById('toast').close()">OK</button>
+      </footer>
+    </article>
+  </dialog>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const live = { ws: null, timer: null, lastStatus: null };
+    let netDialogOpen = false;     // blockiert UI-Overwrite im Dialog
+
+    function showToast(msg){ $('toastMsg').textContent = msg; $('toast').showModal(); }
+    function ipv4ok(s){
+      const parts=(s||'').split('.').map(n=>+n);
+      return parts.length===4 && parts.every(n=>Number.isInteger(n) && n>=0 && n<=255);
+    }
+    function phoneOk(s){ return /^\+\d{6,16}$/.test((s||'').trim()); }
+    function format1(n){ return (n==null||isNaN(n))?'—':(+n).toFixed(1); }
+
+    function updateToggleButton(started){
+      $('toggleGrow').textContent = started ? 'STOP' : 'START';
+      $('toggleGrow').classList.toggle('primary', !started);
+    }
+    function updateSeedVisibility(started){ $('seedRow').classList.toggle('hidden', !!started); }
+
+    function updateStatus(s){
+      live.lastStatus = s;
+      // Grow
+      if (s.grow){
+        $('growTitle').textContent = s.grow.started ? `Tag ${s.grow.day} · ${s.grow.phase||''}` : 'Noch nicht gestartet';
+        $('totalDays').textContent = s.grow.total_days ?? 90;
+        $('growStart').textContent = s.grow.start_epoch ? new Date(s.grow.start_epoch*1000).toLocaleString() : '—';
+        const total = s.grow.total_days||0, day = s.grow.day||0;
+        const pct = total>0 ? Math.min(100, Math.round((day/total)*100)) : 0;
+        $('growProgress').style.width = pct + '%';
+        updateToggleButton(s.grow.started);
+        updateSeedVisibility(s.grow.started);
+      }
+      if (s.seed) { $('seed').value = s.seed; $('seedNow').textContent = s.seed; }
+
+      // System/Netz
+      $('stUp').textContent = (s.uptime_s != null) ? (Math.floor(s.uptime_s/3600)+'h '+Math.floor((s.uptime_s%3600)/60)+'m') : '—';
+      $('stNtp').textContent = s.ntp_time || '—';
+      $('stT').textContent = format1(s.temp_c);
+      $('stH').textContent = format1(s.humi_rh);
+      $('stVpd').textContent = format1(s.vpd_kpa);
+      $('stLight').textContent = s.light_on ? 'AN' : 'AUS';
+      $('stFan').textContent = s.fan_on ? 'AN' : 'AUS';
+      $('stPump').textContent = s.pump_on ? 'AN' : 'AUS';
+      $('stTs').textContent = s.ntp_time || '—';
+      $('fw').textContent = s.fw || '—';
+      $('stIp').textContent = s.ip || '—';
+      $('stNet').textContent = s.use_static ? 'statisch' : 'DHCP';
+      $('stRssi').textContent = (s.rssi != null ? s.rssi : '—');
+      if (s.ap && s.ap.ssid && s.ap.ip) { $('apInfo').textContent = 'AP: '+s.ap.ssid+' · '+s.ap.ip; }
+
+      // Notify-Felder nicht überschreiben, wenn Dialog offen
+      if (!netDialogOpen && s.notify) {
+        $('notifyEnabled').checked = !!s.notify.enabled;
+        $('notifyBlock').classList.toggle('hidden', !s.notify.enabled);
+        if (s.notify.phone) $('notifyPhone').value = s.notify.phone;
+        if (s.notify.apikey) $('notifyKey').value = s.notify.apikey;
+      }
+    }
+
+    async function fetchJSON(url, options){
+      const r=await fetch(url, Object.assign({headers:{'Content-Type':'application/json'}}, options||{}));
+      if(!r.ok) throw new Error(r.status+' '+r.statusText);
+      return await r.json().catch(()=> ({}));
+    }
+
+    async function loadInfo(){
+      try{
+        const j=await fetchJSON('/api/info');
+        if(j.seed) $('seed').value=j.seed; $('seedNow').textContent=j.seed||'—';
+        if(j.network){
+          $('ssid').value=''; // leer lassen, um bestehendes WLAN nicht zu überschreiben
+          $('pass').value='';
+          const useStatic=!!j.network.use_static;
+          $('useStatic').checked=useStatic;
+          $('staticBlock').classList.toggle('hidden', !useStatic);
+          if(j.network.static){
+            $('ip').value=j.network.static.ip||'';
+            $('mask').value=j.network.static.mask||'';
+            $('gw').value=j.network.static.gw||'';
+            $('dns').value=j.network.static.dns||'';
+          }
+        }
+        if(j.notify){
+          $('notifyEnabled').checked=!!j.notify.enabled;
+          $('notifyBlock').classList.toggle('hidden', !j.notify.enabled);
+          $('notifyPhone').value=j.notify.phone||'';
+          $('notifyKey').value=j.notify.apikey||'';
+        }
+      }catch(e){ console.warn('info load failed', e); }
+    }
+
+    function startWS(){
+      try{
+        const proto=location.protocol==='https:'?'wss':'ws';
+        live.ws=new WebSocket(proto+'://'+location.host+'/ws');
+        live.ws.addEventListener('message',(ev)=>{ try{ updateStatus(JSON.parse(ev.data)); }catch(_){} });
+        live.ws.addEventListener('close',()=>{ startPolling(); });
+        live.ws.addEventListener('error',()=>{ try{ live.ws.close(); }catch(_){} });
+      }catch(_){ startPolling(); }
+    }
+    function startPolling(){
+      if(live.timer) return;
+      live.timer=setInterval(async()=>{
+        try{ const s=await fetchJSON('/api/status'); updateStatus(s); }catch(_){ }
+      }, 3000);
+    }
+
+    // UI Events
+    document.addEventListener('click', (e)=>{
+      if (e.target && e.target.id === 'btnOpenNet') {
+        netDialogOpen = true;
+        $('dlgNet').showModal();
+      }
+    });
+    $('dlgNet').addEventListener('close', ()=>{ netDialogOpen = false; });
+    $('dlgNet').addEventListener('cancel', ()=>{ netDialogOpen = false; });
+
+    $('useStatic').addEventListener('change', (e)=> $('staticBlock').classList.toggle('hidden', !e.target.checked));
+    $('notifyEnabled').addEventListener('change', (e)=> $('notifyBlock').classList.toggle('hidden', !e.target.checked));
+
+    async function saveNotify(){
+      const enabled=$('notifyEnabled').checked;
+      const phone=$('notifyPhone').value.trim();
+      const apikey=$('notifyKey').value.trim();
+      if(enabled){
+        if(!phoneOk(phone)){ showToast('Telefonnummer ist ungültig (Format +49...)'); return; }
+        if(!apikey){ showToast('API-Key fehlt'); return; }
+      }
+      const payload={ enabled, phone, apikey };
+      try{
+        // bevorzugt eigenes Notify-Endpoint
+        await fetchJSON('/api/notify', { method:'POST', body: JSON.stringify(payload) });
+        showToast('Benachrichtigung gespeichert');
+      }catch(e){
+        // Fallback: über /api/network nur notify persistieren (Backend-kompatibel)
+        try{
+          await fetchJSON('/api/network', { method:'POST', body: JSON.stringify({ notify: payload }) });
+          showToast('Benachrichtigung gespeichert');
+        }catch(e2){ showToast('Fehler beim Speichern: '+e2.message); }
+      }
+    }
+
+    $('btnNotifySave').addEventListener('click', saveNotify);
+
+    $('btnNotifyTest').addEventListener('click', async ()=>{
+      if(!$('notifyEnabled').checked){ showToast('Benachrichtigungen sind deaktiviert'); return; }
+      const phone=$('notifyPhone').value.trim(); const key=$('notifyKey').value.trim();
+      if(!phoneOk(phone)){ showToast('Telefonnummer ist ungültig (Format +49...)'); return; }
+      if(!key){ showToast('API-Key fehlt'); return; }
+      try{
+        await fetchJSON('/api/notify/test',{method:'POST', body: JSON.stringify({ phone, apikey:key })});
+        showToast('Testnachricht gesendet');
+      } catch(e){ showToast('Fehler beim Senden: '+e.message); }
+    });
+
+    // WLAN explizit speichern (immer Reboot danach)
+    $('btnNetSave').addEventListener('click', async ()=>{
+      const ssid=$('ssid').value.trim();
+      const pass=$('pass').value; // kann leer bleiben -> Passwort unverändert lassen
+      const useStatic=$('useStatic').checked;
+      const ip=$('ip').value.trim();
+      const mask=$('mask').value.trim();
+      const gw=$('gw').value.trim();
+      const dns=$('dns').value.trim();
+
+      const wantsStaticBlock = useStatic || ip || mask || gw || dns; // irgendeine statische Eingabe
+
+      // Wenn weder SSID eingegeben noch IP-Settings angefasst, dann nichts speichern
+      if(!ssid && !wantsStaticBlock){
+        showToast('Keine WLAN-Änderungen erkannt');
+        return;
+      }
+
+      if(useStatic){
+        for(const [val,label] of [[ip,'IP-Adresse'],[mask,'Subnetzmaske'],[gw,'Gateway']]){
+          if(!ipv4ok(val)){ showToast('Ungültige IPv4 in '+label); return; }
+        }
+        if(dns && !ipv4ok(dns)){ showToast('Ungültige IPv4 in DNS'); return; }
+      }
+
+      const payload = {};
+      if(ssid) payload.ssid = ssid;            // nur senden, wenn gesetzt
+      if(pass) payload.pass = pass;            // nur senden, wenn gesetzt (sonst altes PW beibehalten)
+      payload.use_static = !!useStatic;        // explizit senden (spiegelt UI)
+      payload.static = useStatic ? { ip, mask, gw, dns } : null;
+
+      try{
+        await fetchJSON('/api/network', {method:'POST', body: JSON.stringify(payload)});
+        showToast('WLAN gespeichert – Gerät startet neu…');
+        setTimeout(()=>location.reload(), 1500);
+      } catch(e){ showToast('Fehler: '+e.message); }
+    });
+
+    (async function(){
+      await loadInfo();
+      startWS();
+      try{ const s=await fetchJSON('/api/status'); updateStatus(s); }catch(_){ }
+    })();
+  </script>
+</body>
+</html>

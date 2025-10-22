@@ -298,7 +298,7 @@ namespace lumina
   // --- Sensor-/Kalibrier-Defaults ---
   namespace calib
   {
-    constexpr int TOF_CAL_TARGET_MM = 100;
+    constexpr int TOF_CAL_TARGET_MM = 50;
     constexpr uint8_t TOF_CAL_SAMPLES = 10;
   }
 

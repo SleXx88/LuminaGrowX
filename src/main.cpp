@@ -1,6 +1,16 @@
 // LuminaGrowX main – uses centralized lumina_config
 
 #include <Arduino.h>
+
+#include <WiFi.h>
+#include <LittleFS.h>
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
+#include <ArduinoJson.h>
+#include <ESPmDNS.h>
+#include <HTTPClient.h>
+#include <time.h>
+
 #include <Wire.h>
 #include "sht41_ctrl.h"
 #include "gp8211_ctrl.h"
@@ -11,7 +21,8 @@
 #include "plant_ctrl.h"
 #include "rtc_ctrl.h"
 #include "lumina_config.h"
-#include <LittleFS.h>
+#include "net_ctrl.h"
+#include "web_ctrl.h"
 
 using namespace vpd_calc;
 using namespace plant_ctrl;
@@ -50,6 +61,8 @@ static StepperPins makeStepPins() {
 static StepperCtrl step(makeStepPins());
 PlantCtrl controller;
 RTC_Ctrl rtc;
+net_ctrl::NetCtrl net;
+web_ctrl::WebCtrl web;
 
 static inline bool approxEq(float a, float b, float eps = 0.02f) {
   return fabsf(a - b) <= eps;
@@ -85,6 +98,9 @@ void setup()
 {
   Serial.begin(115200);
   delay(200);
+
+  // Optional: Boot-Zurücksetzen in AP-Mode über GPIO6 (aktiv LOW für 5s, Pullup)
+  net.configureResetPin(6, /*activeHigh=*/false);
 
   // I2C
   Wire.begin(I2C_SDA_1, I2C_SCL_1, 400000);
@@ -135,37 +151,43 @@ void setup()
     Serial.println(F("[FS] LittleFS bereit"));
   }
 
-  // ToF: Offset laden oder automatisch kalibrieren (Fixture mit definiertem Abstand)
-  {
-    int offsetLoaded = 0;
-    bool haveOffset = false;
-    File f = LittleFS.open("/tof_offset.dat", FILE_READ);
-    if (f) {
-      String s = f.readString();
-      f.close();
-      int val = 0; int n = 0;
-      if (s.length() > 0) n = sscanf(s.c_str(), "%d", &val);
-      if (n == 1) { tof.setOffsetMm((int16_t)val); haveOffset = true; }
-    }
-    if (!haveOffset) {
-      // Automatische Ein-Punkt-Offset-Kalibrierung
-      int measured = tof.readAvgMm(lumina::calib::TOF_CAL_SAMPLES);
-      if (measured >= 0) {
-        int target = lumina::calib::TOF_CAL_TARGET_MM;
-        int off = measured - target; // readRawMm() zieht diesen Offset ab
-        tof.setOffsetMm((int16_t)off);
-        File fw = LittleFS.open("/tof_offset.dat", FILE_WRITE);
-        if (fw) { fw.printf("%d\n", off); fw.close(); }
-        Serial.println(F("[CAL] ToF Offset kalibriert und gespeichert"));
-      }
-    }
-  }
+  // // ToF: Offset laden oder automatisch kalibrieren (Fixture mit definiertem Abstand)
+  // {
+  //   int offsetLoaded = 0;
+  //   bool haveOffset = false;
+  //   File f = LittleFS.open("/tof_offset.dat", FILE_READ);
+  //   if (f) {
+  //     String s = f.readString();
+  //     f.close();
+  //     int val = 0; int n = 0;
+  //     if (s.length() > 0) n = sscanf(s.c_str(), "%d", &val);
+  //     if (n == 1) { tof.setOffsetMm((int16_t)val); haveOffset = true; }
+  //   }
+  //   if (!haveOffset) {
+  //     // Automatische Ein-Punkt-Offset-Kalibrierung
+  //     int measured = tof.readAvgMm(lumina::calib::TOF_CAL_SAMPLES);
+  //     if (measured >= 0) {
+  //       int target = lumina::calib::TOF_CAL_TARGET_MM;
+  //       int off = measured - target; // readRawMm() zieht diesen Offset ab
+  //       tof.setOffsetMm((int16_t)off);
+  //       File fw = LittleFS.open("/tof_offset.dat", FILE_WRITE);
+  //       if (fw) { fw.printf("%d\n", off); fw.close(); }
+  //       Serial.println(F("[CAL] ToF Offset kalibriert und gespeichert"));
+  //     }
+  //   }
+  // }
 
-  // RTC
+  // RTC (vor Netzstart initialisieren, damit NetCtrl darauf zugreifen darf)
   if (!rtc.begin(Wire1)) {
     Serial.println("[RTC] Keine Verbindung zur DS3231 (0x57).");
   } else {
     Serial.println("[RTC] Init OK (DS3231 gefunden).");
+  }
+
+  // Netzwerkteil starten (AP immer, STA wenn konfiguriert); mDNS: luminagrowx.local
+  {
+    bool forceAP = net.shouldForceAPAtBoot(5000);
+    net.begin(forceAP, "luminagrowx", &rtc);
   }
 
   // SHT41
@@ -201,9 +223,12 @@ void setup()
   controller.applyLuminaConfig();
 
   // Nach Homing: blockierende Annäherung an Mindestabstand
-  controller.runStartupApproachBlocking();
+  // controller.runStartupApproachBlocking();
 
   Serial.println(F("PlantCtrl demo startet"));
+
+  // Webserver + API starten
+  web.begin(&controller, &rtc, &net);
 }
 
 void loop()
@@ -259,4 +284,7 @@ void loop()
       Serial.println(F(" [SHT41] Read FAILED"));
     }
   }
+
+  // Web/Net periodische Aufgaben
+  web.loop();
 }
