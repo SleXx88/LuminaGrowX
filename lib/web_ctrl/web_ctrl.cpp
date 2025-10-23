@@ -14,6 +14,7 @@ static const char* NOTIFY_CFG_PATH= "/cfg/notify.json";
 static const char* FW_VERSION     = "1.0.0";
 
 static bool readTextFile(const char* path, String& out) {
+  if (!LittleFS.exists(path)) return false;
   File f = LittleFS.open(path, FILE_READ);
   if (!f) return false;
   out = f.readString();
@@ -143,9 +144,9 @@ void WebCtrl::setupRoutes_() {
              if (!doc["notify"].isNull()) {
                JsonObject ntf = doc["notify"].as<JsonObject>();
                NotifyCfg n = notify_;
-               if (!ntf["enabled"].isNull()) n.enabled = ntf["enabled"].as<bool>();
-               if (!ntf["phone"].isNull())   n.phone   = String((const char*)ntf["phone"]);
-               if (!ntf["apikey"].isNull())  n.apikey  = String((const char*)ntf["apikey"]);
+             if (!ntf["enabled"].isNull()) n.enabled = ntf["enabled"].as<bool>();
+             if (!ntf["phone"].isNull())   n.phone   = String((const char*)ntf["phone"]);
+             if (!ntf["apikey"].isNull())  { String k = String((const char*)ntf["apikey"]); if (k.length() && k != "***") n.apikey = k; }
                saveNotify(n);
              }
              bool requestedReboot = doc["reboot"].as<bool>();
@@ -169,9 +170,27 @@ void WebCtrl::setupRoutes_() {
              NotifyCfg n = notify_;
              if (!doc["enabled"].isNull()) n.enabled = doc["enabled"].as<bool>();
              if (!doc["phone"].isNull())   n.phone   = String((const char*)doc["phone"]);
-             if (!doc["apikey"].isNull())  n.apikey  = String((const char*)doc["apikey"]);
+             if (!doc["apikey"].isNull())  { String k = String((const char*)doc["apikey"]); if (k.length() && k != "***") n.apikey = k; }
              saveNotify(n);
-             req->send(200, "application/json", "{\"ok\":true}");
+             bool sent = false;
+             if (n.enabled && n.phone.length() && n.apikey.length()) {
+               String timeStr = rtc_ ? rtc_->readTimeString() : String("?");
+               String ipStr = (net_ && net_->isConnected()) ? net_->staIP().toString() : String("0.0.0.0");
+               int rssi = net_ ? net_->rssi() : -127;
+               float t = 0.f, rh = 0.f; float vpd = 0.f; float led = 0.f, fan = 0.f;
+               if (ctrl_) { t = (float)ctrl_->currentTemp(); rh = (float)ctrl_->currentRh(); vpd = (float)ctrl_->currentVpd();
+                 led = ctrl_->currentLedPercentEffective(); fan = ctrl_->currentFanPercent(); }
+               String msg = String("LuminaGrowX: Benachrichtigung aktiviert ") + timeStr +
+                            String(" | IP ") + ipStr +
+                            String(" | RSSI ") + String(rssi) + String(" dBm") +
+                            String(" | T ") + String(t,1) + String(" C, RH ") + String(rh,1) + String("%, VPD ") + String(vpd,2) + String(" kPa") +
+                            String(" | LED ") + String(led,0) + String("%, Fan ") + String(fan,0) + String("%");
+               Serial.printf("[API] /api/notify sending activation msg to %s\n", n.phone.c_str());
+               sent = whatsappSend_(n.phone, n.apikey, msg);
+               Serial.println(sent ? "[WA] Activation message sent" : "[WA] Activation message FAILED");
+             }
+             JsonDocument resp; resp["ok"] = true; resp["sent"] = sent; String out; serializeJson(resp, out);
+             req->send(200, "application/json", out);
            });
   http_.on("/api/notify", HTTP_OPTIONS, [this](AsyncWebServerRequest* req){
     Serial.println("[DEBUG] OPTIONS /api/notify");
@@ -188,6 +207,29 @@ void WebCtrl::setupRoutes_() {
                Serial.printf("[API] /api/notify/test JSON error: %s\n", err.c_str());
                req->send(400, "application/json", "{\"error\":\"bad json\"}"); 
                return; 
+             }
+             // If notifications are disabled but request provides phone+apikey, allow a one-off test send
+             bool _hasReqPhone = !doc["phone"].isNull() && String((const char*)doc["phone"]).length() > 0;
+             bool _hasReqKey   = !doc["apikey"].isNull() && String((const char*)doc["apikey"]).length() > 0;
+             if (!notify_.enabled && _hasReqPhone && _hasReqKey) {
+               String _phone = String((const char*)doc["phone"]);
+               String _key   = String((const char*)doc["apikey"]);
+               String timeStr = rtc_ ? rtc_->readTimeString() : String("?");
+               String ipStr = (net_ && net_->isConnected()) ? net_->staIP().toString() : String("0.0.0.0");
+               int rssi = net_ ? net_->rssi() : -127;
+               float t = 0.f, rh = 0.f; float vpd = 0.f; float led = 0.f, fan = 0.f;
+               if (ctrl_) { t = (float)ctrl_->currentTemp(); rh = (float)ctrl_->currentRh(); vpd = (float)ctrl_->currentVpd();
+                 led = ctrl_->currentLedPercentEffective(); fan = ctrl_->currentFanPercent(); }
+               String _msg = String("LuminaGrowX Test ") + timeStr +
+                             String(" | IP ") + ipStr +
+                             String(" | RSSI ") + String(rssi) + String(" dBm") +
+                             String(" | T ") + String(t,1) + String(" C, RH ") + String(rh,1) + String("%, VPD ") + String(vpd,2) + String(" kPa") +
+                             String(" | LED ") + String(led,0) + String("%, Fan ") + String(fan,0) + String("%");
+               Serial.printf("[API] /api/notify/test (one-off) phone=%s\n", _phone.c_str());
+               bool ok = whatsappSend_(_phone, _key, _msg);
+               if (ok) { Serial.println("[WA] Testnachricht OK (one-off)"); req->send(200, "application/json", "{\"ok\":true}"); }
+               else { Serial.println("[WA] Testnachricht FEHLER (one-off)"); req->send(500, "application/json", "{\"error\":\"send failed\"}"); }
+               return;
              }
              if (!notify_.enabled) {
                Serial.println("[WA] Notifications disabled (switch off) — aborting send");
@@ -277,16 +319,18 @@ String WebCtrl::makeStatusJson_() {
   doc["uptime_s"] = (uint64_t)uptime_s();
   doc["ntp_time"] = rtc_ ? rtc_->readTimeString() : String("");
   // Env
-  float tIn = NAN, rhIn = NAN; double vpd = NAN;
+  float tIn = NAN, rhIn = NAN; double vpd = NAN; float tOut = NAN;
   if (ctrl_) {
     tIn = (float)ctrl_->currentTemp();
     rhIn = (float)ctrl_->currentRh();
     vpd = ctrl_->currentVpd();
+    tOut = (float)ctrl_->currentTempOut();
   }
   auto round1 = [](float x){ return isnan(x)? NAN : (float)roundf(x*10.f)/10.f; };
   doc["temp_c"] = round1(tIn);
   doc["humi_rh"] = round1(rhIn);
   doc["vpd_kpa"] = round1((float)vpd);
+  doc["temp_out_c"] = round1(tOut);
   // Actuators
   float ledPct = ctrl_ ? ctrl_->currentLedPercentEffective() : 0.0f;
   float fanPct = ctrl_ ? ctrl_->currentFanPercent() : 0.0f;
@@ -379,7 +423,9 @@ bool WebCtrl::whatsappSend_(const String& phone, const String& apikey, const Str
     Serial.println(String("[WA] HTTPS ") + url);
     if (http.begin(client, url)) {
       int code = http.GET();
+      String body = http.getString();
       Serial.printf("[WA] HTTPS code=%d\n", code);
+      if (body.length()) { Serial.print("[WA] HTTPS body: "); Serial.println(body); }
       http.end();
       if (code == 200) return true;
     } else {
@@ -395,7 +441,9 @@ bool WebCtrl::whatsappSend_(const String& phone, const String& apikey, const Str
     Serial.println(String("[WA] HTTP ") + url);
     if (http.begin(client, url)) {
       int code = http.GET();
+      String body = http.getString();
       Serial.printf("[WA] HTTP code=%d\n", code);
+      if (body.length()) { Serial.print("[WA] HTTP body: "); Serial.println(body); }
       http.end();
       if (code == 200) return true;
     } else {
