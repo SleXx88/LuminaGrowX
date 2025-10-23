@@ -127,10 +127,10 @@ void setup()
   dac.setPercent(10);
 
   // Stepper
-  step.begin();
-  step.enableDebug(true);
-  step.setDebugMoveLogInterval(100);
-  while (!step.home()) { step.tick(); }
+  // step.begin();
+  // step.enableDebug(true);
+  // step.setDebugMoveLogInterval(100);
+  // while (!step.home()) { step.tick(); }
 
   // step.moveTo(180.0f, 5); // --------------------------------------------------------------- Nur für den Anfang, damit die LED näher an der Pflanze ist
   // waitUntilStill(step);
