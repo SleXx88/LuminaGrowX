@@ -81,6 +81,7 @@ void WebCtrl::begin(plant_ctrl::PlantCtrl* ctrl, RTC_Ctrl* rtc, NetCtrl* net) {
 
   DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
   DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "Content-Type");
+  DefaultHeaders::Instance().addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
 
   setupRoutes_();
   http_.begin();
@@ -163,6 +164,7 @@ void WebCtrl::setupRoutes_() {
   // standalone notify save
   http_.on("/api/notify", HTTP_POST, [](AsyncWebServerRequest*){}, NULL,
            [this](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t, size_t){
+             Serial.printf("[DEBUG] /api/notify hit, body len=%u\n", (unsigned)len);
              JsonDocument doc; if (deserializeJson(doc, data, len)) { req->send(400, "application/json", "{\"error\":\"bad json\"}"); return; }
              NotifyCfg n = notify_;
              if (!doc["enabled"].isNull()) n.enabled = doc["enabled"].as<bool>();
@@ -171,9 +173,14 @@ void WebCtrl::setupRoutes_() {
              saveNotify(n);
              req->send(200, "application/json", "{\"ok\":true}");
            });
+  http_.on("/api/notify", HTTP_OPTIONS, [this](AsyncWebServerRequest* req){
+    Serial.println("[DEBUG] OPTIONS /api/notify");
+    req->send(200);
+  });
 
   http_.on("/api/notify/test", HTTP_POST, [](AsyncWebServerRequest*){}, NULL,
            [this](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t, size_t){
+             Serial.println("[DEBUG] UI: Testnachricht-Button gedrueckt");
              Serial.printf("[API] /api/notify/test body len=%u\n", (unsigned)len);
              JsonDocument doc; 
              DeserializationError err = deserializeJson(doc, data, len);
@@ -181,6 +188,11 @@ void WebCtrl::setupRoutes_() {
                Serial.printf("[API] /api/notify/test JSON error: %s\n", err.c_str());
                req->send(400, "application/json", "{\"error\":\"bad json\"}"); 
                return; 
+             }
+             if (!notify_.enabled) {
+               Serial.println("[WA] Notifications disabled (switch off) — aborting send");
+               req->send(403, "application/json", "{\"error\":\"notifications disabled\"}");
+               return;
              }
              String phone = doc["phone"].isNull() ? notify_.phone : String((const char*)doc["phone"]);
              String key   = doc["apikey"].isNull() ? notify_.apikey : String((const char*)doc["apikey"]);
@@ -202,7 +214,26 @@ void WebCtrl::setupRoutes_() {
              bool ok = whatsappSend_(phone, key, msg);
              if (ok) { Serial.println("[WA] Testnachricht OK"); req->send(200, "application/json", "{\"ok\":true}"); }
              else { Serial.println("[WA] Testnachricht FEHLER"); req->send(500, "application/json", "{\"error\":\"send failed\"}"); }
-           });
+            });
+  http_.on("/api/notify/test", HTTP_OPTIONS, [this](AsyncWebServerRequest* req){
+    Serial.println("[DEBUG] OPTIONS /api/notify/test");
+    req->send(200);
+  });
+
+  // Simple debug touch endpoint to verify frontend click reaches backend
+  http_.on("/api/debug/touch", HTTP_GET, [this](AsyncWebServerRequest* req){
+    String stage = req->hasParam("stage") ? req->getParam("stage")->value() : String("");
+    String en = req->hasParam("en") ? req->getParam("en")->value() : String("");
+    String phoneLen = req->hasParam("phoneLen") ? req->getParam("phoneLen")->value() : String("");
+    String hasKey = req->hasParam("key") ? req->getParam("key")->value() : String("");
+    if (stage.length()) {
+      Serial.printf("[DEBUG] /api/debug/touch stage=%s en=%s phoneLen=%s key=%s\n",
+                    stage.c_str(), en.c_str(), phoneLen.c_str(), hasKey.c_str());
+    } else {
+      Serial.println("[DEBUG] /api/debug/touch hit");
+    }
+    req->send(200, "text/plain", "ok");
+  });
 
   http_.on("/api/grow", HTTP_POST, [](AsyncWebServerRequest*){}, NULL,
            [this](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t, size_t){

@@ -267,21 +267,21 @@ void loop()
       Serial.print(F(" % | LED: "));
       Serial.print(controller.currentLedPercentEffective(), 1);
       Serial.print(F(" % | Fan: "));
-      Serial.print(controller.currentFanPercent(), 1);
+      Serial.println(controller.currentFanPercent(), 1);
 
-      int distance = tof.readRawMm();
-      Serial.print(F(" % | ToF: "));
-      if (distance >= 0) {
-        Serial.print(distance);
-        Serial.print(F(" mm"));
-      } else {
-        Serial.print(F("out of range - "));
-        Serial.print(distance);
-        Serial.print(F(" mm"));
-      }
-      Serial.println();
-    } else {
-      Serial.println(F(" [SHT41] Read FAILED"));
+    //   int distance = tof.readRawMm();
+    //   Serial.print(F(" % | ToF: "));
+    //   if (distance >= 0) {
+    //     Serial.print(distance);
+    //     Serial.print(F(" mm"));
+    //   } else {
+    //     Serial.print(F("out of range - "));
+    //     Serial.print(distance);
+    //     Serial.print(F(" mm"));
+    //   }
+    //   Serial.println();
+    // } else {
+    //   Serial.println(F(" [SHT41] Read FAILED"));
     }
   }
 

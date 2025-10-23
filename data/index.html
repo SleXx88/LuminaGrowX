@@ -146,7 +146,7 @@
     </main>
 
     <footer class="site container">
-      <small>© 2025 Lisa Pro - "Grow smart, not hard."</small>
+      <small>Ãƒâ€šÃ‚Â© 2025 Lisa Pro - "Grow smart, not hard."</small>
       <small><span id="apInfo" class="mono"></span></small>
     </footer>
 
@@ -154,7 +154,7 @@
       <article>
         <header>
           <h3>Einstellungen</h3>
-          <button aria-label="Schliessen" rel="prev" onclick="document.getElementById('dlgNet').close()">✕</button>
+          <button aria-label="Schliessen" rel="prev" onclick="document.getElementById('dlgNet').close()"></button>
         </header>
         <div class="content" style="padding: 1rem; display:grid; gap:1rem;">
           <form id="netForm">
@@ -164,7 +164,7 @@
               <label>Passwort <input id="pass" name="pass" type="password" placeholder="********" /></label>
             </div>
             <div class="grid">
-              <label><input type="checkbox" id="useStatic" name="useStatic" /> Statische IP-Adresse verwenden</label>
+              <label><input type="checkbox" id="useStatic" name="useStatic" role="switch" /> Statische IP-Adresse verwenden</label>
             </div>
             <div id="staticBlock" class="grid hidden">
               <label>IP-Adresse <input id="ip" name="ip" placeholder="192.168.1.50" /></label>
@@ -179,7 +179,7 @@
 
             <hr />
             <h4>Benachrichtigungen (WhatsApp via CallMeBot)</h4>
-            <label><input type="checkbox" id="notifyEnabled" /> Benachrichtigungen aktivieren</label>
+            <label><input type="checkbox" id="notifyEnabled" role="switch" /> Benachrichtigungen aktivieren</label>
             <div id="notifyBlock" class="grid hidden">
               <label>Telefonnummer (+Laendervorwahl) <input id="notifyPhone" placeholder="+49XXXXXXXXXX" /></label>
               <label>API-Key <input id="notifyKey" placeholder="abcdef" /></label>
@@ -229,7 +229,7 @@
         }
         if (s.grow){
           $('growTitle').textContent = s.grow.started ? ('Tag ' + s.grow.day + ' - ' + (s.grow.phase||'')) : 'Noch nicht gestartet';
-          $('totalDays').textContent = s.grow.total_days ?? 90;
+          totalDays.textContent = (s.grow.total_days != null ? s.grow.total_days : 90);
           $('growStart').textContent = s.grow.start_epoch ? new Date(s.grow.start_epoch*1000).toLocaleString() : '';
           const total = s.grow.total_days||0, day = s.grow.day||0;
           const pct = total>0 ? Math.min(100, Math.round((day/total)*100)) : 0;
@@ -272,10 +272,9 @@
       $('notifyEnabled').addEventListener('change', (e)=> $('notifyBlock').classList.toggle('hidden', !e.target.checked));
       async function saveNotify(){ const enabled=$('notifyEnabled').checked; const phone=$('notifyPhone').value.trim(); const apikey=$('notifyKey').value.trim(); if(enabled){ if(!phoneOk(phone)){ showToast('Telefonnummer ist ungueltig (Format +49...)'); return; } if(!apikey){ showToast('API-Key fehlt'); return; } } const payload={ enabled, phone, apikey }; try{ await fetchJSON('/api/notify', { method:'POST', body: JSON.stringify(payload) }); showToast('Benachrichtigung gespeichert'); }catch(e){ try{ await fetchJSON('/api/network', { method:'POST', body: JSON.stringify({ notify: payload }) }); showToast('Benachrichtigung gespeichert'); }catch(e2){ showToast('Fehler beim Speichern: '+e2.message); } } }
       $('btnNotifySave').addEventListener('click', saveNotify);
-      $('btnNotifyTest').addEventListener('click', async ()=>{ if(!$('notifyEnabled').checked){ showToast('Benachrichtigungen sind deaktiviert'); return; } const phone=$('notifyPhone').value.trim(); const key=$('notifyKey').value.trim(); if(!phoneOk(phone)){ showToast('Telefonnummer ist ungueltig (Format +49...)'); return; } if(!key){ showToast('API-Key fehlt'); return; } try{ showToast('Sende Testnachricht...'); const r = await fetch('/api/notify/test', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ phone, apikey:key }) }); if(!r.ok){ const t=await r.text().catch(()=> ''); throw new Error(r.status+' '+r.statusText+' '+t); } showToast('Testnachricht gesendet (siehe WhatsApp)'); } catch(e){ showToast('Fehler beim Senden: '+e.message); } });
+      btnNotifyTest.addEventListener('click', async ()=>{ const en=notifyEnabled.checked; const phone=notifyPhone.value.trim(); const key=notifyKey.value.trim(); try{ fetch(location.origin + '/api/debug/touch?stage=clicked&en='+(en?1:0)+'&phoneLen='+phone.length+'&key='+(key?1:0)).catch(()=>{});}catch(_){} if(!en){ showToast('Benachrichtigungen sind deaktiviert'); return; } if(!phoneOk(phone)){ try{ fetch(location.origin + '/api/debug/touch?stage=blocked_phone').catch(()=>{});}catch(_){} showToast('Telefonnummer ist ungueltig (Format +49...)'); return; } if(!key){ try{ fetch(location.origin + '/api/debug/touch?stage=blocked_key').catch(()=>{});}catch(_){} showToast('API-Key fehlt'); return; } try{ showToast('Sende Testnachricht...'); try{ fetch(location.origin + '/api/debug/touch?stage=sendreq').catch(()=>{});}catch(__){} const r = await fetch(location.origin + '/api/notify/test', { method:'POST', headers:{'Content-Type':'application/json','Cache-Control':'no-cache'}, cache:'no-store', body: JSON.stringify({ phone, apikey:key }) }); if(!r.ok){ const t=await r.text().catch(()=> ''); try{ fetch(location.origin + '/api/debug/touch?stage=resp_err').catch(()=>{});}catch(__){} throw new Error(r.status+' '+r.statusText+' '+t); } try{ fetch(location.origin + '/api/debug/touch?stage=resp_ok').catch(()=>{});}catch(__){} showToast('Testnachricht gesendet (siehe WhatsApp)'); } catch(e){ showToast('Fehler beim Senden: '+e.message); } });
       $('btnNetSave').addEventListener('click', async ()=>{ const ssid=$('ssid').value.trim(); const pass=$('pass').value; const useStatic=$('useStatic').checked; const ip=$('ip').value.trim(); const mask=$('mask').value.trim(); const gw=$('gw').value.trim(); const dns=$('dns').value.trim(); const wantsStaticBlock = useStatic || ip || mask || gw || dns; if(!ssid && !wantsStaticBlock){ showToast('Keine WLAN-Aenderungen erkannt'); return; } if(useStatic){ for(const [val,label] of [[ip,'IP-Adresse'],[mask,'Subnetzmaske'],[gw,'Gateway']]){ if(!ipv4ok(val)){ showToast('Ungueltige IPv4 in '+label); return; } } if(dns && !ipv4ok(dns)){ showToast('Ungueltige IPv4 in DNS'); return; } } const payload = {}; if(ssid) payload.ssid = ssid; if(pass) payload.pass = pass; payload.use_static = !!useStatic; payload.static = useStatic ? { ip, mask, gw, dns } : null; payload.reboot = true; showToastHtml('WLAN gespeichert. Bitte jetzt ins Heimnetz wechseln und <a href="http://luminagrowx.local/" target="_blank">http://luminagrowx.local/</a> aufrufen.'); try{ fetch('/api/network', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)}); }catch(_){ } });
       (async function(){ await loadInfo(); startWS(); try{ const s=await fetchJSON('/api/status'); updateStatus(s); }catch(_){ } })();
     </script>
   </body>
 </html>
-
