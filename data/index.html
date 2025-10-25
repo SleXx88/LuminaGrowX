@@ -38,6 +38,9 @@
       .brand-pro  { color: var(--accent); font-weight: 800; font-size: .55em; line-height: 1; vertical-align: super; position: relative; top: -0.25em; }
       header.hero { padding: 1rem; }
       header.hero p.subtitle { margin: .25rem 0 0; opacity: .85; color: var(--text-dim); }
+      .health-banner { margin-top:.6rem; padding:.6rem .8rem; border-radius: var(--radius); border:1px solid var(--border); background: rgba(239, 68, 68, 0.12); color: var(--text); }
+      .health-banner.ok { display:none; }
+      .health-list { margin:.25rem 0 0; padding-left:1rem; }
       .badge { display:inline-flex; align-items:center; gap:.4rem; font-size:.85rem; padding:.25rem .5rem; border-radius:999px; background: var(--glass-strong); border: 1px solid var(--border); }
       .dot { width:.55rem; height:.55rem; border-radius:50%; background:#9ca3af; display:inline-block; }
       .dot.ok { background: var(--ok); } .dot.warn { background: var(--warn); } .dot.err { background: var(--err); }
@@ -89,6 +92,7 @@
         </ul>
       </nav>
       <p class="subtitle">Automatisierte Growbox</p>
+      <div id="healthBanner" class="health-banner ok"></div>
     </header>
 
     <main class="container">
@@ -287,6 +291,37 @@
         $('stIp').textContent = s.ip || '-';
         $('stNet').textContent = s.use_static ? 'statisch' : 'DHCP';
         $('stRssi').textContent = (s.rssi != null ? s.rssi : '-');
+        // Health-Anzeige
+        try {
+          const hb = $('healthBanner');
+          if (s && s.health) {
+            const h = s.health;
+            const err = (h.state === 'error');
+            hb.classList.toggle('ok', !err);
+            if (err) {
+              const m = [];
+              const mods = (h.modules||{});
+              if (mods.sht_in === false) m.push('Innen-Sensor SHT41 fehlt/fehlerhaft');
+              if (mods.sht_out === false) m.push('Außen-Sensor SHT41 fehlt/fehlerhaft');
+              if (mods.dac === false) m.push('LED-DAC (GP8211) nicht erreichbar');
+              if (mods.fan === false) m.push('Lüfter-PWM Fehler');
+              if (mods.rtc === false) m.push('RTC (DS3231) nicht erreichbar');
+              if (mods.tof === false) m.push('ToF-Sensor nicht erreichbar');
+              if (mods.i2c0 === false) m.push('I²C-Bus 0 Fehler');
+              if (mods.i2c1 === false) m.push('I²C-Bus 1 Fehler');
+              if (mods.fs === false) m.push('Dateisystem (LittleFS) Fehler');
+              const paused = (h.control_paused===true);
+              const head = paused ? 'Regelung pausiert – Fehler erkannt:' : 'Fehler erkannt:';
+              const msg = (h.message && h.message.length) ? ('<div>'+h.message+'</div>') : '';
+              const list = m.length ? ('<ul class="health-list"><li>' + m.join('</li><li>') + '</li></ul>') : '';
+              hb.innerHTML = '<strong>'+head+'</strong>'+msg+list;
+            } else {
+              hb.innerHTML = '';
+            }
+          } else {
+            hb.classList.add('ok'); hb.innerHTML = '';
+          }
+        } catch(_){}
         if (s.ap && s.ap.ssid && s.ap.ip) { $('apInfo').textContent = 'AP: ' + s.ap.ssid + ' @ ' + s.ap.ip; }
         if (!netDialogOpen && s.notify) {
           $('notifyEnabled').checked = !!s.notify.enabled;

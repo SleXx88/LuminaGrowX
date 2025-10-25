@@ -23,6 +23,7 @@
 #include "lumina_config.h"
 #include "net_ctrl.h"
 #include "web_ctrl.h"
+#include "../include/health.h"
 
 using namespace vpd_calc;
 using namespace plant_ctrl;
@@ -105,6 +106,8 @@ void setup()
   // I2C
   Wire.begin(I2C_SDA_1, I2C_SCL_1, 400000);
   Wire1.begin(I2C_SDA_2, I2C_SCL_2, I2C_FREQ_2);
+  health::set_i2c0(true);
+  health::set_i2c1(true);
 
   // Fan
   FanCtrl::Config cfg;
@@ -119,8 +122,10 @@ void setup()
   // LED Initialisierung (GP8211)
   if (!dac.begin(Wire1)) {
     Serial.println("[GP8211] init FAIL (I2C addr 0x58)");
+    health::set_dac(false, F("GP8211 nicht erreichbar"));
   } else {
     Serial.println("[GP8211] init OK (10V-range set)");
+    health::set_dac(true);
   }
   // LED/DAC-Minimalspannung anpassen (Anzeige: 1% entspricht dieser Spannung)
   dac.setMinVoltAt1Percent(lumina::ledcfg::MIN_V_AT_1PCT);
@@ -143,12 +148,15 @@ void setup()
   }
   bool ok = tof.begin(Wire, 0x29, PIN_XSHUT);
   Serial.println(ok ? F("[ToF] Init OK") : F("[ToF] Init FAILED"));
+  health::set_tof(ok, ok ? String("") : F("ToF Init fehlgeschlagen"));
 
   // FS
   if (!LittleFS.begin(true)) {
     Serial.println(F("[FS] LittleFS mount/format FAILED"));
+    health::set_fs(false, F("LittleFS Fehler"));
   } else {
     Serial.println(F("[FS] LittleFS bereit"));
+    health::set_fs(true);
   }
 
   // // ToF: Offset laden oder automatisch kalibrieren (Fixture mit definiertem Abstand)
@@ -180,8 +188,10 @@ void setup()
   // RTC (vor Netzstart initialisieren, damit NetCtrl darauf zugreifen darf)
   if (!rtc.begin(Wire1)) {
     Serial.println("[RTC] Keine Verbindung zur DS3231 (0x57).");
+    health::set_rtc(false, F("RTC nicht erreichbar"));
   } else {
     Serial.println("[RTC] Init OK (DS3231 gefunden).");
+    health::set_rtc(true);
   }
 
   // Netzwerkteil starten (AP immer, STA wenn konfiguriert); mDNS: luminagrowx.local
@@ -194,14 +204,18 @@ void setup()
   Serial.println(F("[SHT41_in] Init..."));
   if (!sht_in.begin(Wire1, true)) {
     Serial.println(F("[SHT41_in] Init FAILED (Sensor nicht erreichbar?)"));
+    health::set_sht_in(false, F("SHT41 innen fehlt/fehlerhaft"));
   } else {
     Serial.println(F("[SHT41_in] Init OK"));
+    health::set_sht_in(true);
   }
   Serial.println(F("[SHT41_out] Init..."));
   if (!sht_out.begin(Wire, true)) {
     Serial.println(F("[SHT41_out] Init FAILED (Sensor nicht erreichbar?)"));
+    health::set_sht_out(false, F("SHT41 außen fehlt/fehlerhaft"));
   } else {
     Serial.println(F("[SHT41_out] Init OK"));
+    health::set_sht_out(true);
   }
 
   // Zentrale Env-Defaults anwenden (aus lumina_config.h)
@@ -227,7 +241,7 @@ void setup()
 
   Serial.println(F("PlantCtrl demo startet"));
 
-  // Webserver + API starten
+  // Webserver + API starten (immer, auch bei HW-Fehlern)
   web.begin(&controller, &rtc, &net);
 }
 
@@ -236,8 +250,20 @@ void loop()
   // Keep stepper ticking every frame
   step.tick();
 
-  // Run controller at high rate every loop iteration
-  controller.update();
+  // Regelung nur laufen lassen, wenn kritische Sensoren OK
+  if (health::critical_ok()) {
+    health::state().control_paused = false;
+    // Run controller at high rate every loop iteration
+    bool okUpdate = controller.update();
+    if (!okUpdate) {
+      // Sensor-Lesefehler -> pausieren und markieren
+      health::state().control_paused = true;
+      // Versuche, bei nächstem Loop weiterzumachen; hier kein harter Reset
+    }
+  } else {
+    health::state().control_paused = true;
+    // Keine Regelung wenn SHT fehlt; Stepper tickt weiter, Web läuft
+  }
 
   // Debug print every ~3s without throttling the control loop
   static unsigned long lastLogMs = 0;

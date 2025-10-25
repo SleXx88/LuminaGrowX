@@ -116,15 +116,34 @@ void NetCtrl::begin(bool forceAP, const char* mdnsName, RTC_Ctrl* rtc) {
   NetworkConfig tmp;
   loadConfig(tmp);
 
-  WiFi.mode(WIFI_AP_STA);
+  // Verhindere ungewolltes Auto-Connect mit alten, persistenten STA-Credentials
+  // (sonst wuerde der AP sofort wieder gestoppt, wenn STA automatisch verbindet)
+  WiFi.persistent(false);
+  WiFi.setAutoConnect(false);
+  WiFi.setAutoReconnect(true);
+  // Stelle sicher, dass kein altes Autokonfig-Connect aktiv ist
+  WiFi.disconnect(false, true);
 
-  // AP SSID: LuminaGrowX-<last4 mac>
+  WiFi.mode(WIFI_AP_STA);
+  delay(50);
+  // Sicherstellen, dass kein auto-gestarteter AP vom Core aktiv bleibt
+  WiFi.softAPdisconnect(true);
+  delay(20);
+  // Maximale Sendeleistung und kein Leichtschlaf, damit AP stabil sichtbar ist
+  WiFi.setTxPower(WIFI_POWER_19_5dBm);
+  WiFi.setSleep(false);
+
+  // AP SSID: LuminaGrowX-Setup-<last4 mac>
   String mac = WiFi.macAddress();
   mac.replace(":", "");
   mac = mac.substring(mac.length() - 4);
   apSSID_ = String("LuminaGrowX-Setup-") + mac;
-  WiFi.softAP(apSSID_.c_str());
+  // Statische AP-IP sicherstellen (Standard 192.168.4.1)
+  WiFi.softAPConfig(IPAddress(192,168,4,1), IPAddress(192,168,4,1), IPAddress(255,255,255,0));
+  // Offener AP ohne Passwort, sichtbare SSID, Kanal 1
+  WiFi.softAP(apSSID_.c_str(), "", 1, 0);
   apActive_ = true;
+  Serial.printf("[NET] AP gestartet (offen): SSID=%s, IP=%s\n", apSSID_.c_str(), WiFi.softAPIP().toString().c_str());
 
   if (!forceAP && cfg_.ssid.length()) {
     if (cfg_.useStatic) {
@@ -142,14 +161,13 @@ void NetCtrl::begin(bool forceAP, const char* mdnsName, RTC_Ctrl* rtc) {
     }
   }
 
-  if (WiFi.isConnected()) {
+  // STA-Verbindung herstellen (falls konfiguriert); AP bleiben lassen
+  if (WiFi.isConnected() && !forceAP && cfg_.ssid.length() > 0) {
     if (mdnsName && MDNS.begin(mdnsName)) {
       MDNS.addService("http", "tcp", 80);
       mdnsOk_ = true;
     }
-    // STA verbunden -> AP herunterfahren, damit das Handy ins Heimnetz wechselt
-    WiFi.softAPdisconnect(true);
-    apActive_ = false;
+    Serial.printf("[NET] STA verbunden: IP=%s (AP bleibt aktiv)\n", WiFi.localIP().toString().c_str());
   }
 
   internetOK_ = probeInternet();

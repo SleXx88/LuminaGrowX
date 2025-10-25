@@ -2,6 +2,7 @@
 #include "rtc_ctrl.h"
 #include "plant_ctrl.h"
 #include "net_ctrl.h"
+#include "../../include/health.h"
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 
@@ -338,9 +339,22 @@ String WebCtrl::makeStatusJson_() {
   doc["fan_on"]   = fanPct > 0.5f;
   doc["pump_on"]  = false; // kein Pumpen-State integriert
 
-  JsonObject health = doc["health"].to<JsonObject>();
-  health["state"] = "ok";
-  health["message"] = "";
+  JsonObject healthObj = doc["health"].to<JsonObject>();
+  const auto& hs = health::state();
+  bool anyErr = health::any_error();
+  healthObj["state"] = anyErr ? "error" : "ok";
+  healthObj["message"] = hs.message;
+  healthObj["control_paused"] = hs.control_paused;
+  JsonObject mods = healthObj["modules"].to<JsonObject>();
+  mods["i2c0"] = hs.mod.i2c0_ok;
+  mods["i2c1"] = hs.mod.i2c1_ok;
+  mods["sht_in"] = hs.mod.sht_in_ok;
+  mods["sht_out"] = hs.mod.sht_out_ok;
+  mods["dac"] = hs.mod.dac_ok;
+  mods["fan"] = hs.mod.fan_ok;
+  mods["rtc"] = hs.mod.rtc_ok;
+  mods["tof"] = hs.mod.tof_ok;
+  mods["fs"] = hs.mod.fs_ok;
 
   // Grow block
   JsonObject g = doc["grow"].to<JsonObject>();
