@@ -5,6 +5,7 @@
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
+#include <Update.h>
 
 class RTC_Ctrl;
 class SHT41Ctrl;
@@ -42,10 +43,26 @@ public:
 private:
   // HTTP handlers
   void setupRoutes_();
+  void registerUpdateRoutes_();
   void sendFile_(AsyncWebServerRequest* req, const char* path, const char* mime);
   String makeStatusJson_();
   String makeInfoJson_();
   static String urlEncode_(const String& s);
+  
+  // Update helpers (TAR-based package with optional firmware.bin and www/* assets)
+  bool handlePackageUploadBegin_();
+  bool handlePackageUploadWrite_(const uint8_t* data, size_t len);
+  bool handlePackageUploadEnd_(bool& fwUpdated, int& filesUpdated, String& err);
+  bool applyPackageFromFile_(const char* tarPath, bool& fwUpdated, int& filesUpdated, String& err);
+  bool downloadToFile_(const String& url, const char* path);
+  bool parseOctal_(const char* str, size_t n, uint32_t& out);
+  bool ensureDir_(const String& path);
+  bool isSafeAssetPath_(const String& name);
+  // Update config (manifest URL)
+  bool loadUpdateCfg_(String& manifestUrl, String& ghOwner, String& ghRepo, String& ghAsset);
+  bool saveUpdateCfg_(const String& manifestUrl, const String& ghOwner, const String& ghRepo, const String& ghAsset);
+  String manifestUrl_();
+  bool ghLatestTarUrl_(String& outUrl, String& outLatestTag);
 
   // WhatsApp
   bool whatsappSend_(const String& phone, const String& apikey, const String& message);
@@ -65,6 +82,9 @@ private:
   uint32_t nextPushAt_ = 0;
   uint32_t nextProbeAt_ = 0;
   uint32_t rebootAt_ = 0;
+
+  // Temporary file for package upload/download
+  String pkgTempPath_ = "/.update_pkg.tar";
 };
 
 } // namespace web_ctrl

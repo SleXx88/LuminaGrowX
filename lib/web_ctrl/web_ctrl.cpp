@@ -1,10 +1,11 @@
-#include "web_ctrl.h"
+﻿#include "web_ctrl.h"
 #include "rtc_ctrl.h"
 #include "plant_ctrl.h"
 #include "net_ctrl.h"
 #include "../../include/health.h"
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
+#include <Update.h>
 
 using namespace web_ctrl;
 using net_ctrl::NetCtrl;
@@ -12,7 +13,13 @@ using net_ctrl::NetCtrl;
 static const char* APP_CFG_PATH   = "/cfg/app.json";
 static const char* GROW_CFG_PATH  = "/cfg/grow.json";
 static const char* NOTIFY_CFG_PATH= "/cfg/notify.json";
-static const char* FW_VERSION     = "1.0.0";
+static const char* UPDATE_CFG_PATH= "/cfg/update.json";
+static const char* FW_VERSION     = "V0.5";
+// GitHub Releases (latest) defaults â€“ fest im Code hinterlegt
+static const char* GH_OWNER = "SleXx88";
+static const char* GH_REPO  = "LuminaGrowX";
+static const char* GH_ASSET = "LuminaGrowX-package.tar";
+static const char* UPDATE_MANIFEST_URL = ""; // leer -> aus /cfg/update.json lesen
 
 static bool readTextFile(const char* path, String& out) {
   if (!LittleFS.exists(path)) return false;
@@ -115,6 +122,9 @@ void WebCtrl::setupRoutes_() {
   http_.on("/api/info", HTTP_GET, [this](AsyncWebServerRequest* req){ req->send(200, "application/json", makeInfoJson_()); });
   http_.on("/api/status", HTTP_GET, [this](AsyncWebServerRequest* req){ req->send(200, "application/json", makeStatusJson_()); });
 
+  // Register updater routes
+  registerUpdateRoutes_();
+
   http_.on("/api/seed", HTTP_POST, [](AsyncWebServerRequest*){}, NULL,
            [this](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t, size_t){
              JsonDocument doc; if (deserializeJson(doc, data, len)) { req->send(400, "application/json", "{\"error\":\"bad json\"}"); return; }
@@ -157,7 +167,7 @@ void WebCtrl::setupRoutes_() {
                // Sofortiger Verbindungsversuch ohne Reboot
                connectedNow = net_->reconnectSTA(true /*close AP on success*/);
              }
-             // Wenn erfolgreich direkt verbunden: Reboot unterdrücken, sonst optional rebooten
+             // Wenn erfolgreich direkt verbunden: Reboot unterdrÃ¼cken, sonst optional rebooten
              bool doReboot = (!connectedNow) && requestedReboot;
              req->send(200, "application/json", "{\"ok\":true}");
              if (doReboot) rebootAt_ = millis() + 800;
@@ -233,7 +243,7 @@ void WebCtrl::setupRoutes_() {
                return;
              }
              if (!notify_.enabled) {
-               Serial.println("[WA] Notifications disabled (switch off) — aborting send");
+               Serial.println("[WA] Notifications disabled (switch off) â€” aborting send");
                req->send(403, "application/json", "{\"error\":\"notifications disabled\"}");
                return;
              }
@@ -372,7 +382,7 @@ String WebCtrl::makeStatusJson_() {
   }
   g["day"] = day;
   const char* phase = "";
-  if (day > 0) { if (day <= 14) phase = "Keimung/Seedling"; else if (day <= 35) phase = "Vegetationsphase"; else phase = "Blütephase"; }
+  if (day > 0) { if (day <= 14) phase = "Keimung/Seedling"; else if (day <= 35) phase = "Vegetationsphase"; else phase = "BlÃ¼tephase"; }
   g["phase"] = phase;
 
   // Notify (mask apikey)
@@ -466,3 +476,235 @@ bool WebCtrl::whatsappSend_(const String& phone, const String& apikey, const Str
   }
   return false;
 }
+
+// ========== Updater routes and helpers ==========
+
+void WebCtrl::registerUpdateRoutes_() {
+  // Minimal Update UI (dynamic)
+  http_.on("/update", HTTP_GET, [this](AsyncWebServerRequest* req){
+    sendFile_(req, "/update.html", "text/html");
+  });
+
+  // Check manifest or GitHub latest
+  http_.on("/api/update/check", HTTP_GET, [this](AsyncWebServerRequest* req){
+    JsonDocument resp;
+    resp["current"] = FW_VERSION;
+    resp["hasUpdate"] = false;
+    resp["latest"] = "";
+    resp["tar_url"] = "";
+    if (!net_ || !net_->isConnected()) { String out; serializeJson(resp, out); req->send(200, "application/json", out); return; }
+    // Prefer GitHub latest if configured
+    String ghUrl, latestTag;
+    if (ghLatestTarUrl_(ghUrl, latestTag)) {
+      resp["latest"] = latestTag;
+      resp["tar_url"] = ghUrl;
+      resp["hasUpdate"] = (latestTag.length() && latestTag != String(FW_VERSION));
+      String out; serializeJson(resp, out); req->send(200, "application/json", out); return;
+    }
+    // Fallback: Manifest URL mode
+    String manUrl = manifestUrl_();
+    if (!manUrl.length()) { String out; serializeJson(resp, out); req->send(200, "application/json", out); return; }
+    WiFiClientSecure client; client.setInsecure();
+    HTTPClient http; if (!http.begin(client, manUrl)) { String out; serializeJson(resp, out); req->send(200, "application/json", out); return; }
+    int code = http.GET();
+    if (code == 200) {
+      JsonDocument man; DeserializationError err = deserializeJson(man, http.getStream());
+      if (!err) {
+        String latest = String((const char*)man["version"]);
+        String tar = String((const char*)man["tar_url"]);
+        resp["latest"] = latest;
+        resp["tar_url"] = tar;
+        resp["hasUpdate"] = (latest.length() && latest != String(FW_VERSION));
+      }
+    }
+    http.end(); String out; serializeJson(resp, out); req->send(200, "application/json", out);
+  });
+
+  // Remote run (GitHub latest preferred, manifest fallback)
+  http_.on("/api/update/remote", HTTP_POST, [this](AsyncWebServerRequest* req){
+    JsonDocument resp; resp["ok"] = false; resp["rebooting"] = false; resp["fwUpdated"] = false; resp["filesUpdated"] = 0; resp["error"] = "";
+    if (!net_ || !net_->isConnected()) { resp["error"] = "wifi not connected"; String out; serializeJson(resp, out); req->send(200, "application/json", out); return; }
+    String tarUrl, latestTag;
+    if (!ghLatestTarUrl_(tarUrl, latestTag)) {
+      String manUrl = manifestUrl_();
+      if (!manUrl.length()) { resp["error"] = "manifest url not set"; String out; serializeJson(resp, out); req->send(200, "application/json", out); return; }
+      WiFiClientSecure client; client.setInsecure(); HTTPClient http;
+      if (!http.begin(client, manUrl)) { resp["error"] = "manifest begin failed"; String out; serializeJson(resp, out); req->send(200, "application/json", out); return; }
+      int code = http.GET();
+      if (code == 200) {
+        JsonDocument man; if (!deserializeJson(man, http.getStream())) { tarUrl = String((const char*)man["tar_url"]); }
+      }
+      http.end();
+      if (!tarUrl.length()) { resp["error"] = "no tar_url"; String out; serializeJson(resp, out); req->send(200, "application/json", out); return; }
+    }
+    if (!downloadToFile_(tarUrl, pkgTempPath_.c_str())) { resp["error"] = "download failed"; String out; serializeJson(resp, out); req->send(200, "application/json", out); return; }
+    bool fwUpd=false; int filesUpd=0; String err;
+    bool ok = applyPackageFromFile_(pkgTempPath_.c_str(), fwUpd, filesUpd, err);
+    resp["ok"] = ok; resp["fwUpdated"] = fwUpd; resp["filesUpdated"] = filesUpd; if (!ok) resp["error"] = err; else { LittleFS.remove(pkgTempPath_.c_str()); }
+    if (ok && fwUpd) { resp["rebooting"] = true; rebootAt_ = millis() + 750; }
+    String out; serializeJson(resp, out); req->send(ok?200:500, "application/json", out);
+  });
+
+  // Manual upload (.tar)
+  http_.on("/api/update/upload", HTTP_POST,
+    [this](AsyncWebServerRequest* req){
+      bool ok = true; bool fwUpd=false; int filesUpd=0; String err;
+      ok = handlePackageUploadEnd_(fwUpd, filesUpd, err);
+      JsonDocument resp; resp["ok"] = ok; resp["fwUpdated"] = fwUpd; resp["filesUpdated"] = filesUpd; resp["error"] = err; resp["rebooting"] = ok && fwUpd;
+      if (ok && fwUpd) rebootAt_ = millis() + 750;
+      String out; serializeJson(resp, out); req->send(ok?200:500, "application/json", out);
+    },
+    [this](AsyncWebServerRequest* req, String filename, size_t index, uint8_t* data, size_t len, bool final){
+      if (index == 0) { handlePackageUploadBegin_(); }
+      handlePackageUploadWrite_(data, len);
+      // finalize in completion handler
+    }
+  );
+
+  // Update config endpoints (manifest and/or GitHub latest)
+  http_.on("/api/update/config", HTTP_GET, [this](AsyncWebServerRequest* req){
+    String man, owner, repo, asset; loadUpdateCfg_(man, owner, repo, asset);
+    JsonDocument resp; resp["manifest_url"] = man; resp["gh_owner"] = owner; resp["gh_repo"] = repo; resp["gh_asset"] = asset; String out; serializeJson(resp, out); req->send(200, "application/json", out);
+  });
+  http_.on("/api/update/config", HTTP_POST, [](AsyncWebServerRequest*){}, NULL,
+           [this](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t, size_t){
+             JsonDocument doc; if (deserializeJson(doc, data, len)) { req->send(400, "application/json", "{\"error\":\"bad json\"}"); return; }
+             String man = doc["manifest_url"].isNull()? String("") : String((const char*)doc["manifest_url"]);
+             String owner = doc["gh_owner"].isNull()? String("") : String((const char*)doc["gh_owner"]);
+             String repo  = doc["gh_repo"].isNull()?  String("") : String((const char*)doc["gh_repo"]);
+             String asset = doc["gh_asset"].isNull()? String("") : String((const char*)doc["gh_asset"]);
+             bool ok = saveUpdateCfg_(man, owner, repo, asset);
+             req->send(ok?200:500, "application/json", ok?"{\"ok\":true}":"{\"ok\":false}");
+           });
+}
+
+bool WebCtrl::handlePackageUploadBegin_() {
+  LittleFS.remove(pkgTempPath_.c_str());
+  File f = LittleFS.open(pkgTempPath_.c_str(), FILE_WRITE);
+  if (!f) return false; f.close(); return true;
+}
+
+bool WebCtrl::handlePackageUploadWrite_(const uint8_t* data, size_t len) {
+  File f = LittleFS.open(pkgTempPath_.c_str(), FILE_APPEND);
+  if (!f) return false; size_t w = f.write(data, len); f.close(); return w == len;
+}
+
+bool WebCtrl::downloadToFile_(const String& url, const char* path) {
+  WiFiClientSecure client; client.setInsecure(); HTTPClient http;
+  if (!http.begin(client, url)) return false; int code = http.GET(); if (code != 200) { http.end(); return false; }
+  File f = LittleFS.open(path, FILE_WRITE); if (!f) { http.end(); return false; }
+  WiFiClient* stream = http.getStreamPtr(); uint8_t buf[2048]; int total=0;
+  while (http.connected()) { size_t avail = stream->available(); if (!avail) { delay(1); continue; } int n = stream->readBytes((char*)buf, avail > sizeof(buf) ? sizeof(buf) : avail); if (n <= 0) break; f.write(buf, n); total += n; }
+  f.close(); http.end(); return total > 0;
+}
+
+bool WebCtrl::parseOctal_(const char* str, size_t n, uint32_t& out) {
+  uint32_t v = 0; bool any=false; for (size_t i=0;i<n;i++){ char c=str[i]; if (c=='\0'||c==' ') break; if (c<'0'||c>'7') continue; any=true; v=(v<<3)+(uint32_t)(c-'0'); }
+  out=v; return any;
+}
+
+bool WebCtrl::ensureDir_(const String& path) {
+  int slash = 1; while (true) { slash = path.indexOf('/', slash); if (slash < 0) break; String dir = path.substring(0, slash); if (dir.length() > 0) LittleFS.mkdir(dir); slash++; }
+  return true;
+}
+
+bool WebCtrl::isSafeAssetPath_(const String& name) {
+  if (!name.length()) return false; if (name[0]=='/') return false; if (name.indexOf("..")>=0) return false; if (name.startsWith("cfg/")) return false; return true;
+}
+
+bool WebCtrl::handlePackageUploadEnd_(bool& fwUpdated, int& filesUpdated, String& err) {
+  fwUpdated=false; filesUpdated=0; err="";
+  if (!LittleFS.exists(pkgTempPath_.c_str())) { err="temp not found"; return false; }
+  bool ok = applyPackageFromFile_(pkgTempPath_.c_str(), fwUpdated, filesUpdated, err); LittleFS.remove(pkgTempPath_.c_str()); return ok;
+}
+
+bool WebCtrl::applyPackageFromFile_(const char* tarPath, bool& fwUpdated, int& filesUpdated, String& err) {
+  fwUpdated=false; filesUpdated=0; err="";
+  File f = LittleFS.open(tarPath, FILE_READ); if (!f) { err="open failed"; return false; }
+  const size_t BLK=512; uint8_t hdr[BLK];
+  while (true) {
+    size_t r = f.read(hdr, BLK); if (r == 0) break; if (r != BLK) { err="bad tar header"; f.close(); return false; }
+    bool allZero=true; for (size_t i=0;i<BLK;i++){ if (hdr[i]!=0){ allZero=false; break; } } if (allZero) break;
+    char nameC[101]; memcpy(nameC, hdr+0, 100); nameC[100]='\0'; String name=String(nameC);
+    uint32_t size=0; if (!parseOctal_((const char*)(hdr+124), 12, size)) size=0; char typeflag=(char)hdr[156]; if (typeflag=='\0') typeflag='0';
+    uint32_t toRead=size; uint32_t pad=(BLK-(size%BLK))%BLK;
+    if (typeflag=='0') {
+      if (name=="firmware.bin") {
+        if (size==0) { err="empty firmware"; f.close(); return false; }
+        if (!Update.begin((size_t)size, U_FLASH)) { err=String("Update.begin ")+Update.errorString(); f.close(); return false; }
+        const size_t CH=2048; uint8_t buf[CH]; uint32_t left=toRead;
+        while (left>0) { size_t n = left>CH?CH:left; int nr=f.read(buf,n); if (nr<=0){ Update.abort(); err="firmware read"; f.close(); return false; } size_t nw=Update.write(buf,nr); if (nw!=(size_t)nr){ Update.abort(); err=String("Update.write ")+Update.errorString(); f.close(); return false; } left-=nr; }
+        if (!Update.end(true)) { err=String("Update.end ")+Update.errorString(); f.close(); return false; }
+        fwUpdated=true; if (pad) f.seek(pad, SeekCur);
+      } else if (name.startsWith("www/") && isSafeAssetPath_(name.substring(4))) {
+        String rel=name.substring(4); String dest=String("/")+rel; String tmp=String("/.u_tmp_")+rel; ensureDir_(dest); int lastSlash=tmp.lastIndexOf('/'); if (lastSlash>0) { LittleFS.mkdir(tmp.substring(0,lastSlash)); }
+        File wf=LittleFS.open(tmp, FILE_WRITE); if (!wf) { err=String("open fail ")+tmp; f.close(); return false; }
+        const size_t CH=2048; uint8_t buf[CH]; uint32_t left=toRead;
+        while (left>0) { size_t n=left>CH?CH:left; int nr=f.read(buf,n); if (nr<=0){ wf.close(); LittleFS.remove(tmp); err="asset read"; f.close(); return false; } if (wf.write(buf,nr)!=(size_t)nr){ wf.close(); LittleFS.remove(tmp); err="asset write"; f.close(); return false; } left-=nr; }
+        wf.close(); LittleFS.remove(dest); ensureDir_(dest); if (!LittleFS.rename(tmp, dest)) { File rf=LittleFS.open(tmp, FILE_READ); File df=LittleFS.open(dest, FILE_WRITE); if (rf && df){ uint8_t b[1024]; int n; while ((n=rf.read(b,sizeof(b)))>0){ if (df.write(b,n)!=(size_t)n){ break; } } } if (rf) rf.close(); if (df) df.close(); LittleFS.remove(tmp); }
+        filesUpdated++; if (pad) f.seek(pad, SeekCur);
+      } else {
+        if (toRead) f.seek(toRead, SeekCur); if (pad) f.seek(pad, SeekCur);
+      }
+    } else {
+      if (toRead) f.seek(toRead, SeekCur); if (pad) f.seek(pad, SeekCur);
+    }
+  }
+  f.close(); return true;
+}
+
+bool WebCtrl::loadUpdateCfg_(String& manifestUrl, String& ghOwner, String& ghRepo, String& ghAsset) {
+  manifestUrl = ""; ghOwner = ""; ghRepo = ""; ghAsset = "";
+  if (!LittleFS.exists(UPDATE_CFG_PATH)) return false;
+  File f = LittleFS.open(UPDATE_CFG_PATH, FILE_READ); if (!f) return false;
+  String s = f.readString(); f.close();
+  JsonDocument doc; if (deserializeJson(doc, s)) return false;
+  if (!doc["manifest_url"].isNull()) manifestUrl = String((const char*)doc["manifest_url"]);
+  if (!doc["gh_owner"].isNull()) ghOwner = String((const char*)doc["gh_owner"]);
+  if (!doc["gh_repo"].isNull())  ghRepo  = String((const char*)doc["gh_repo"]);
+  if (!doc["gh_asset"].isNull()) ghAsset = String((const char*)doc["gh_asset"]);
+  return (manifestUrl.length() + ghOwner.length() + ghRepo.length() + ghAsset.length()) > 0;
+}
+
+bool WebCtrl::saveUpdateCfg_(const String& manifestUrl, const String& ghOwner, const String& ghRepo, const String& ghAsset) {
+  LittleFS.mkdir("/cfg");
+  JsonDocument doc; doc["manifest_url"] = manifestUrl; doc["gh_owner"] = ghOwner; doc["gh_repo"] = ghRepo; doc["gh_asset"] = ghAsset; String out; serializeJson(doc, out);
+  File f = LittleFS.open(UPDATE_CFG_PATH, FILE_WRITE); if (!f) return false; f.print(out); f.close(); return true;
+}
+
+String WebCtrl::manifestUrl_() {
+  String u, o, r, a;
+  if (strlen(UPDATE_MANIFEST_URL) > 0) return String(UPDATE_MANIFEST_URL);
+  if (loadUpdateCfg_(u, o, r, a)) return u; return String("");
+}
+
+bool WebCtrl::ghLatestTarUrl_(String& outUrl, String& outLatestTag) {
+  outUrl = ""; outLatestTag = "";
+  // Wenn eine Manifest-URL fest definiert ist, bevorzugen wir diese nicht; GH hat Vorrang, falls Owner/Repo/Asset vorhanden.
+  String man, owner, repo, asset;
+  loadUpdateCfg_(man, owner, repo, asset);
+  if (!owner.length() && strlen(GH_OWNER) > 0) owner = GH_OWNER;
+  if (!repo.length()  && strlen(GH_REPO)  > 0) repo  = GH_REPO;
+  if (!asset.length() && strlen(GH_ASSET) > 0) asset = GH_ASSET;
+  if (!(owner.length() && repo.length() && asset.length())) return false;
+  WiFiClientSecure client; client.setInsecure();
+  HTTPClient http;
+  String api = String("https://api.github.com/repos/") + owner + "/" + repo + "/releases/latest";
+  if (!http.begin(client, api)) return false;
+  http.addHeader("User-Agent", "LuminaGrowX");
+  int code = http.GET();
+  if (code == 200) {
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, http.getStream());
+    if (!err) {
+      outLatestTag = String((const char*)doc["tag_name"]);
+      // Construct stable latest-download URL with fixed asset name
+      outUrl = String("https://github.com/") + owner + "/" + repo + "/releases/latest/download/" + asset;
+    }
+  }
+  http.end();
+  return outUrl.length() > 0;
+}
+
+
+
