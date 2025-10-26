@@ -14,7 +14,7 @@ static const char* APP_CFG_PATH   = "/cfg/app.json";
 static const char* GROW_CFG_PATH  = "/cfg/grow.json";
 static const char* NOTIFY_CFG_PATH= "/cfg/notify.json";
 static const char* UPDATE_CFG_PATH= "/cfg/update.json";
-static const char* FW_VERSION     = "V0.5";
+static const char* FW_VERSION     = "V0.6";
 // GitHub Releases (latest) defaults â€“ fest im Code hinterlegt
 static const char* GH_OWNER = "SleXx88";
 static const char* GH_REPO  = "LuminaGrowX";
@@ -590,12 +590,54 @@ bool WebCtrl::handlePackageUploadWrite_(const uint8_t* data, size_t len) {
 }
 
 bool WebCtrl::downloadToFile_(const String& url, const char* path) {
-  WiFiClientSecure client; client.setInsecure(); HTTPClient http;
-  if (!http.begin(client, url)) return false; int code = http.GET(); if (code != 200) { http.end(); return false; }
-  File f = LittleFS.open(path, FILE_WRITE); if (!f) { http.end(); return false; }
-  WiFiClient* stream = http.getStreamPtr(); uint8_t buf[2048]; int total=0;
-  while (http.connected()) { size_t avail = stream->available(); if (!avail) { delay(1); continue; } int n = stream->readBytes((char*)buf, avail > sizeof(buf) ? sizeof(buf) : avail); if (n <= 0) break; f.write(buf, n); total += n; }
-  f.close(); http.end(); return total > 0;
+  WiFiClientSecure client; client.setInsecure();
+  HTTPClient http;
+  String current = url;
+  // Verfolge bis zu 5 Redirect-Hops (GitHub nutzt meist 2)
+  for (int hop = 0; hop < 5; ++hop) {
+    if (!http.begin(client, current)) return false;
+    http.setUserAgent("LuminaGrowX");
+    int code = http.GET();
+    // Redirects (301/302/303/307/308)
+    if ((code >= 300 && code < 400)) {
+      String loc = http.getLocation();
+      http.end();
+      if (!loc.length()) return false;
+      current = loc;
+      continue; // nächsten Hop versuchen
+    }
+    if (code != 200) { http.end(); return false; }
+
+    // Stream in Datei schreiben
+    File f = LittleFS.open(path, FILE_WRITE);
+    if (!f) { http.end(); return false; }
+    WiFiClient* stream = http.getStreamPtr();
+    uint8_t buf[2048];
+    int total = 0;
+    int32_t remaining = http.getSize(); // -1 wenn unbekannt
+    unsigned long lastRead = millis();
+    for (;;) {
+      size_t avail = stream->available();
+      if (avail == 0) {
+        if (!http.connected()) break;
+        if (remaining == 0) break;
+        if (millis() - lastRead > 15000) break; // Timeout 15s ohne Daten
+        delay(1);
+        continue;
+      }
+      size_t nToRead = avail > sizeof(buf) ? sizeof(buf) : avail;
+      int n = stream->readBytes((char*)buf, nToRead);
+      if (n <= 0) break;
+      lastRead = millis();
+      if (f.write(buf, n) != (size_t)n) { f.close(); http.end(); return false; }
+      total += n;
+      if (remaining > 0) { remaining -= n; if (remaining <= 0) break; }
+    }
+    f.close();
+    http.end();
+    return total > 0;
+  }
+  return false;
 }
 
 bool WebCtrl::parseOctal_(const char* str, size_t n, uint32_t& out) {
