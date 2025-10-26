@@ -64,6 +64,18 @@ private:
   String manifestUrl_();
   bool ghLatestTarUrl_(String& outUrl, String& outLatestTag);
 
+  // FS diagnostics
+  String fsInfoJson_();
+  String fsListJson_(const char* path);
+  bool fileExists_(const char* path);
+
+  // Async update job
+  void startRemoteUpdateJob_();
+  void startApplyUploadedJob_();
+  static void updateTaskTrampoline_(void* arg);
+  void updateTaskRun_(bool remote, const String& localTarPath);
+  String updateProgressJson_();
+
   // WhatsApp
   bool whatsappSend_(const String& phone, const String& apikey, const String& message);
 
@@ -85,6 +97,20 @@ private:
 
   // Temporary file for package upload/download
   String pkgTempPath_ = "/.update_pkg.tar";
+
+  // Update job state
+  bool updateJobRunning_ = false;
+  String updatePhase_ = "idle"; // idle|checking|downloading|applying|done|error
+  String updateMsg_;
+  bool updateOk_ = false;
+  bool updateFwUpdated_ = false;
+  int updateFilesUpdated_ = 0;
+  String updateErr_;
+  // Progress counters
+  int32_t updateDLTotal_ = -1;
+  int32_t updateDLSoFar_ = 0;
+  int32_t updateApplyTotal_ = -1;
+  int32_t updateApplySoFar_ = 0;
 };
 
 } // namespace web_ctrl

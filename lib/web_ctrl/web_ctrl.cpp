@@ -7,6 +7,8 @@
 #include <WiFiClientSecure.h>
 #include <Update.h>
 #include "../../include/version.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 using namespace web_ctrl;
 using net_ctrl::NetCtrl;
@@ -119,6 +121,15 @@ void WebCtrl::setupRoutes_() {
   http_.on("/pico.min.css", HTTP_GET, [this](AsyncWebServerRequest* req){ sendFile_(req, "/pico.min.css", "text/css"); });
   http_.on("/custom.css", HTTP_GET, [this](AsyncWebServerRequest* req){ sendFile_(req, "/custom.css", "text/css"); });
   http_.on("/bg.jpg", HTTP_GET, [this](AsyncWebServerRequest* req){ sendFile_(req, "/bg.jpg", "image/jpeg"); });
+
+  // FS diagnostics
+  http_.on("/api/fs/info", HTTP_GET, [this](AsyncWebServerRequest* req){ req->send(200, "application/json", fsInfoJson_()); });
+  http_.on("/api/fs/list", HTTP_GET, [this](AsyncWebServerRequest* req){
+    String path = "/";
+    if (req->hasParam("p")) path = req->getParam("p")->value();
+    if (!path.length()) path = "/";
+    req->send(200, "application/json", fsListJson_(path.c_str()));
+  });
 
   http_.on("/api/info", HTTP_GET, [this](AsyncWebServerRequest* req){ req->send(200, "application/json", makeInfoJson_()); });
   http_.on("/api/status", HTTP_GET, [this](AsyncWebServerRequest* req){ req->send(200, "application/json", makeStatusJson_()); });
@@ -311,7 +322,28 @@ void WebCtrl::setupRoutes_() {
 }
 
 void WebCtrl::sendFile_(AsyncWebServerRequest* req, const char* path, const char* mime) {
-  if (LittleFS.exists(path)) req->send(LittleFS, path, mime); else req->send(404, "text/plain", "Not found");
+  // Ensure FS is mounted and report useful diagnostics
+  if (!LittleFS.begin(false, "/littlefs", 10, "littlefs")) {
+    Serial.println(F("[FS] not mounted when serving file"));
+    req->send(500, "text/plain", "FS not mounted");
+    return;
+  }
+  if (!LittleFS.exists(path)) {
+    Serial.printf("[FS] 404 missing: %s\n", path);
+    Serial.printf("[FS] total=%u used=%u free=%u\n",
+                  (unsigned)LittleFS.totalBytes(), (unsigned)LittleFS.usedBytes(),
+                  (unsigned)((LittleFS.totalBytes()>LittleFS.usedBytes())?(LittleFS.totalBytes()-LittleFS.usedBytes()):0));
+    // Optionally list root to aid debugging
+    File dir = LittleFS.open("/");
+    if (dir && dir.isDirectory()) {
+      Serial.println(F("[FS] root entries:"));
+      File f; int cnt=0;
+      while ((f = dir.openNextFile())) { Serial.printf(" - %s (%u)\n", f.name(), (unsigned)f.size()); f.close(); if (++cnt>20) break; }
+    }
+    req->send(404, "text/plain", "Not found");
+    return;
+  }
+  req->send(LittleFS, path, mime);
 }
 
 static String fmtDateTime_local(time_t t) {
@@ -524,37 +556,22 @@ void WebCtrl::registerUpdateRoutes_() {
 
   // Remote run (GitHub latest preferred, manifest fallback)
   http_.on("/api/update/remote", HTTP_POST, [this](AsyncWebServerRequest* req){
-    JsonDocument resp; resp["ok"] = false; resp["rebooting"] = false; resp["fwUpdated"] = false; resp["filesUpdated"] = 0; resp["error"] = "";
-    if (!net_ || !net_->isConnected()) { resp["error"] = "wifi not connected"; String out; serializeJson(resp, out); req->send(200, "application/json", out); return; }
-    String tarUrl, latestTag;
-    if (!ghLatestTarUrl_(tarUrl, latestTag)) {
-      String manUrl = manifestUrl_();
-      if (!manUrl.length()) { resp["error"] = "manifest url not set"; String out; serializeJson(resp, out); req->send(200, "application/json", out); return; }
-      WiFiClientSecure client; client.setInsecure(); HTTPClient http;
-      if (!http.begin(client, manUrl)) { resp["error"] = "manifest begin failed"; String out; serializeJson(resp, out); req->send(200, "application/json", out); return; }
-      int code = http.GET();
-      if (code == 200) {
-        JsonDocument man; if (!deserializeJson(man, http.getStream())) { tarUrl = String((const char*)man["tar_url"]); }
-      }
-      http.end();
-      if (!tarUrl.length()) { resp["error"] = "no tar_url"; String out; serializeJson(resp, out); req->send(200, "application/json", out); return; }
-    }
-    if (!downloadToFile_(tarUrl, pkgTempPath_.c_str())) { resp["error"] = "download failed"; String out; serializeJson(resp, out); req->send(200, "application/json", out); return; }
-    bool fwUpd=false; int filesUpd=0; String err;
-    bool ok = applyPackageFromFile_(pkgTempPath_.c_str(), fwUpd, filesUpd, err);
-    resp["ok"] = ok; resp["fwUpdated"] = fwUpd; resp["filesUpdated"] = filesUpd; if (!ok) resp["error"] = err; else { LittleFS.remove(pkgTempPath_.c_str()); }
-    if (ok && fwUpd) { resp["rebooting"] = true; rebootAt_ = millis() + 750; }
-    String out; serializeJson(resp, out); req->send(ok?200:500, "application/json", out);
+    if (updateJobRunning_) { req->send(409, "application/json", "{\"error\":\"update running\"}"); return; }
+    if (!net_ || !net_->isConnected()) { req->send(400, "application/json", "{\"error\":\"wifi not connected\"}"); return; }
+    startRemoteUpdateJob_();
+    req->send(202, "application/json", "{\"started\":true}");
   });
 
   // Manual upload (.tar)
   http_.on("/api/update/upload", HTTP_POST,
     [this](AsyncWebServerRequest* req){
-      bool ok = true; bool fwUpd=false; int filesUpd=0; String err;
-      ok = handlePackageUploadEnd_(fwUpd, filesUpd, err);
-      JsonDocument resp; resp["ok"] = ok; resp["fwUpdated"] = fwUpd; resp["filesUpdated"] = filesUpd; resp["error"] = err; resp["rebooting"] = ok && fwUpd;
-      if (ok && fwUpd) rebootAt_ = millis() + 750;
-      String out; serializeJson(resp, out); req->send(ok?200:500, "application/json", out);
+      // Finalize upload to temp file, then start async apply job
+      bool fwUpd=false; int filesUpd=0; String err;
+      bool saved = handlePackageUploadEnd_(fwUpd, filesUpd, err);
+      if (!saved) { JsonDocument resp; resp["ok"]=false; resp["error"]=err; String out; serializeJson(resp,out); req->send(500,"application/json",out); return; }
+      if (updateJobRunning_) { req->send(409, "application/json", "{\"error\":\"update running\"}"); return; }
+      startApplyUploadedJob_();
+      req->send(202, "application/json", "{\"started\":true}");
     },
     [this](AsyncWebServerRequest* req, String filename, size_t index, uint8_t* data, size_t len, bool final){
       if (index == 0) { handlePackageUploadBegin_(); }
@@ -562,6 +579,11 @@ void WebCtrl::registerUpdateRoutes_() {
       // finalize in completion handler
     }
   );
+
+  // Progress polling
+  http_.on("/api/update/progress", HTTP_GET, [this](AsyncWebServerRequest* req){
+    String out = updateProgressJson_(); req->send(200, "application/json", out);
+  });
 
   // Update config endpoints (manifest and/or GitHub latest)
   http_.on("/api/update/config", HTTP_GET, [this](AsyncWebServerRequest* req){
@@ -578,6 +600,80 @@ void WebCtrl::registerUpdateRoutes_() {
              bool ok = saveUpdateCfg_(man, owner, repo, asset);
              req->send(ok?200:500, "application/json", ok?"{\"ok\":true}":"{\"ok\":false}");
            });
+}
+
+void WebCtrl::startRemoteUpdateJob_() {
+  if (updateJobRunning_) return;
+  updateJobRunning_ = true; updatePhase_ = "checking"; updateMsg_ = "GitHub latest"; updateOk_ = false; updateFwUpdated_ = false; updateFilesUpdated_ = 0; updateErr_ = "";
+  // Spawn on Core 0 with moderate stack
+  xTaskCreatePinnedToCore(&WebCtrl::updateTaskTrampoline_, "upd_remote", 12288, this, 1, nullptr, 0);
+}
+
+void WebCtrl::startApplyUploadedJob_() {
+  if (updateJobRunning_) return;
+  updateJobRunning_ = true; updatePhase_ = "applying"; updateMsg_ = "apply uploaded"; updateOk_ = false; updateFwUpdated_ = false; updateFilesUpdated_ = 0; updateErr_ = "";
+  xTaskCreatePinnedToCore(&WebCtrl::updateTaskTrampoline_, "upd_apply", 12288, this, 1, nullptr, 0);
+}
+
+void WebCtrl::updateTaskTrampoline_(void* arg) {
+  WebCtrl* self = static_cast<WebCtrl*>(arg);
+  // Determine mode from phase
+  String local = self->pkgTempPath_;
+  bool remote = (self->updateMsg_.indexOf("GitHub") >= 0) || (self->updatePhase_ == "checking");
+  self->updateTaskRun_(remote, local);
+  vTaskDelete(nullptr);
+}
+
+void WebCtrl::updateTaskRun_(bool useRemote, const String& localTarPath) {
+  // Resolve TAR URL if remote
+  if (useRemote) {
+    updatePhase_ = "checking"; updateMsg_ = "resolve latest";
+    String tarUrl, latestTag;
+    if (!ghLatestTarUrl_(tarUrl, latestTag)) {
+      // Fallback to manifest
+      String manUrl = manifestUrl_();
+      if (!manUrl.length()) { updatePhase_ = "error"; updateErr_ = "manifest url not set"; updateJobRunning_ = false; return; }
+      WiFiClientSecure client; client.setInsecure(); HTTPClient http;
+      if (!http.begin(client, manUrl)) { updatePhase_ = "error"; updateErr_ = "manifest begin failed"; updateJobRunning_ = false; return; }
+      int code = http.GET();
+      if (code == 200) {
+        JsonDocument man; if (!deserializeJson(man, http.getStream())) { tarUrl = String((const char*)man["tar_url"]); }
+      }
+      http.end();
+      if (!tarUrl.length()) { updatePhase_ = "error"; updateErr_ = "no tar_url"; updateJobRunning_ = false; return; }
+    }
+    updatePhase_ = "downloading"; updateMsg_ = "download tar";
+    if (!downloadToFile_(tarUrl, pkgTempPath_.c_str())) { updatePhase_ = "error"; if (updateErr_.length()==0) updateErr_ = "download failed"; updateMsg_ = updateErr_; updateJobRunning_ = false; return; }
+  }
+  // Apply local tar
+  updatePhase_ = "applying"; updateMsg_ = "apply tar";
+  bool fwUpd=false; int filesUpd=0; String err;
+  bool ok = applyPackageFromFile_(pkgTempPath_.c_str(), fwUpd, filesUpd, err);
+  if (ok) { LittleFS.remove(pkgTempPath_.c_str()); }
+  updateOk_ = ok; updateFwUpdated_ = fwUpd; updateFilesUpdated_ = filesUpd; updateErr_ = ok? String("") : err;
+  updatePhase_ = ok ? "done" : "error";
+  updateJobRunning_ = false;
+  if (ok && fwUpd) { rebootAt_ = millis() + 750; }
+}
+
+String WebCtrl::updateProgressJson_() {
+  JsonDocument doc;
+  doc["running"] = updateJobRunning_;
+  doc["phase"] = updatePhase_;
+  doc["msg"] = updateMsg_;
+  doc["ok"] = updateOk_;
+  doc["fwUpdated"] = updateFwUpdated_;
+  doc["filesUpdated"] = updateFilesUpdated_;
+  doc["error"] = updateErr_;
+  JsonObject dl = doc["download"].to<JsonObject>();
+  dl["total"] = updateDLTotal_;
+  dl["sofar"] = updateDLSoFar_;
+  dl["pct"] = (updateDLTotal_>0 && updateDLSoFar_>=0) ? (int)((100LL*updateDLSoFar_)/updateDLTotal_) : -1;
+  JsonObject ap = doc["apply"].to<JsonObject>();
+  ap["total"] = updateApplyTotal_;
+  ap["sofar"] = updateApplySoFar_;
+  ap["pct"] = (updateApplyTotal_>0 && updateApplySoFar_>=0) ? (int)((100LL*updateApplySoFar_)/updateApplyTotal_) : -1;
+  String out; serializeJson(doc, out); return out;
 }
 
 bool WebCtrl::handlePackageUploadBegin_() {
@@ -597,26 +693,40 @@ bool WebCtrl::downloadToFile_(const String& url, const char* path) {
   String current = url;
   // Verfolge bis zu 5 Redirect-Hops (GitHub nutzt meist 2)
   for (int hop = 0; hop < 5; ++hop) {
-    if (!http.begin(client, current)) return false;
+    if (!http.begin(client, current)) { updateErr_ = "http begin failed"; return false; }
     http.setUserAgent("LuminaGrowX");
     int code = http.GET();
     // Redirects (301/302/303/307/308)
     if ((code >= 300 && code < 400)) {
       String loc = http.getLocation();
       http.end();
-      if (!loc.length()) return false;
+      if (!loc.length()) { updateErr_ = "redirect without location"; return false; }
       current = loc;
       continue; // nächsten Hop versuchen
     }
-    if (code != 200) { http.end(); return false; }
+    if (code != 200) { updateErr_ = String("http code ")+String(code); http.end(); return false; }
 
     // Stream in Datei schreiben
     File f = LittleFS.open(path, FILE_WRITE);
-    if (!f) { http.end(); return false; }
+    if (!f) { updateErr_ = "open temp failed"; http.end(); return false; }
     WiFiClient* stream = http.getStreamPtr();
     uint8_t buf[2048];
     int total = 0;
     int32_t remaining = http.getSize(); // -1 wenn unbekannt
+    if (remaining > 0) {
+      size_t total = LittleFS.totalBytes();
+      size_t used = LittleFS.usedBytes();
+      size_t freeB = (total > used) ? (total - used) : 0;
+      // etwas Reserve (64KB) einplanen
+      if ((size_t)remaining + 65536UL > freeB) {
+        http.end();
+        updatePhase_ = "error";
+        updateErr_ = "insufficient FS space for TAR";
+        return false;
+      }
+    }
+    updateDLTotal_ = remaining;
+    updateDLSoFar_ = 0;
     unsigned long lastRead = millis();
     for (;;) {
       size_t avail = stream->available();
@@ -624,19 +734,27 @@ bool WebCtrl::downloadToFile_(const String& url, const char* path) {
         if (!http.connected()) break;
         if (remaining == 0) break;
         if (millis() - lastRead > 15000) break; // Timeout 15s ohne Daten
-        delay(1);
+        vTaskDelay(1);
         continue;
       }
       size_t nToRead = avail > sizeof(buf) ? sizeof(buf) : avail;
       int n = stream->readBytes((char*)buf, nToRead);
       if (n <= 0) break;
       lastRead = millis();
-      if (f.write(buf, n) != (size_t)n) { f.close(); http.end(); return false; }
+      if (f.write(buf, n) != (size_t)n) { updateErr_ = "fs write failed"; f.close(); http.end(); return false; }
       total += n;
+      updateDLSoFar_ += n;
+      if (updateDLTotal_ > 0) {
+        int pct = (int)((100LL * updateDLSoFar_) / updateDLTotal_);
+        updateMsg_ = String("download ") + String(updateDLSoFar_) + "/" + String(updateDLTotal_) + String(" (") + String(pct) + String("%)");
+      } else {
+        updateMsg_ = String("download ") + String(updateDLSoFar_) + String(" bytes");
+      }
       if (remaining > 0) { remaining -= n; if (remaining <= 0) break; }
     }
     f.close();
     http.end();
+    if (total > 0) { updateMsg_ = String("download complete ") + String(total) + String(" bytes"); }
     return total > 0;
   }
   return false;
@@ -752,3 +870,45 @@ bool WebCtrl::ghLatestTarUrl_(String& outUrl, String& outLatestTag) {
 
 
 
+
+String WebCtrl::fsInfoJson_() {
+  JsonDocument doc;
+  bool mounted = LittleFS.begin(false, "/littlefs", 10, "littlefs"); // mount using known label
+  doc["mounted"] = mounted;
+  size_t total = 0, used = 0;
+  if (mounted) { total = LittleFS.totalBytes(); used = LittleFS.usedBytes(); }
+  doc["total"] = (uint32_t)total;
+  doc["used"] = (uint32_t)used;
+  doc["free"] = (uint32_t)((total>used)?(total-used):0);
+  // important files
+  JsonObject files = doc["files"].to<JsonObject>();
+  const char* keys[] = { "/index.html", "/update.html", "/pico.min.css", "/custom.css", "/bg.jpg" };
+  for (size_t i=0;i<sizeof(keys)/sizeof(keys[0]);++i) files[keys[i]] = LittleFS.exists(keys[i]);
+  String out; serializeJson(doc, out); return out;
+}
+
+String WebCtrl::fsListJson_(const char* path) {
+  JsonDocument doc;
+  JsonArray arr = doc["entries"].to<JsonArray>();
+  bool mounted = LittleFS.begin(false, "/littlefs", 10, "littlefs");
+  doc["mounted"] = mounted;
+  doc["path"] = path;
+  if (!mounted) { String out; serializeJson(doc, out); return out; }
+  File dir = LittleFS.open(path);
+  if (!dir || !dir.isDirectory()) { String out; serializeJson(doc, out); return out; }
+  File f;
+  while ((f = dir.openNextFile())) {
+    JsonObject e = arr.add<JsonObject>();
+    e["name"] = f.name();
+    e["size"] = (uint32_t)f.size();
+    e["isdir"] = f.isDirectory();
+    f.close();
+  }
+  String out; serializeJson(doc, out); return out;
+}
+
+bool WebCtrl::fileExists_(const char* path) {
+  bool mounted = LittleFS.begin(false, "/littlefs", 10, "littlefs");
+  if (!mounted) { Serial.println(F("[FS] not mounted in fileExists_")); return false; }
+  return LittleFS.exists(path);
+}

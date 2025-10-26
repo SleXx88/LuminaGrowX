@@ -30,11 +30,23 @@
           <p class="dim">Aktuelle Version: <b id="ver">-</b></p>
           <div class="btn-grid">
             <button id="btnCheck">Auf Updates prüfen</button>
-            <button id="btnRunRemote" class="primary" disabled>Jetzt updaten (Internet)</button>
+            <button id="btnRunRemote" class="primary">Jetzt updaten (Internet)</button>
           </div>
           <div class="grid" style="grid-template-columns:1fr 1fr; gap:.5rem; margin-top:.5rem;">
             <div>Neueste Version: <b id="latest">-</b></div>
             <div>Update verfügbar: <b id="updflag">-</b></div>
+          </div>
+          <div class="grid" style="grid-template-columns:1fr 1fr; gap:.5rem;">
+            <div>
+              <small class="dim">Download</small>
+              <progress id="dlProg" max="100" value="0"></progress>
+              <div><small id="dlText" class="dim">-</small></div>
+            </div>
+            <div>
+              <small class="dim">Anwenden</small>
+              <progress id="apProg" max="100" value="0"></progress>
+              <div><small id="apText" class="dim">-</small></div>
+            </div>
           </div>
           <pre id="log" style="margin-top:.5rem"></pre>
           <hr />
@@ -59,24 +71,41 @@
 
       fetch('/api/status').then(r=>r.json()).then(j=>{ ver.textContent = j.fw || '-'; });
 
+      function pollProgress(){
+        fetch('/api/update/progress').then(r=>r.json()).then(j=>{
+          add('['+j.phase+'] '+(j.msg||''));
+          const dlp = document.getElementById('dlProg');
+          const dlt = document.getElementById('dlText');
+          const app = document.getElementById('apProg');
+          const apt = document.getElementById('apText');
+          if (j.download){ dlp.value = (j.download.pct>0)? j.download.pct : 0; dlt.textContent = (j.download.sofar||0)+' / '+(j.download.total||0); }
+          if (j.apply){ app.value = (j.apply.pct>0)? j.apply.pct : 0; apt.textContent = (j.apply.sofar||0)+' / '+(j.apply.total||0); }
+          if (!j.running){
+            if (j.ok){
+              add('Update erfolgreich '+ (j.fwUpdated?'(Firmware + Webassets)':'(Webassets)'));
+              if (j.fwUpdated) add('Reboot...');
+            } else {
+              add('Update fehlgeschlagen: '+(j.error||'unbekannt'));
+            }
+          } else {
+            setTimeout(pollProgress, 1000);
+          }
+        }).catch(()=> setTimeout(pollProgress, 1500));
+      }
       btnC.onclick = () => {
         add('Neueste Version wird ermittelt...');
         fetch('/api/update/check').then(r=>r.json()).then(j=>{
           latest.textContent = j.latest || '-';
           updflag.textContent = j.hasUpdate ? 'Ja' : 'Nein';
-          btnR.disabled = !j.hasUpdate || !j.tar_url;
           add('Neueste Version: ' + (j.latest||'-') + ', Update verfügbar: ' + (j.hasUpdate?'Ja':'Nein'));
         }).catch(e=> add('Fehler beim Prüfen: ' + e));
       };
 
       btnR.onclick = () => {
-        btnR.disabled = true;
         add('Starte Remote-Update...');
         fetch('/api/update/remote', { method: 'POST' })
-          .then(r=>r.json()).then(j=>{
-            add(JSON.stringify(j));
-            if (j.rebooting) add('Reboot...');
-          }).catch(e=> add('Fehler beim Update: ' + e));
+          .then(r=>{ if (r.status===202) { add('Update gestartet'); pollProgress(); } else { return r.text().then(t=>{ throw new Error(t) }) } })
+          .catch(e=> add('Fehler beim Start: ' + e));
       };
 
       document.getElementById('f').onsubmit = (e) => {
@@ -84,14 +113,11 @@
         const f = document.getElementById('pkg').files[0];
         if (!f) { alert('Bitte .tar wählen'); return; }
         const fd = new FormData(); fd.append('package', f);
-        add('Lade hoch...');
+        add('Lade hoch und starte Anwendung...');
         fetch('/api/update/upload', { method:'POST', body: fd })
-          .then(r=>r.json()).then(j=>{
-            add(JSON.stringify(j));
-            if (j.rebooting) add('Reboot...');
-          }).catch(e=> add('Fehler beim Upload: ' + e));
+          .then(r=>{ if (r.status===202) { add('Anwendung gestartet'); pollProgress(); } else { return r.text().then(t=>{ throw new Error(t) }) } })
+          .catch(e=> add('Fehler beim Upload: ' + e));
       };
     </script>
   </body>
   </html>
-

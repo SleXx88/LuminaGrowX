@@ -152,12 +152,15 @@ void setup()
   Serial.println(ok ? F("[ToF] Init OK") : F("[ToF] Init FAILED"));
   health::set_tof(ok, ok ? String("") : F("ToF Init fehlgeschlagen"));
 
-  // FS
-  if (!LittleFS.begin(true)) {
+  // FS (mit explizitem Partition-Label "littlefs" und Mount-Pfad "/littlefs")
+  if (!LittleFS.begin(true, "/littlefs", 10, "littlefs")) {
     Serial.println(F("[FS] LittleFS mount/format FAILED"));
     health::set_fs(false, F("LittleFS Fehler"));
   } else {
-    Serial.println(F("[FS] LittleFS bereit"));
+    size_t total = LittleFS.totalBytes();
+    size_t used  = LittleFS.usedBytes();
+    Serial.printf("[FS] LittleFS bereit total=%u used=%u free=%u\n",
+                  (unsigned)total, (unsigned)used, (unsigned)((total>used)?(total-used):0));
     health::set_fs(true);
   }
 
