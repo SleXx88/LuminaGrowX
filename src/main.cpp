@@ -24,6 +24,7 @@
 #include "net_ctrl.h"
 #include "web_ctrl.h"
 #include "../include/health.h"
+#include "../include/version.h"
 
 using namespace vpd_calc;
 using namespace plant_ctrl;
@@ -99,6 +100,7 @@ void setup()
 {
   Serial.begin(115200);
   delay(200);
+  Serial.printf("[FW] Version %s (%s %s)\n", FW_VERSION, __DATE__, __TIME__);
 
   // Optional: Boot-Zurücksetzen in AP-Mode über GPIO6 (aktiv LOW für 5s, Pullup)
   net.configureResetPin(6, /*activeHigh=*/false);

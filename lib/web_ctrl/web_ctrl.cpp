@@ -6,6 +6,7 @@
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <Update.h>
+#include "../../include/version.h"
 
 using namespace web_ctrl;
 using net_ctrl::NetCtrl;
@@ -14,7 +15,7 @@ static const char* APP_CFG_PATH   = "/cfg/app.json";
 static const char* GROW_CFG_PATH  = "/cfg/grow.json";
 static const char* NOTIFY_CFG_PATH= "/cfg/notify.json";
 static const char* UPDATE_CFG_PATH= "/cfg/update.json";
-static const char* FW_VERSION     = "V0.6";
+// Version kommt aus include/version.h (FW_VERSION)
 // GitHub Releases (latest) defaults â€“ fest im Code hinterlegt
 static const char* GH_OWNER = "SleXx88";
 static const char* GH_REPO  = "LuminaGrowX";
@@ -403,6 +404,7 @@ String WebCtrl::makeStatusJson_() {
 
   doc["seed"] = app_.seed;
   doc["fw"] = FW_VERSION;
+  doc["build"] = String(__DATE__) + String(" ") + String(__TIME__);
   doc["ts"] = (uint64_t)millis();
 
   String out; serializeJson(doc, out); return out;
@@ -675,14 +677,14 @@ bool WebCtrl::applyPackageFromFile_(const char* tarPath, bool& fwUpdated, int& f
         if (size==0) { err="empty firmware"; f.close(); return false; }
         if (!Update.begin((size_t)size, U_FLASH)) { err=String("Update.begin ")+Update.errorString(); f.close(); return false; }
         const size_t CH=2048; uint8_t buf[CH]; uint32_t left=toRead;
-        while (left>0) { size_t n = left>CH?CH:left; int nr=f.read(buf,n); if (nr<=0){ Update.abort(); err="firmware read"; f.close(); return false; } size_t nw=Update.write(buf,nr); if (nw!=(size_t)nr){ Update.abort(); err=String("Update.write ")+Update.errorString(); f.close(); return false; } left-=nr; }
+        while (left>0) { size_t n = left>CH?CH:left; int nr=f.read(buf,n); if (nr<=0){ Update.abort(); err="firmware read"; f.close(); return false; } size_t nw=Update.write(buf,nr); if (nw!=(size_t)nr){ Update.abort(); err=String("Update.write ")+Update.errorString(); f.close(); return false; } left-=nr; yield(); }
         if (!Update.end(true)) { err=String("Update.end ")+Update.errorString(); f.close(); return false; }
         fwUpdated=true; if (pad) f.seek(pad, SeekCur);
       } else if (name.startsWith("www/") && isSafeAssetPath_(name.substring(4))) {
         String rel=name.substring(4); String dest=String("/")+rel; String tmp=String("/.u_tmp_")+rel; ensureDir_(dest); int lastSlash=tmp.lastIndexOf('/'); if (lastSlash>0) { LittleFS.mkdir(tmp.substring(0,lastSlash)); }
         File wf=LittleFS.open(tmp, FILE_WRITE); if (!wf) { err=String("open fail ")+tmp; f.close(); return false; }
         const size_t CH=2048; uint8_t buf[CH]; uint32_t left=toRead;
-        while (left>0) { size_t n=left>CH?CH:left; int nr=f.read(buf,n); if (nr<=0){ wf.close(); LittleFS.remove(tmp); err="asset read"; f.close(); return false; } if (wf.write(buf,nr)!=(size_t)nr){ wf.close(); LittleFS.remove(tmp); err="asset write"; f.close(); return false; } left-=nr; }
+        while (left>0) { size_t n=left>CH?CH:left; int nr=f.read(buf,n); if (nr<=0){ wf.close(); LittleFS.remove(tmp); err="asset read"; f.close(); return false; } if (wf.write(buf,nr)!=(size_t)nr){ wf.close(); LittleFS.remove(tmp); err="asset write"; f.close(); return false; } left-=nr; yield(); }
         wf.close(); LittleFS.remove(dest); ensureDir_(dest); if (!LittleFS.rename(tmp, dest)) { File rf=LittleFS.open(tmp, FILE_READ); File df=LittleFS.open(dest, FILE_WRITE); if (rf && df){ uint8_t b[1024]; int n; while ((n=rf.read(b,sizeof(b)))>0){ if (df.write(b,n)!=(size_t)n){ break; } } } if (rf) rf.close(); if (df) df.close(); LittleFS.remove(tmp); }
         filesUpdated++; if (pad) f.seek(pad, SeekCur);
       } else {
