@@ -116,8 +116,8 @@ void WebCtrl::loop() {
 }
 
 void WebCtrl::setupRoutes_() {
-  http_.on("/", HTTP_GET, [this](AsyncWebServerRequest* req){ sendFile_(req, "/index.html", "text/html"); });
-  http_.on("/index.html", HTTP_GET, [this](AsyncWebServerRequest* req){ sendFile_(req, "/index.html", "text/html"); });
+  http_.on("/", HTTP_GET, [this](AsyncWebServerRequest* req){ sendFile_(req, "/index.html", "text/html; charset=utf-8"); });
+  http_.on("/index.html", HTTP_GET, [this](AsyncWebServerRequest* req){ sendFile_(req, "/index.html", "text/html; charset=utf-8"); });
   http_.on("/pico.min.css", HTTP_GET, [this](AsyncWebServerRequest* req){ sendFile_(req, "/pico.min.css", "text/css"); });
   http_.on("/custom.css", HTTP_GET, [this](AsyncWebServerRequest* req){ sendFile_(req, "/custom.css", "text/css"); });
   http_.on("/bg.jpg", HTTP_GET, [this](AsyncWebServerRequest* req){ sendFile_(req, "/bg.jpg", "image/jpeg"); });
@@ -516,7 +516,7 @@ bool WebCtrl::whatsappSend_(const String& phone, const String& apikey, const Str
 void WebCtrl::registerUpdateRoutes_() {
   // Minimal Update UI (dynamic)
   http_.on("/update", HTTP_GET, [this](AsyncWebServerRequest* req){
-    sendFile_(req, "/update.html", "text/html");
+    sendFile_(req, "/update.html", "text/html; charset=utf-8");
   });
 
   // Check manifest or GitHub latest
@@ -574,8 +574,31 @@ void WebCtrl::registerUpdateRoutes_() {
       req->send(202, "application/json", "{\"started\":true}");
     },
     [this](AsyncWebServerRequest* req, String filename, size_t index, uint8_t* data, size_t len, bool final){
-      if (index == 0) { handlePackageUploadBegin_(); }
-      handlePackageUploadWrite_(data, len);
+      if (index == 0) {
+        // Begin upload: prepare temp file and set progress state
+        handlePackageUploadBegin_();
+        updateJobRunning_ = true;
+        updatePhase_ = "uploading";
+        updateMsg_ = "upload tar";
+        // Try to get total content length (may be -1)
+        int32_t cl = (int32_t)req->contentLength();
+        updateDLTotal_ = cl > 0 ? cl : -1;
+        updateDLSoFar_ = 0;
+      }
+      if (len) {
+        handlePackageUploadWrite_(data, len);
+        updateDLSoFar_ += (int32_t)len;
+        if (updateDLTotal_ > 0) {
+          int pct = (int)((100LL * updateDLSoFar_) / updateDLTotal_);
+          updateMsg_ = String("upload ") + String(updateDLSoFar_) + "/" + String(updateDLTotal_) + String(" (") + String(pct) + String("%)");
+        } else {
+          updateMsg_ = String("upload ") + String(updateDLSoFar_) + String(" bytes");
+        }
+      }
+      if (final) {
+        // Upload finished; the main handler will start the apply job and keep running=true
+        updateMsg_ = String("upload complete ") + String(updateDLSoFar_) + String(" bytes");
+      }
       // finalize in completion handler
     }
   );

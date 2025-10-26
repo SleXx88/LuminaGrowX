@@ -55,7 +55,7 @@
             <input type="file" id="pkg" accept=".tar" />
             <button class="primary">Upload & Anwenden</button>
           </form>
-          <p class="dim" style="margin-top:.5rem">Firmware im Paket ist optional. Web‑Assets unter <code>www/</code> werden selektiv aktualisiert. Konfiguration bleibt erhalten.</p>
+          <p class="dim" style="margin-top:.5rem">Firmware im Paket ist optional. Web-Assets unter <code>www/</code> werden selektiv aktualisiert. Konfiguration bleibt erhalten.</p>
         </div>
       </article>
     </main>
@@ -67,23 +67,39 @@
       const btnR = document.getElementById('btnRunRemote');
       const latest = document.getElementById('latest');
       const updflag = document.getElementById('updflag');
-      function add(m){ log.textContent += m + "\n"; }
+      const dlp = document.getElementById('dlProg');
+      const dlt = document.getElementById('dlText');
+      const app = document.getElementById('apProg');
+      const apt = document.getElementById('apText');
 
-      fetch('/api/status').then(r=>r.json()).then(j=>{ ver.textContent = j.fw || '-'; });
+      let preFw = null, preBuild = null, expectedFw = null;
+      function add(m){ log.textContent += m + "\n"; log.scrollTop = log.scrollHeight; }
+
+      fetch('/api/status').then(r=>r.json()).then(j=>{ ver.textContent = j.fw || '-'; preFw = j.fw||null; preBuild = j.build||null; }).catch(()=>{});
+
+      function waitForReboot(expectFw){
+        add('Warte auf Neustart...');
+        const ping = () => {
+          fetch('/api/status', {cache:'no-store'}).then(r=>r.json()).then(j=>{
+            const fwOk = expectFw ? (j.fw === expectFw) : ((j.build && preBuild) ? (j.build !== preBuild) : (j.fw && preFw ? (j.fw !== preFw) : false));
+            if (fwOk) {
+              ver.textContent = j.fw || '-';
+              add('Gerät wieder online – Update erfolgreich');
+            } else { setTimeout(ping, 1500); }
+          }).catch(()=> setTimeout(ping, 1500));
+        };
+        setTimeout(ping, 1500);
+      }
 
       function pollProgress(){
         fetch('/api/update/progress').then(r=>r.json()).then(j=>{
-          add('['+j.phase+'] '+(j.msg||''));
-          const dlp = document.getElementById('dlProg');
-          const dlt = document.getElementById('dlText');
-          const app = document.getElementById('apProg');
-          const apt = document.getElementById('apText');
-          if (j.download){ dlp.value = (j.download.pct>0)? j.download.pct : 0; dlt.textContent = (j.download.sofar||0)+' / '+(j.download.total||0); }
-          if (j.apply){ app.value = (j.apply.pct>0)? j.apply.pct : 0; apt.textContent = (j.apply.sofar||0)+' / '+(j.apply.total||0); }
+          if (j.msg) add('['+j.phase+'] '+j.msg);
+          if (j.download){ dlp.value = Math.max(0, j.download.pct||0); dlt.textContent = (j.download.sofar||0)+' / '+(j.download.total||0); }
+          if (j.apply){ app.value = Math.max(0, j.apply.pct||0); apt.textContent = (j.apply.sofar||0)+' / '+(j.apply.total||0); }
           if (!j.running){
             if (j.ok){
-              add('Update erfolgreich '+ (j.fwUpdated?'(Firmware + Webassets)':'(Webassets)'));
-              if (j.fwUpdated) add('Reboot...');
+              add('Update erfolgreich '+ (j.fwUpdated?'(Firmware + Web-Assets)':'(Web-Assets)'));
+              if (j.fwUpdated) { add('Reboot...'); waitForReboot(expectedFw||null); }
             } else {
               add('Update fehlgeschlagen: '+(j.error||'unbekannt'));
             }
@@ -92,11 +108,13 @@
           }
         }).catch(()=> setTimeout(pollProgress, 1500));
       }
+
       btnC.onclick = () => {
         add('Neueste Version wird ermittelt...');
         fetch('/api/update/check').then(r=>r.json()).then(j=>{
           latest.textContent = j.latest || '-';
           updflag.textContent = j.hasUpdate ? 'Ja' : 'Nein';
+          expectedFw = j.latest || null;
           add('Neueste Version: ' + (j.latest||'-') + ', Update verfügbar: ' + (j.hasUpdate?'Ja':'Nein'));
         }).catch(e=> add('Fehler beim Prüfen: ' + e));
       };
@@ -121,3 +139,4 @@
     </script>
   </body>
   </html>
+

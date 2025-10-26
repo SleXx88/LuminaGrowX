@@ -1,2 +1,4 @@
-$('btnNotifyTest').addEventListener('click', async ()=>{
-      if(!$('notifyEnabled').checked){ showToast('Benachrichtigungen sind deaktiviert');
+
+  </body>
+  </html>
+
