@@ -518,6 +518,10 @@ void WebCtrl::registerUpdateRoutes_() {
   http_.on("/update", HTTP_GET, [this](AsyncWebServerRequest* req){
     sendFile_(req, "/update.html", "text/html; charset=utf-8");
   });
+  // Settings page
+  http_.on("/settings", HTTP_GET, [this](AsyncWebServerRequest* req){
+    sendFile_(req, "/settings.html", "text/html; charset=utf-8");
+  });
 
   // Check manifest or GitHub latest
   http_.on("/api/update/check", HTTP_GET, [this](AsyncWebServerRequest* req){

@@ -157,7 +157,7 @@
             </ul>
             <footer style="display:flex; justify-content:flex-end; gap:.5rem; padding-top:.5rem;">
               <a href="/update" class="button primary" role="button">Updates</a>
-              <button id="btnOpenNet" class="primary">Einstellungen</button>
+              <a href="/settings" class="button primary" role="button">Einstellungen</a>
             </footer>
           </div>
         </article>
@@ -353,10 +353,7 @@
       function startWS(){ try{ const proto=location.protocol==='https:'?'wss':'ws'; live.ws=new WebSocket(proto+'://'+location.host+'/ws'); live.ws.addEventListener('message',(ev)=>{ try{ updateStatus(JSON.parse(ev.data)); }catch(_){} }); live.ws.addEventListener('close',()=>{ startPolling(); }); live.ws.addEventListener('error',()=>{ try{ live.ws.close(); }catch(_){} }); }catch(_){ startPolling(); } }
       function startPolling(){ if(live.timer) return; live.timer=setInterval(async()=>{ try{ const s=await fetchJSON('/api/status'); updateStatus(s); }catch(_){ } }, 3000); }
 
-      document.addEventListener('click', (e)=>{ if (e.target && e.target.id === 'btnOpenNet') { netDialogOpen = true; $('dlgNet').showModal(); } });
-      $('dlgNet').addEventListener('close', ()=>{ netDialogOpen = false; }); $('dlgNet').addEventListener('cancel', ()=>{ netDialogOpen = false; });
-      $('useStatic').addEventListener('change', (e)=> $('staticBlock').classList.toggle('hidden', !e.target.checked));
-      $('notifyEnabled').addEventListener('change', (e)=> $('notifyBlock').classList.toggle('hidden', !e.target.checked));
+      // Einstellungen wandern auf eigene Seite; keine Dialog-Öffner mehr nötig
       // Grow start/stop
       document.getElementById('toggleGrow').addEventListener('click', async ()=>{
         const started = !!(live.lastStatus && live.lastStatus.grow && live.lastStatus.grow.started);
