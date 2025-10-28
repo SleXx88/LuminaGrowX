@@ -105,6 +105,24 @@ void WebCtrl::loop() {
     if (net_) net_->probeInternet();
     nextProbeAt_ = now + 60000;
   }
+  // Periodische RTC-Synchronisierung: einmal nach erstem Internet (SNTP) und danach täglich gegen 03:05 Lokalzeit
+  if (net_ && net_->internetOK() && rtc_) {
+    time_t tnow = time(nullptr);
+    // Nur synchronisieren, wenn Systemzeit valide (SNTP) ist
+    if (tnow >= 1700000000) {
+      struct tm tmL; localtime_r(&tnow, &tmL);
+      uint32_t ymd = (uint32_t)((tmL.tm_year+1900)*10000 + (tmL.tm_mon+1)*100 + tmL.tm_mday);
+      // Erste Synchronisierung nach Boot sobald Internetzeit vorhanden
+      if (!rtcSyncedOnce_) {
+        if (syncRTCFromSystem_()) { rtcSyncedOnce_ = true; lastRtcSyncYMD_ = ymd; }
+      } else {
+        // Tägliche Synchronisierung: zwischen 03:05:00 und 03:10:59, maximal einmal pro Tag
+        if (ymd != lastRtcSyncYMD_ && tmL.tm_hour == 3 && tmL.tm_min >= 5 && tmL.tm_min <= 10) {
+          if (syncRTCFromSystem_()) { lastRtcSyncYMD_ = ymd; }
+        }
+      }
+    }
+  }
   if (now >= nextPushAt_) {
     if (ws_.count() > 0) ws_.textAll(makeStatusJson_());
     nextPushAt_ = now + 2000;
@@ -346,6 +364,18 @@ void WebCtrl::sendFile_(AsyncWebServerRequest* req, const char* path, const char
   req->send(LittleFS, path, mime);
 }
 
+bool WebCtrl::syncRTCFromSystem_() {
+  if (!rtc_) return false;
+  time_t now = time(nullptr);
+  if (now <= 0) return false;
+  struct tm tmL; localtime_r(&now, &tmL);
+  char buf[24];
+  snprintf(buf, sizeof(buf), "%02d-%02d-%04d %02d-%02d-%02d",
+           tmL.tm_mday, tmL.tm_mon + 1, tmL.tm_year + 1900,
+           tmL.tm_hour, tmL.tm_min, tmL.tm_sec);
+  return rtc_->writeTimeFromString(String(buf));
+}
+
 static String fmtDateTime_local(time_t t) {
   if (t == 0) return String("");
   struct tm tmL; localtime_r(&t, &tmL);
@@ -361,7 +391,24 @@ String WebCtrl::makeStatusJson_() {
   doc["internet_ok"] = net_ ? net_->internetOK() : false;
   doc["rssi"] = net_ ? net_->rssi() : -127;
   doc["uptime_s"] = (uint64_t)uptime_s();
-  doc["ntp_time"] = rtc_ ? rtc_->readTimeString() : String("");
+  // Lokale Zeit bevorzugt aus System (TZ via NetCtrl::tzInit). Fallback: RTC.
+  {
+    String tstr;
+    time_t now = time(nullptr);
+    // Nutze Systemzeit nur, wenn SNTP gesetzt ist (nach 2023-11-14 ca.).
+    if (now >= 1700000000) {
+      struct tm tmL;
+      localtime_r(&now, &tmL);
+      char buf[24];
+      snprintf(buf, sizeof(buf), "%02d-%02d-%04d %02d-%02d-%02d",
+               tmL.tm_mday, tmL.tm_mon + 1, tmL.tm_year + 1900,
+               tmL.tm_hour, tmL.tm_min, tmL.tm_sec);
+      tstr = String(buf);
+    } else {
+      tstr = rtc_ ? rtc_->readTimeString() : String("");
+    }
+    doc["ntp_time"] = tstr;
+  }
   // Env
   float tIn = NAN, rhIn = NAN; double vpd = NAN; float tOut = NAN;
   if (ctrl_) {

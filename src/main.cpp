@@ -192,7 +192,7 @@ void setup()
 
   // RTC (vor Netzstart initialisieren, damit NetCtrl darauf zugreifen darf)
   if (!rtc.begin(Wire1)) {
-    Serial.println("[RTC] Keine Verbindung zur DS3231 (0x57).");
+    Serial.println("[RTC] Keine Verbindung zur DS3231 (0x68).");
     health::set_rtc(false, F("RTC nicht erreichbar"));
   } else {
     Serial.println("[RTC] Init OK (DS3231 gefunden).");
@@ -276,8 +276,20 @@ void loop()
   if (now - lastLogMs >= 3000) {
     lastLogMs = now;
     if (!health::state().control_paused) {
-      String t = rtc.readTimeString();
-      Serial.print(t);
+      // System-Lokalzeit (SNTP + TZ) und RTC-Lokalzeit zum Vergleich ausgeben
+      time_t ts = time(nullptr);
+      char sysBuf[24] = {0};
+      if (ts >= 0) {
+        struct tm tmL; localtime_r(&ts, &tmL);
+        snprintf(sysBuf, sizeof(sysBuf), "%02d-%02d-%04d %02d-%02d-%02d",
+                 tmL.tm_mday, tmL.tm_mon+1, tmL.tm_year+1900,
+                 tmL.tm_hour, tmL.tm_min, tmL.tm_sec);
+      }
+      String rtcStr = rtc.readTimeString();
+      Serial.print("SYS:");
+      Serial.print(sysBuf);
+      Serial.print(" | RTC:");
+      Serial.print(rtcStr);
 
       float tC_in = NAN, tC_out = NAN, rh_in = NAN, rh_out = NAN;
       if (sht_in.read(tC_in, rh_in) && sht_out.read(tC_out, rh_out)) {

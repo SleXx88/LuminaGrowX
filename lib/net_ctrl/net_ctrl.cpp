@@ -61,12 +61,14 @@ bool NetCtrl::saveConfig(const NetworkConfig& c) {
 }
 
 void NetCtrl::tzInit() {
+  // POSIX TZ string for Europe/Berlin (CET/CEST)
   setenv("TZ", "CET-1CEST,M3.5.0/2,M10.5.0/3", 1);
   tzset();
 }
 
 void NetCtrl::ntpInit() {
-  configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+  // Set TZ and NTP servers in one call to ensure localtime_r uses DST correctly
+  configTzTime("CET-1CEST,M3.5.0/2,M10.5.0/3", "pool.ntp.org", "time.nist.gov");
 }
 
 bool NetCtrl::shouldForceAPAtBoot(uint32_t holdMs) {

@@ -299,6 +299,16 @@
       function ipv4ok(s) { const parts = (s || "").split(".").map((n) => +n); return (parts.length === 4 && parts.every((n) => Number.isInteger(n) && n >= 0 && n <= 255)); }
       function phoneOk(s) { return /^\+\d{6,16}$/.test((s || "").trim()); }
       function format1(n) { return n == null || isNaN(n) ? "-" : (+n).toFixed(1); }
+      function formatUptime(sec) {
+        if (sec == null || isNaN(sec)) return "-";
+        sec = Math.floor(+sec);
+        const d = Math.floor(sec / 86400); sec -= d*86400;
+        const h = Math.floor(sec / 3600);  sec -= h*3600;
+        const m = Math.floor(sec / 60);    const s = sec - m*60;
+        if (d > 0) return `${d}d ${h}h ${m}m`;
+        if (h > 0) return `${h}h ${m}m ${s}s`;
+        return `${m}m ${s}s`;
+      }
       function updateToggleButton(started) { $("toggleGrow").textContent = started ? "STOP" : "START"; $("toggleGrow").classList.toggle("primary", !started); }
       function updateSeedVisibility(started) { const row = $("seedRow"); if (row) row.classList.toggle("hidden", !!started); }
 
@@ -335,7 +345,8 @@
           updateSeedVisibility(s.grow.started);
         }
         // System/Env/Aktoren
-        $("stUp").textContent = s.uptime || "-";
+        const up = (typeof s.uptime_s !== 'undefined') ? s.uptime_s : s.uptime;
+        $("stUp").textContent = formatUptime(up);
         if ($("stNtp")) $("stNtp").textContent = s.ntp_time || "-";
         const ntpTopEl = document.getElementById("ntpTop"); if (ntpTopEl) ntpTopEl.textContent = s.ntp_time || "--";
         $("stT").textContent = format1(s.temp_c);

@@ -94,6 +94,10 @@ private:
   uint32_t nextPushAt_ = 0;
   uint32_t nextProbeAt_ = 0;
   uint32_t rebootAt_ = 0;
+  // RTC sync
+  uint32_t lastRtcSyncYMD_ = 0; // YYYYMMDD of last RTC sync
+  bool rtcSyncedOnce_ = false;
+  bool syncRTCFromSystem_();
 
   // Temporary file for package upload/download
   String pkgTempPath_ = "/.update_pkg.tar";

@@ -58,7 +58,7 @@ public:
 
 private:
   TwoWire* wire_ = nullptr;
-  uint8_t addr_ = 0x57;
+  uint8_t addr_ = 0x68; // DS3231 default I2C address
 
   struct DateTime {
     int16_t year;   // 2000..2099 (ausreichend)
