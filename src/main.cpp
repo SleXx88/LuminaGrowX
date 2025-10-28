@@ -270,49 +270,38 @@ void loop()
     // Keine Regelung wenn SHT fehlt; Stepper tickt weiter, Web läuft
   }
 
-  // Debug print every ~3s without throttling the control loop
+  // Debug print every ~3s; nur wenn Regelung aktiv
   static unsigned long lastLogMs = 0;
   unsigned long now = millis();
   if (now - lastLogMs >= 3000) {
     lastLogMs = now;
+    if (!health::state().control_paused) {
+      String t = rtc.readTimeString();
+      Serial.print(t);
 
-    String t = rtc.readTimeString();
-    Serial.print(t);
+      float tC_in = NAN, tC_out = NAN, rh_in = NAN, rh_out = NAN;
+      if (sht_in.read(tC_in, rh_in) && sht_out.read(tC_out, rh_out)) {
+        Serial.print(F(" | [INDOOR] Temp: "));
+        Serial.print(tC_in, 1);
+        Serial.print(F(" C, RH: "));
+        Serial.print(rh_in, 1);
+        Serial.print(F(" %, Taupunkt: "));
+        Serial.print(computeDewPoint(static_cast<double>(tC_in), static_cast<double>(rh_in)), 1);
+        Serial.print(F(" C, VPD: "));
+        Serial.print(computeVpd(static_cast<double>(tC_in), static_cast<double>(rh_in)), 3);
+        Serial.print(F(" kPa"));
 
-    float tC_in = NAN, tC_out = NAN, rh_in = NAN, rh_out = NAN;
-    if (sht_in.read(tC_in, rh_in) && sht_out.read(tC_out, rh_out)) {
-      Serial.print(F(" | [INDOOR] Temp: "));
-      Serial.print(tC_in, 1);
-      Serial.print(F(" C, RH: "));
-      Serial.print(rh_in, 1);
-      Serial.print(F(" %, Taupunkt: "));
-      Serial.print(computeDewPoint(static_cast<double>(tC_in), static_cast<double>(rh_in)), 1);
-      Serial.print(F(" C, VPD: "));
-      Serial.print(computeVpd(static_cast<double>(tC_in), static_cast<double>(rh_in)), 3);
-      Serial.print(F(" kPa"));
-
-      Serial.print(F(" | [OUTDOOR] Temp: "));
-      Serial.print(tC_out, 1);
-      Serial.print(F(" C, RH: "));
-      Serial.print(rh_out, 1);
-      Serial.print(F(" % | LED: "));
-      Serial.print(controller.currentLedPercentEffective(), 1);
-      Serial.print(F(" % | Fan: "));
-      Serial.println(controller.currentFanPercent(), 1);
-
-    //   int distance = tof.readRawMm();
-    //   Serial.print(F(" % | ToF: "));
-    //   if (distance >= 0) {
-    //     Serial.print(distance);
-    //     Serial.print(F(" mm"));
-    //   } else {
-    //     Serial.print(F("out of range - "));
-    //     Serial.print(distance);
-    //     Serial.print(F(" mm"));
-    //   }
-    //   Serial.println();
-    // } else {
-    //   Serial.println(F(" [SHT41] Read FAILED"));
+        Serial.print(F(" | [OUTDOOR] Temp: "));
+        Serial.print(tC_out, 1);
+        Serial.print(F(" C, RH: "));
+        Serial.print(rh_out, 1);
+        Serial.print(F(" % | LED: "));
+        Serial.print(controller.currentLedPercentEffective(), 1);
+        Serial.print(F(" % | Fan: "));
+        Serial.println(controller.currentFanPercent(), 1);
+      }
+    } else {
+      Serial.println(F("Reglung unterbrochen"));
     }
   }
 

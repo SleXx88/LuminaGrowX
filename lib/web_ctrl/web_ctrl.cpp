@@ -558,6 +558,8 @@ void WebCtrl::registerUpdateRoutes_() {
   http_.on("/api/update/remote", HTTP_POST, [this](AsyncWebServerRequest* req){
     if (updateJobRunning_) { req->send(409, "application/json", "{\"error\":\"update running\"}"); return; }
     if (!net_ || !net_->isConnected()) { req->send(400, "application/json", "{\"error\":\"wifi not connected\"}"); return; }
+    // Pausiere die Regelung direkt beim Start des Updates
+    health::state().control_paused = true;
     startRemoteUpdateJob_();
     req->send(202, "application/json", "{\"started\":true}");
   });
@@ -569,7 +571,10 @@ void WebCtrl::registerUpdateRoutes_() {
       bool fwUpd=false; int filesUpd=0; String err;
       bool saved = handlePackageUploadEnd_(fwUpd, filesUpd, err);
       if (!saved) { JsonDocument resp; resp["ok"]=false; resp["error"]=err; String out; serializeJson(resp,out); req->send(500,"application/json",out); return; }
-      if (updateJobRunning_) { req->send(409, "application/json", "{\"error\":\"update running\"}"); return; }
+      // Wenn wir direkt aus der Upload-Phase kommen, erlaube den Übergang ins Anwenden
+      if (updateJobRunning_ && updatePhase_ != "uploading") { req->send(409, "application/json", "{\"error\":\"update running\"}"); return; }
+      // Upload ist abgeschlossen, beende Upload-Phase und starte Apply-Job
+      updateJobRunning_ = false;
       startApplyUploadedJob_();
       req->send(202, "application/json", "{\"started\":true}");
     },
@@ -577,6 +582,8 @@ void WebCtrl::registerUpdateRoutes_() {
       if (index == 0) {
         // Begin upload: prepare temp file and set progress state
         handlePackageUploadBegin_();
+        // Pausiere die Regelung bereits zum Upload-Start, um Ressourcen frei zu machen
+        health::state().control_paused = true;
         updateJobRunning_ = true;
         updatePhase_ = "uploading";
         updateMsg_ = "upload tar";
@@ -628,6 +635,8 @@ void WebCtrl::registerUpdateRoutes_() {
 void WebCtrl::startRemoteUpdateJob_() {
   if (updateJobRunning_) return;
   updateJobRunning_ = true; updatePhase_ = "checking"; updateMsg_ = "GitHub latest"; updateOk_ = false; updateFwUpdated_ = false; updateFilesUpdated_ = 0; updateErr_ = "";
+  // Während des Updates Regelung pausieren
+  health::state().control_paused = true;
   // Spawn on Core 0 with moderate stack
   xTaskCreatePinnedToCore(&WebCtrl::updateTaskTrampoline_, "upd_remote", 12288, this, 1, nullptr, 0);
 }
@@ -635,6 +644,7 @@ void WebCtrl::startRemoteUpdateJob_() {
 void WebCtrl::startApplyUploadedJob_() {
   if (updateJobRunning_) return;
   updateJobRunning_ = true; updatePhase_ = "applying"; updateMsg_ = "apply uploaded"; updateOk_ = false; updateFwUpdated_ = false; updateFilesUpdated_ = 0; updateErr_ = "";
+  health::state().control_paused = true;
   xTaskCreatePinnedToCore(&WebCtrl::updateTaskTrampoline_, "upd_apply", 12288, this, 1, nullptr, 0);
 }
 
@@ -676,6 +686,8 @@ void WebCtrl::updateTaskRun_(bool useRemote, const String& localTarPath) {
   updateOk_ = ok; updateFwUpdated_ = fwUpd; updateFilesUpdated_ = filesUpd; updateErr_ = ok? String("") : err;
   updatePhase_ = ok ? "done" : "error";
   updateJobRunning_ = false;
+  // Regelung wieder freigeben, wenn kein Reboot folgt
+  if (!(ok && fwUpd)) { health::state().control_paused = false; }
   if (ok && fwUpd) { rebootAt_ = millis() + 750; }
 }
 
@@ -798,34 +810,48 @@ bool WebCtrl::isSafeAssetPath_(const String& name) {
 }
 
 bool WebCtrl::handlePackageUploadEnd_(bool& fwUpdated, int& filesUpdated, String& err) {
+  // Nur Upload finalisieren; das Anwenden erfolgt asynchron in startApplyUploadedJob_()
   fwUpdated=false; filesUpdated=0; err="";
   if (!LittleFS.exists(pkgTempPath_.c_str())) { err="temp not found"; return false; }
-  bool ok = applyPackageFromFile_(pkgTempPath_.c_str(), fwUpdated, filesUpdated, err); LittleFS.remove(pkgTempPath_.c_str()); return ok;
+  // Paket ist vollständig hochgeladen und liegt unter pkgTempPath_; Anwendung startet asynchron
+  return true;
 }
 
 bool WebCtrl::applyPackageFromFile_(const char* tarPath, bool& fwUpdated, int& filesUpdated, String& err) {
   fwUpdated=false; filesUpdated=0; err="";
   File f = LittleFS.open(tarPath, FILE_READ); if (!f) { err="open failed"; return false; }
   const size_t BLK=512; uint8_t hdr[BLK];
+  // Reset Apply-Progress
+  updateApplyTotal_ = 0;
+  updateApplySoFar_ = 0;
+  updateMsg_ = "apply tar";
   while (true) {
     size_t r = f.read(hdr, BLK); if (r == 0) break; if (r != BLK) { err="bad tar header"; f.close(); return false; }
     bool allZero=true; for (size_t i=0;i<BLK;i++){ if (hdr[i]!=0){ allZero=false; break; } } if (allZero) break;
     char nameC[101]; memcpy(nameC, hdr+0, 100); nameC[100]='\0'; String name=String(nameC);
     uint32_t size=0; if (!parseOctal_((const char*)(hdr+124), 12, size)) size=0; char typeflag=(char)hdr[156]; if (typeflag=='\0') typeflag='0';
     uint32_t toRead=size; uint32_t pad=(BLK-(size%BLK))%BLK;
+    // Zähle Gesamtmenge der anzuwendenden Daten hoch, wenn reguläre Datei
+    if (typeflag=='0') {
+      if (name=="firmware.bin" || name.startsWith("www/")) {
+        if (updateApplyTotal_ >= 0) updateApplyTotal_ += (int32_t)size;
+      }
+    }
     if (typeflag=='0') {
       if (name=="firmware.bin") {
         if (size==0) { err="empty firmware"; f.close(); return false; }
+        updateMsg_ = "apply firmware";
         if (!Update.begin((size_t)size, U_FLASH)) { err=String("Update.begin ")+Update.errorString(); f.close(); return false; }
         const size_t CH=2048; uint8_t buf[CH]; uint32_t left=toRead;
-        while (left>0) { size_t n = left>CH?CH:left; int nr=f.read(buf,n); if (nr<=0){ Update.abort(); err="firmware read"; f.close(); return false; } size_t nw=Update.write(buf,nr); if (nw!=(size_t)nr){ Update.abort(); err=String("Update.write ")+Update.errorString(); f.close(); return false; } left-=nr; yield(); }
+        while (left>0) { size_t n = left>CH?CH:left; int nr=f.read(buf,n); if (nr<=0){ Update.abort(); err="firmware read"; f.close(); return false; } size_t nw=Update.write(buf,nr); if (nw!=(size_t)nr){ Update.abort(); err=String("Update.write ")+Update.errorString(); f.close(); return false; } left-=nr; updateApplySoFar_ += nr; yield(); }
         if (!Update.end(true)) { err=String("Update.end ")+Update.errorString(); f.close(); return false; }
         fwUpdated=true; if (pad) f.seek(pad, SeekCur);
       } else if (name.startsWith("www/") && isSafeAssetPath_(name.substring(4))) {
         String rel=name.substring(4); String dest=String("/")+rel; String tmp=String("/.u_tmp_")+rel; ensureDir_(dest); int lastSlash=tmp.lastIndexOf('/'); if (lastSlash>0) { LittleFS.mkdir(tmp.substring(0,lastSlash)); }
         File wf=LittleFS.open(tmp, FILE_WRITE); if (!wf) { err=String("open fail ")+tmp; f.close(); return false; }
         const size_t CH=2048; uint8_t buf[CH]; uint32_t left=toRead;
-        while (left>0) { size_t n=left>CH?CH:left; int nr=f.read(buf,n); if (nr<=0){ wf.close(); LittleFS.remove(tmp); err="asset read"; f.close(); return false; } if (wf.write(buf,nr)!=(size_t)nr){ wf.close(); LittleFS.remove(tmp); err="asset write"; f.close(); return false; } left-=nr; yield(); }
+        updateMsg_ = String("apply ")+rel;
+        while (left>0) { size_t n=left>CH?CH:left; int nr=f.read(buf,n); if (nr<=0){ wf.close(); LittleFS.remove(tmp); err="asset read"; f.close(); return false; } if (wf.write(buf,nr)!=(size_t)nr){ wf.close(); LittleFS.remove(tmp); err="asset write"; f.close(); return false; } left-=nr; updateApplySoFar_ += nr; yield(); }
         wf.close(); LittleFS.remove(dest); ensureDir_(dest); if (!LittleFS.rename(tmp, dest)) { File rf=LittleFS.open(tmp, FILE_READ); File df=LittleFS.open(dest, FILE_WRITE); if (rf && df){ uint8_t b[1024]; int n; while ((n=rf.read(b,sizeof(b)))>0){ if (df.write(b,n)!=(size_t)n){ break; } } } if (rf) rf.close(); if (df) df.close(); LittleFS.remove(tmp); }
         filesUpdated++; if (pad) f.seek(pad, SeekCur);
       } else {

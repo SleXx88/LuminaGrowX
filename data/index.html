@@ -87,7 +87,7 @@
             <span class="badge" title="Benachrichtigungen"><span id="waIcon" class="icon"></span></span>
           </li>
           <li>
-            <span class="badge" title="Raumtemperatur (SHT OUT)"><span id="tempIcon" class="icon"></span> <span id="tempText" class="mono">--.- �C</span></span>
+            <span class="badge" title="Raumtemperatur (SHT OUT)"><span id="tempIcon" class="icon"></span> <span id="tempText" class="mono">--.- °C</span></span>
           </li>
         </ul>
       </nav>
@@ -128,7 +128,7 @@
               <div>
                 <h3>Umgebung</h3>
                 <ul>
-                  <li>Temp: <span class="mono" id="stT">-</span> C</li>
+                  <li>Temp: <span class="mono" id="stT">-</span> °C</li>
                   <li>rF: <span class="mono" id="stH">-</span> %</li>
                   <li>VPD: <span class="mono" id="stVpd">-</span> kPa</li>
                 </ul>
@@ -137,7 +137,7 @@
                 <h3>Aktoren</h3>
                 <ul>
                   <li>Licht: <span id="stLight">-</span></li>
-                  <li>Luefter: <span id="stFan">-</span></li>
+                  <li>Lüfter: <span id="stFan">-</span></li>
                   <li>Pumpe: <span id="stPump">-</span></li>
                 </ul>
               </div>
@@ -165,7 +165,7 @@
     </main>
 
     <footer class="site container">
-      <small>� 2025 Lisa Pro - "Grow smart, not hard."</small>
+      <small>© 2025 Lisa Pro - "Grow smart, not hard."</small>
       <small><span id="apInfo" class="mono"></span></small>
     </footer>
 
@@ -173,7 +173,7 @@
       <article>
         <header>
           <h3>Einstellungen</h3>
-          <button aria-label="Schliessen" rel="prev" onclick="document.getElementById('dlgNet').close()"></button>
+          <button aria-label="Schließen" rel="prev" onclick="document.getElementById('dlgNet').close()"></button>
         </header>
         <div class="content" style="padding: 1rem; display:grid; gap:1rem;">
           <form id="netForm">
@@ -200,7 +200,7 @@
             <h4>Benachrichtigungen (WhatsApp via CallMeBot)</h4>
             <label><input type="checkbox" id="notifyEnabled" role="switch" /> Benachrichtigungen aktivieren</label>
             <div id="notifyBlock" class="grid hidden">
-              <label>Telefonnummer (+Laendervorwahl) <input id="notifyPhone" placeholder="+49XXXXXXXXXX" /></label>
+              <label>Telefonnummer (+Ländervorwahl) <input id="notifyPhone" placeholder="+49XXXXXXXXXX" /></label>
               <label>API-Key <input id="notifyKey" placeholder="1234567" /></label>
               <div style="display:flex; gap:.5rem;">
                 <button id="btnNotifySave" type="button" class="primary">Speichern</button>
@@ -229,7 +229,7 @@
 
     <script>
       const $ = (id) => document.getElementById(id);
-      // Inline, lizenzfreie SVG-Icons (Check/X/Minus) � Heroicons-�hnlich
+      // Inline, lizenzfreie SVG-Icons (Check/X/Minus) – Heroicons-ähnlich
       const icons = {
         wifi:  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18"/><path d="M12 3a14 14 0 0 0 0 18"/></svg>',
         mail: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" ry="2"/><path d="M3 7l9 6 9-6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
@@ -248,7 +248,7 @@
 
       function updateStatus(s){
         live.lastStatus = s;
-        // Internet-/WLAN-Status als festes Symbol, nur Farbe �ndert sich
+        // Internet-/WLAN-Status als festes Symbol, nur Farbe ändert sich
         const liveEl = $('liveIcon');
         if (liveEl) {
           if (!liveEl.innerHTML) liveEl.innerHTML = icons.wifi;
@@ -257,7 +257,7 @@
           else if (s && s.wifi_connected) { liveEl.classList.add('warn'); }
           else { liveEl.classList.add('err'); }
         }
-        // Benachrichtigungen als festes Symbol, nur Farbe �ndert sich
+        // Benachrichtigungen als festes Symbol, nur Farbe ändert sich
         const waEl = $('waIcon');
         if (waEl) {
           if (!waEl.innerHTML) waEl.innerHTML = icons.mail;
@@ -267,7 +267,7 @@
         }
         // Temperatur-Badge (SHT OUT)
         const tEl = $('tempIcon'); if (tEl && !tEl.innerHTML) tEl.innerHTML = icons.thermo;
-        const tTxt = $('tempText'); if (tTxt) tTxt.textContent = (s && s.temp_out_c!=null && !isNaN(s.temp_out_c)) ? (format1(s.temp_out_c)+' �C') : '--.- �C';
+        const tTxt = $('tempText'); if (tTxt) tTxt.textContent = (s && s.temp_out_c!=null && !isNaN(s.temp_out_c)) ? (format1(s.temp_out_c)+' °C') : '--.- °C';
         if (s.grow){
           $('growTitle').textContent = s.grow.started ? ('Tag ' + s.grow.day + ' - ' + (s.grow.phase||'')) : 'Noch nicht gestartet';
           totalDays.textContent = (s.grow.total_days != null ? s.grow.total_days : 90);
@@ -278,66 +278,78 @@
           updateToggleButton(s.grow.started);
           updateSeedVisibility(s.grow.started);
         }
-        if (s.seed) { $('seed').value = s.seed; $('seedNow').textContent = s.seed; }
-        $('stUp').textContent = (s.uptime_s != null) ? (Math.floor(s.uptime_s/3600)+'h '+Math.floor((s.uptime_s%3600)/60)+'m') : '-';
-        $('stNtp').textContent = s.ntp_time || '-';
+        // System/Env/Aktoren
+        $('stUp').textContent = (s.uptime||'-');
+        $('stNtp').textContent = (s.ntp_time||'-');
         $('stT').textContent = format1(s.temp_c);
-        $('stH').textContent = format1(s.humi_rh);
+        $('stH').textContent = format1(s.hum_pct);
         $('stVpd').textContent = format1(s.vpd_kpa);
+        $('stTs').textContent = s.ts ? new Date(s.ts*1000).toLocaleString() : '-';
+        $('fw').textContent = s.fw || '-';
+        // Aktoren
         $('stLight').textContent = s.light_on ? 'AN' : 'AUS';
         $('stFan').textContent = s.fan_on ? 'AN' : 'AUS';
         $('stPump').textContent = s.pump_on ? 'AN' : 'AUS';
-        $('stTs').textContent = s.ntp_time || '-';
-        $('fw').textContent = s.fw || '-';
+        // Netzwerk
         $('stIp').textContent = s.ip || '-';
-        $('stNet').textContent = s.use_static ? 'statisch' : 'DHCP';
-        $('stRssi').textContent = (s.rssi != null ? s.rssi : '-');
-        // Health-Anzeige
+        $('stNet').textContent = s.wifi_connected ? 'verbunden' : 'AP-Only';
+        $('stRssi').textContent = (s.rssi!=null) ? s.rssi : '-';
+        if (typeof s.seed !== 'undefined') { const sn=$('seedNow'); if (sn) sn.textContent = s.seed || '-'; }
+        // Health banner
+        const hb = $('healthBanner');
         try {
-          const hb = $('healthBanner');
-          if (s && s.health) {
-            const h = s.health;
-            const err = (h.state === 'error');
-            hb.classList.toggle('ok', !err);
-            if (err) {
-              const m = [];
-              const mods = (h.modules||{});
-              if (mods.sht_in === false) m.push('Innen-Sensor SHT41 fehlt/fehlerhaft');
-              if (mods.sht_out === false) m.push('Au�en-Sensor SHT41 fehlt/fehlerhaft');
-              if (mods.dac === false) m.push('LED-DAC (GP8211) nicht erreichbar');
-              if (mods.fan === false) m.push('L�fter-PWM Fehler');
-              if (mods.rtc === false) m.push('RTC (DS3231) nicht erreichbar');
-              if (mods.tof === false) m.push('ToF-Sensor nicht erreichbar');
-              if (mods.i2c0 === false) m.push('I�C-Bus 0 Fehler');
-              if (mods.i2c1 === false) m.push('I�C-Bus 1 Fehler');
-              if (mods.fs === false) m.push('Dateisystem (LittleFS) Fehler');
-              const paused = (h.control_paused===true);
-              const head = paused ? 'Regelung pausiert � Fehler erkannt:' : 'Fehler erkannt:';
-              const msg = (h.message && h.message.length) ? ('<div>'+h.message+'</div>') : '';
-              const list = m.length ? ('<ul class="health-list"><li>' + m.join('</li><li>') + '</li></ul>') : '';
-              hb.innerHTML = '<strong>'+head+'</strong>'+msg+list;
-            } else {
-              hb.innerHTML = '';
-            }
+          const h = s.health || {};
+          const err = (h.error===true) || (h.control_paused===true) || (h.modules && Object.values(h.modules).some(v=>v===false));
+          hb.classList.toggle('ok', !err);
+          if (err) {
+            const m = [];
+            const mods = (h.modules||{});
+            if (mods.sht_in === false) m.push('Innen-Sensor SHT41 fehlt/fehlerhaft');
+            if (mods.sht_out === false) m.push('Außen-Sensor SHT41 fehlt/fehlerhaft');
+            if (mods.dac === false) m.push('LED-DAC (GP8211) nicht erreichbar');
+            if (mods.fan === false) m.push('Lüfter-PWM Fehler');
+            if (mods.rtc === false) m.push('RTC (DS3231) nicht erreichbar');
+            if (mods.tof === false) m.push('ToF-Sensor nicht erreichbar');
+            if (mods.i2c0 === false) m.push('I²C-Bus 0 Fehler');
+            if (mods.i2c1 === false) m.push('I²C-Bus 1 Fehler');
+            if (mods.fs === false) m.push('Dateisystem (LittleFS) Fehler');
+            const paused = (h.control_paused===true);
+            const head = paused ? 'Regelung pausiert – Fehler erkannt:' : 'Fehler erkannt:';
+            const msg = (h.message && h.message.length) ? ('<div>'+h.message+'</div>') : '';
+            const list = m.length ? ('<ul class="health-list"><li>' + m.join('</li><li>') + '</li></ul>') : '';
+            hb.innerHTML = '<strong>'+head+'</strong>'+msg+list;
           } else {
-            hb.classList.add('ok'); hb.innerHTML = '';
+            hb.innerHTML = '';
           }
         } catch(_){}
         if (s.ap && s.ap.ssid && s.ap.ip) { $('apInfo').textContent = 'AP: ' + s.ap.ssid + ' @ ' + s.ap.ip; }
-        if (!netDialogOpen && s.notify) {
-          $('notifyEnabled').checked = !!s.notify.enabled;
-          $('notifyBlock').classList.toggle('hidden', !s.notify.enabled);
-          if (s.notify.phone) $('notifyPhone').value = s.notify.phone;
-          // apikey from /api/status is masked as '***' if present; show seven stars instead of cleartext
-          if (s.notify.apikey) {
-            $('notifyKey').value = (s.notify.apikey === '***') ? '*******' : '*******';
+      }
+
+      async function loadInfo(){
+        try{
+          const r = await fetch('/api/info');
+          if (!r.ok) return;
+          const j = await r.json();
+          if (j && j.notify){
+            $('notifyEnabled').checked = !!j.notify.enabled;
+            $('notifyPhone').value = j.notify.phone || '';
+            $('notifyKey').value = j.notify.apikey || '';
+            $('notifyBlock').classList.toggle('hidden', !$('notifyEnabled').checked);
           }
-        }
+          const w = (j && j.wifi) || {};
+          $('ssid').value = w.ssid || '';
+          $('pass').value = '';
+          $('useStatic').checked = !!(w.use_static);
+          const st = (w.static) || {};
+          $('ip').value = st.ip || '';
+          $('mask').value = st.mask || '';
+          $('gw').value = st.gw || '';
+          $('dns').value = st.dns || '';
+          $('staticBlock').classList.toggle('hidden', !$('useStatic').checked);
+        }catch(_){ }
       }
 
       async function fetchJSON(url, options){ const r=await fetch(url, Object.assign({headers:{'Content-Type':'application/json'}}, options||{})); if(!r.ok) throw new Error(r.status+' '+r.statusText); return await r.json().catch(()=> ({})); }
-      async function loadInfo(){ try{ const j = await fetchJSON('/api/info'); if (j.seed) $('seed').value = j.seed; $('seedNow').textContent = j.seed||''; if (j.network){ $('ssid').value = ''; $('pass').value = ''; const useStatic = !!j.network.use_static; $('useStatic').checked = useStatic; $('staticBlock').classList.toggle('hidden', !useStatic); if (j.network.static){ $('ip').value=j.network.static.ip||''; $('mask').value=j.network.static.mask||''; $('gw').value=j.network.static.gw||''; $('dns').value=j.network.static.dns||''; } } if (j.notify){ $('notifyEnabled').checked=!!j.notify.enabled; $('notifyBlock').classList.toggle('hidden', !j.notify.enabled); $('notifyPhone').value=j.notify.phone||''; $('notifyKey').value = j.notify.apikey ? '*******' : ''; } }catch(e){ console.warn('info load failed', e); } }
-
       function startWS(){ try{ const proto=location.protocol==='https:'?'wss':'ws'; live.ws=new WebSocket(proto+'://'+location.host+'/ws'); live.ws.addEventListener('message',(ev)=>{ try{ updateStatus(JSON.parse(ev.data)); }catch(_){} }); live.ws.addEventListener('close',()=>{ startPolling(); }); live.ws.addEventListener('error',()=>{ try{ live.ws.close(); }catch(_){} }); }catch(_){ startPolling(); } }
       function startPolling(){ if(live.timer) return; live.timer=setInterval(async()=>{ try{ const s=await fetchJSON('/api/status'); updateStatus(s); }catch(_){ } }, 3000); }
 
@@ -345,6 +357,20 @@
       $('dlgNet').addEventListener('close', ()=>{ netDialogOpen = false; }); $('dlgNet').addEventListener('cancel', ()=>{ netDialogOpen = false; });
       $('useStatic').addEventListener('change', (e)=> $('staticBlock').classList.toggle('hidden', !e.target.checked));
       $('notifyEnabled').addEventListener('change', (e)=> $('notifyBlock').classList.toggle('hidden', !e.target.checked));
+      // Grow start/stop
+      document.getElementById('toggleGrow').addEventListener('click', async ()=>{
+        const started = !!(live.lastStatus && live.lastStatus.grow && live.lastStatus.grow.started);
+        const action = started ? 'stop' : 'start';
+        const tdEl = document.getElementById('totalDays');
+        const total_days = tdEl ? parseInt(tdEl.textContent, 10) : undefined;
+        const body = (action==='start' && Number.isFinite(total_days)) ? { action, total_days } : { action };
+        try{ await fetch('/api/grow', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)}); }catch(_){ }
+      });
+      // Seed save
+      document.getElementById('btnSeedSave').addEventListener('click', async ()=>{
+        const seed = (document.getElementById('seed').value||'').trim();
+        try{ await fetch('/api/seed', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ seed })}); showToast('Sorte gespeichert'); }catch(e){ showToast('Fehler beim Speichern: '+e.message); }
+      });
       async function saveNotify(){
         const enabled = $('notifyEnabled').checked;
         const phone = $('notifyPhone').value.trim();
@@ -352,7 +378,7 @@
         const hasSavedKey = !!(live.lastStatus && live.lastStatus.notify && live.lastStatus.notify.apikey === '***');
         const apikeySend = (rawKey === '' || rawKey === '***' || rawKey === '*******') ? null : rawKey;
         if (enabled) {
-          if (!phoneOk(phone)) { showToast('Telefonnummer ist ungueltig (Format +49...)'); return; }
+          if (!phoneOk(phone)) { showToast('Telefonnummer ist ungültig (Format +49...)'); return; }
           if (!apikeySend && !hasSavedKey) { showToast('API-Key fehlt'); return; }
         }
         const payload = { enabled, phone };
@@ -368,16 +394,9 @@
         }
       }
       $('btnNotifySave').addEventListener('click', saveNotify);
-      btnNotifyTest.addEventListener('click', async ()=>{ const en=notifyEnabled.checked; const phone=notifyPhone.value.trim(); const key=notifyKey.value.trim(); const masked = (key===''||key==='***'||key==='*******'); try{ fetch(location.origin + '/api/debug/touch?stage=clicked&en='+(en?1:0)+'&phoneLen='+phone.length+'&key='+(masked?0:1)).catch(()=>{});}catch(_){} if(!en){ showToast('Benachrichtigungen sind deaktiviert'); return; } if(!phoneOk(phone)){ try{ fetch(location.origin + '/api/debug/touch?stage=blocked_phone').catch(()=>{});}catch(_){} showToast('Telefonnummer ist ungueltig (Format +49...)'); return; } if(!masked && !key){ try{ fetch(location.origin + '/api/debug/touch?stage=blocked_key').catch(()=>{});}catch(_){} showToast('API-Key fehlt'); return; } try{ showToast('Sende Testnachricht...'); try{ fetch(location.origin + '/api/debug/touch?stage=sendreq').catch(()=>{});}catch(__){} const body = masked ? { phone } : { phone, apikey: key }; const r = await fetch(location.origin + '/api/notify/test', { method:'POST', headers:{'Content-Type':'application/json','Cache-Control':'no-cache'}, cache:'no-store', body: JSON.stringify(body) }); if(!r.ok){ const t=await r.text().catch(()=> ''); try{ fetch(location.origin + '/api/debug/touch?stage=resp_err').catch(()=>{});}catch(__){} throw new Error(r.status+' '+r.statusText+' '+t); } try{ fetch(location.origin + '/api/debug/touch?stage=resp_ok').catch(()=>{});}catch(__){} showToast('Testnachricht gesendet (siehe WhatsApp)'); } catch(e){ showToast('Fehler beim Senden: '+e.message); } });
-      $('btnNetSave').addEventListener('click', async ()=>{ const ssid=$('ssid').value.trim(); const pass=$('pass').value; const useStatic=$('useStatic').checked; const ip=$('ip').value.trim(); const mask=$('mask').value.trim(); const gw=$('gw').value.trim(); const dns=$('dns').value.trim(); const wantsStaticBlock = useStatic || ip || mask || gw || dns; if(!ssid && !wantsStaticBlock){ showToast('Keine WLAN-Aenderungen erkannt'); return; } if(useStatic){ for(const [val,label] of [[ip,'IP-Adresse'],[mask,'Subnetzmaske'],[gw,'Gateway']]){ if(!ipv4ok(val)){ showToast('Ungueltige IPv4 in '+label); return; } } if(dns && !ipv4ok(dns)){ showToast('Ungueltige IPv4 in DNS'); return; } } const payload = {}; if(ssid) payload.ssid = ssid; if(pass) payload.pass = pass; payload.use_static = !!useStatic; payload.static = useStatic ? { ip, mask, gw, dns } : null; payload.reboot = true; showToastHtml('WLAN gespeichert. Bitte jetzt ins Heimnetz wechseln und <a href="http://luminagrowx.local/" target="_blank">http://luminagrowx.local/</a> aufrufen.'); try{ fetch('/api/network', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)}); }catch(_){ } });
+      btnNotifyTest.addEventListener('click', async ()=>{ const en=notifyEnabled.checked; const phone=notifyPhone.value.trim(); const key=notifyKey.value.trim(); const masked = (key===''||key==='***'||key==='*******'); try{ fetch(location.origin + '/api/debug/touch?stage=clicked&en='+(en?1:0)+'&phoneLen='+phone.length+'&key='+(masked?0:1)).catch(()=>{});}catch(_){} if(!en){ showToast('Benachrichtigungen sind deaktiviert'); return; } if(!phoneOk(phone)){ try{ fetch(location.origin + '/api/debug/touch?stage=blocked_phone').catch(()=>{});}catch(_){} showToast('Telefonnummer ist ungültig (Format +49...)'); return; } if(!masked && !key){ try{ fetch(location.origin + '/api/debug/touch?stage=blocked_key').catch(()=>{});}catch(_){} showToast('API-Key fehlt'); return; } try{ showToast('Sende Testnachricht...'); try{ fetch(location.origin + '/api/debug/touch?stage=sendreq').catch(()=>{});}catch(__){} const body = masked ? { phone } : { phone, apikey: key }; const r = await fetch(location.origin + '/api/notify/test', { method:'POST', headers:{'Content-Type':'application/json','Cache-Control':'no-cache'}, cache:'no-store', body: JSON.stringify(body) }); if(!r.ok){ const t=await r.text().catch(()=> ''); try{ fetch(location.origin + '/api/debug/touch?stage=resp_err').catch(()=>{});}catch(__){} throw new Error(r.status+' '+r.statusText+' '+t); } try{ fetch(location.origin + '/api/debug/touch?stage=resp_ok').catch(()=>{});}catch(__){} showToast('Testnachricht gesendet (siehe WhatsApp)'); } catch(e){ showToast('Fehler beim Senden: '+e.message); } });
+      $('btnNetSave').addEventListener('click', async ()=>{ const ssid=$('ssid').value.trim(); const pass=$('pass').value; const useStatic=$('useStatic').checked; const ip=$('ip').value.trim(); const mask=$('mask').value.trim(); const gw=$('gw').value.trim(); const dns=$('dns').value.trim(); const wantsStaticBlock = useStatic || ip || mask || gw || dns; if(!ssid && !wantsStaticBlock){ showToast('Keine WLAN-Änderungen erkannt'); return; } if(useStatic){ for(const [val,label] of [[ip,'IP-Adresse'],[mask,'Subnetzmaske'],[gw,'Gateway']]){ if(!ipv4ok(val)){ showToast('Ungültige IPv4 in '+label); return; } } if(dns && !ipv4ok(dns)){ showToast('Ungültige IPv4 in DNS'); return; } } const payload = {}; if(ssid) payload.ssid = ssid; if(pass) payload.pass = pass; payload.use_static = !!useStatic; payload.static = useStatic ? { ip, mask, gw, dns } : null; payload.reboot = true; showToastHtml('WLAN gespeichert. Bitte jetzt ins Heimnetz wechseln und <a href="http://luminagrowx.local/" target="_blank">http://luminagrowx.local/</a> aufrufen.'); try{ fetch('/api/network', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)}); }catch(_){ } });
       (async function(){ await loadInfo(); startWS(); try{ const s=await fetchJSON('/api/status'); updateStatus(s); }catch(_){ } })();
     </script>
   </body>
-</html>
-
-
-
-
-
-
-
+  </html>
