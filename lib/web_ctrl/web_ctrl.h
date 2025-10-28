@@ -111,6 +111,15 @@ private:
   int32_t updateDLSoFar_ = 0;
   int32_t updateApplyTotal_ = -1;
   int32_t updateApplySoFar_ = 0;
+
+  // Background: daily auto-check for updates (03:00)
+  bool updateCheckJobRunning_ = false;
+  bool latestKnownHasUpdate_ = false;
+  String latestKnownTag_;
+  uint32_t lastUpdateCheckYMD_ = 0; // YYYYMMDD of last successful/attempted check
+  bool firstUpdateCheckDone_ = false;
+  static void updateCheckTaskTrampoline_(void* arg);
+  void updateCheckTaskRun_();
 };
 
 } // namespace web_ctrl

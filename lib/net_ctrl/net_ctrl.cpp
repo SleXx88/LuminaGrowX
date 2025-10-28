@@ -161,13 +161,16 @@ void NetCtrl::begin(bool forceAP, const char* mdnsName, RTC_Ctrl* rtc) {
     }
   }
 
-  // STA-Verbindung herstellen (falls konfiguriert); AP bleiben lassen
+  // STA-Verbindung herstellen (falls konfiguriert); AP bei Erfolg deaktivieren
   if (WiFi.isConnected() && !forceAP && cfg_.ssid.length() > 0) {
     if (mdnsName && MDNS.begin(mdnsName)) {
       MDNS.addService("http", "tcp", 80);
       mdnsOk_ = true;
     }
-    Serial.printf("[NET] STA verbunden: IP=%s (AP bleibt aktiv)\n", WiFi.localIP().toString().c_str());
+    // Deaktiviere den Access Point, sobald STA verbunden ist
+    WiFi.softAPdisconnect(true);
+    apActive_ = false;
+    Serial.printf("[NET] STA verbunden: IP=%s (AP deaktiviert)\n", WiFi.localIP().toString().c_str());
   }
 
   internetOK_ = probeInternet();

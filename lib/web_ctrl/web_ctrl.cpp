@@ -439,6 +439,28 @@ String WebCtrl::makeStatusJson_() {
   doc["build"] = String(__DATE__) + String(" ") + String(__TIME__);
   doc["ts"] = (uint64_t)millis();
 
+  // Append last known update info (from background daily check)
+  JsonObject upd = doc["update"].to<JsonObject>();
+  upd["has_update"] = latestKnownHasUpdate_;
+  upd["latest"] = latestKnownTag_;
+
+  // Schedule background update check: once after first NTP sync (boot) and then daily ~03:00 if internet is OK
+  if (!updateCheckJobRunning_ && net_ && net_->internetOK()) {
+    time_t now = time(nullptr);
+    if (now > 0) {
+      struct tm tmL; localtime_r(&now, &tmL);
+      uint32_t ymd = (uint32_t)((tmL.tm_year+1900)*10000 + (tmL.tm_mon+1)*100 + tmL.tm_mday);
+      if (!firstUpdateCheckDone_) {
+        firstUpdateCheckDone_ = true;
+        updateCheckJobRunning_ = true;
+        xTaskCreatePinnedToCore(&WebCtrl::updateCheckTaskTrampoline_, "upd_check", 6144, this, 1, nullptr, 0);
+      } else if (tmL.tm_hour >= 3 && lastUpdateCheckYMD_ != ymd) {
+        updateCheckJobRunning_ = true;
+        xTaskCreatePinnedToCore(&WebCtrl::updateCheckTaskTrampoline_, "upd_check", 6144, this, 1, nullptr, 0);
+      }
+    }
+  }
+
   String out; serializeJson(doc, out); return out;
 }
 
@@ -693,6 +715,36 @@ void WebCtrl::updateTaskRun_(bool useRemote, const String& localTarPath) {
   // Regelung wieder freigeben, wenn kein Reboot folgt
   if (!(ok && fwUpd)) { health::state().control_paused = false; }
   if (ok && fwUpd) { rebootAt_ = millis() + 750; }
+}
+
+void WebCtrl::updateCheckTaskTrampoline_(void* arg) {
+  WebCtrl* self = static_cast<WebCtrl*>(arg);
+  self->updateCheckTaskRun_();
+  vTaskDelete(nullptr);
+}
+
+void WebCtrl::updateCheckTaskRun_() {
+  // Perform a lightweight "latest" check (GitHub preferred, manifest fallback), update cached fields
+  String latestTag;
+  String url;
+  bool ok = ghLatestTarUrl_(url, latestTag);
+  if (!ok) {
+    // Fallback: manifest
+    String manUrl = manifestUrl_();
+    if (manUrl.length()) {
+      WiFiClientSecure client; client.setInsecure();
+      HTTPClient http; if (http.begin(client, manUrl)) { int code = http.GET(); if (code==200) {
+            JsonDocument man; if (!deserializeJson(man, http.getStream())) { latestTag = String((const char*)man["version"]); ok = latestTag.length()>0; }
+          } http.end(); }
+    }
+  }
+  if (ok) {
+    latestKnownTag_ = latestTag;
+    latestKnownHasUpdate_ = (latestTag.length() && latestTag != String(FW_VERSION));
+  }
+  // stamp day to avoid repeated checks until next day window
+  time_t now = time(nullptr); if (now>0) { struct tm tmL; localtime_r(&now, &tmL); lastUpdateCheckYMD_ = (uint32_t)((tmL.tm_year+1900)*10000 + (tmL.tm_mon+1)*100 + tmL.tm_mday); }
+  updateCheckJobRunning_ = false;
 }
 
 String WebCtrl::updateProgressJson_() {
