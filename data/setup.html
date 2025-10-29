@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lisa Pro – Setup</title>
+    <link rel="stylesheet" href="/pico.min.css" />
+    <style>
+      :root{ --accent:#ef4444; --border:rgba(255,255,255,0.18); --text:#e5e7eb; --text-dim:#cbd5e1; --glass:rgba(20,20,22,0.42); --glass-strong:rgba(20,20,22,0.62); --radius:18px; --pico-background-color:transparent; --pico-card-background-color:transparent }
+      html,body{height:100%}
+      body{position:relative;color:var(--text);background:transparent}
+      body::before{content:"";position:fixed;inset:0;background:linear-gradient(rgba(0,0,0,0.55),rgba(0,0,0,0.55)),url('/bg.jpg') center/cover no-repeat #0b0b0c;z-index:-1}
+      article{background:var(--glass);border:1px solid var(--border);border-radius:var(--radius);backdrop-filter:blur(3px)}
+      article>header{background:var(--glass-strong);border-bottom:1px solid var(--border);border-radius:var(--radius) var(--radius) 0 0;padding:.75rem 1rem}
+      .grid{gap:1rem}
+      .hidden{display:none}
+      input,select,button,[role=button],.button{border-radius:var(--radius)!important}
+      button,[role=button],.button{background:rgba(20,20,22,0.42);color:var(--text);border:1px solid var(--border);font-weight:700;font-size:1rem;line-height:1.2;padding:.55rem .9rem;border-radius:var(--radius)!important;display:inline-flex;align-items:center}
+      a[role="button"]{text-decoration:none; background:rgba(20,20,22,0.42); color:var(--text); border:1px solid var(--border); line-height:1.2; padding:.55rem .9rem; display:inline-flex; align-items:center; border-radius:var(--radius)!important}
+      .ok{color:#22c55e} .err{color:#ef4444} .warn{color:#f59e0b}
+      .card{padding:1rem}
+      .badge{display:inline-flex;align-items:center;gap:.4rem;font-size:.85rem;padding:.25rem .5rem;border-radius:999px;background:var(--glass-strong);border:1px solid var(--border);}
+    </style>
+  </head>
+  <body>
+    <main class="container" style="margin-top:1rem; display:grid; gap:1rem;">
+      <article>
+        <header style="display:flex;align-items:center;justify-content:space-between;gap:.5rem">
+          <h3>Uhrzeit (RTC)</h3>
+          <span class="badge" id="b_rtc_top">RTC</span>
+        </header>
+        <div class="content" style="padding:1rem; display:grid; gap:1rem;">
+          <small id="modulesMsg" class="mono" style="opacity:.8;display:block"></small>
+          <div class="grid">
+            <div class="card">
+              <h4>Zeit einstellen & prüfen</h4>
+              <small id="rtcState">Status: -</small>
+              <div class="grid">
+                <label>Datum/Zeit
+                  <input id="rtcDt" type="datetime-local" aria-label="Datetime local" />
+                </label>
+              </div>
+              <div style="display:flex; gap:.5rem; align-items:center;">
+                <button id="rtcSet" type="button" class="primary">RTC setzen</button>
+              </div>
+               <div style="display:flex; gap:.5rem; align-items:center;">
+                <label style="margin:0 0 0 .5rem"><input type="checkbox" id="cb_rtc" /> RTC eingestellt</label>
+              </div>
+            </div>
+          </div>
+        
+        </div>
+      </article>
+      <article>
+        <header style="display:flex;align-items:center;justify-content:space-between;gap:.5rem">
+          <h3>Temperatursensor Innen</h3>
+          <span class="badge" id="b_sht_in">SHT innen</span>
+        </header>
+        <div class="content" style="padding:1rem; display:grid; gap:1rem;">
+            <div class="card">
+              <h4 id="shtInHdr"></h4>
+              <p>SHT41 innen kurz mit warmer Luft erwärmen, um Verwechslungen zu vermeiden.</p>
+              <div>Innen: <strong id="shtIn">-</strong></div>
+              <label style="display:block; margin-top:.5rem"><input type="checkbox" id="cb_sht" /> SHT innen geprüft</label>
+            </div>
+        </div>
+      </article>
+
+      <article>
+        <header style="display:flex;align-items:center;justify-content:space-between;gap:.5rem">
+          <h3>Temperatursensor Außen</h3>
+          <span class="badge" id="b_sht_out">SHT außen</span>
+        </header>
+        <div class="content" style="padding:1rem; display:grid; gap:1rem;">
+          <div class="card">
+            <h4 id="shtOutHdr"></h4>
+            <p>SHT41 außen kurz mit warmer Luft erwärmen, um Verwechslungen zu vermeiden.</p>
+            <div>Außen: <strong id="shtOut">-</strong></div>
+            <label style="display:block; margin-top:.5rem"><input type="checkbox" id="cb_sht_out" /> SHT außen geprüft</label>
+          </div>
+        </div>
+      </article>
+
+      <article>
+        <header style="display:flex;align-items:center;justify-content:space-between;gap:.5rem">
+          <h3>Abstandssensor</h3>
+          <span class="badge" id="b_tof">ToF</span>
+        </header>
+        <div class="content" style="padding:1rem; display:grid; gap:1rem;">
+          <div class="card">
+            <h4>ToF Kalibrieren (50 mm)</h4>
+            <ol>
+              <li>Kalibrierwerkzeug plan an den Sensor anlegen.</li>
+              <li>„Kalibrieren“ drücken – es wird auf 50 mm eingemessen.</li>
+            </ol>
+            <div style="display:flex; gap:.5rem; align-items:center;">
+              <button id="tofCal" type="button" class="primary">Kalibrieren</button>
+              <small id="tofMsg">–</small>
+            </div>
+            <div>Aktuell: <strong id="tofLive">-</strong> mm <small>(Offset: <span id="tofOff">0</span> mm)</small></div>
+            <label style="display:block; margin-top:.5rem"><input type="checkbox" id="cb_tof" /> ToF Kalibrierung erfolgreich</label>
+          </div>
+        </div>
+      </article>
+
+      <article>
+        <header style="display:flex;align-items:center;justify-content:space-between;gap:.5rem">
+          <h3>LED (DAC)</h3>
+          <span class="badge" id="b_dac">LED-DAC</span>
+        </header>
+        <div class="content" style="padding:1rem; display:grid; gap:1rem;">
+          <div class="card">
+            <h4>LED testen</h4>
+            <div style="display:flex; gap:.5rem;">
+              <button id="ledOff" type="button">Aus (0%)</button>
+              <button id="ledOn" type="button" class="primary">An (100%)</button>
+            </div>
+            <label style="display:block; margin-top:.5rem"><input type="checkbox" id="cb_led" /> LED Test ok</label>
+          </div>
+        </div>
+      </article>
+
+      <article>
+        <header style="display:flex;align-items:center;justify-content:space-between;gap:.5rem">
+          <h3>Lüfter</h3>
+          <span class="badge" id="b_fan">Lüfter</span>
+        </header>
+        <div class="content" style="padding:1rem; display:grid; gap:1rem;">
+          <div class="card">
+            <h4>Lüfter (PWM) testen</h4>
+            <div style="display:flex; gap:.5rem;">
+              <button id="fanOff" type="button">Aus (0%)</button>
+              <button id="fanOn" type="button" class="primary">An (100%)</button>
+            </div>
+            <label style="display:block; margin-top:.5rem"><input type="checkbox" id="cb_fan" /> Lüfter Test ok</label>
+          </div>
+        </div>
+      </article>
+
+      <article>
+        <header style="display:flex;align-items:center;justify-content:space-between;gap:.5rem">
+          <h3>Höhenverstellung</h3>
+          <span class="badge" id="b_step">Stepper</span>
+        </header>
+        <div class="content" style="padding:1rem; display:grid; gap:1rem;">
+          <div class="card">
+            <h4>Stepper testen</h4>
+            <div style="display:flex; gap:.5rem; align-items:center;">
+              <button id="stepDown" type="button">1 cm runter</button>
+              <button id="stepUp" type="button" class="primary">1 cm hoch</button>
+              <button id="stepHome" type="button">Homing</button>
+              <small id="stepMsg">–</small>
+            </div>
+            <div style="display:flex; gap:1rem; margin-top:.5rem;">
+              <label><input type="checkbox" id="cb_step_jog" /> Stepper Jog ok</label>
+              <label><input type="checkbox" id="cb_step_home" /> Homing ok</label>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <!-- Tür vor Abschluss -->
+      <article>
+        <header style="display:flex;align-items:center;justify-content:space-between;gap:.5rem">
+          <h3>Tür</h3>
+          <span class="badge" id="b_door">Tür</span>
+        </header>
+        <div class="content" style="padding:1rem; display:grid; gap:1rem;">
+          <div class="card">
+            <h4>Status prüfen</h4>
+            <div>Tür ist: <strong id="doorState">unbekannt</strong></div>
+            <label style="display:block; margin-top:.5rem"><input type="checkbox" id="cb_door" /> Türerkennung ok</label>
+            <small>Hinweis: Verdrahtung gegen GND, LOW = Tür geschlossen.</small>
+          </div>
+        </div>
+      </article>
+
+      <article>
+        <header style="display:flex;align-items:center;justify-content:space-between;gap:.5rem">
+          <h3>Abschluss</h3>
+        </header>
+        <div class="content" style="padding:1rem; display:grid; gap:1rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:.5rem;">
+            <a href="/settings" role="button">Zurück</a>
+            <div style="display:flex; gap:.5rem;">
+              <button id="btnAbort" type="button">Abbruch</button>
+              <button id="btnDone" type="button" class="primary" disabled>Setup abschließen</button>
+            </div>
+          </div>
+          <section>
+            <h5>Hinweise zur Fehlersuche</h5>
+            <ul>
+              <li>SHT41: Sensor kurz anpusten/erwärmen; Verkabelung an I2C prüfen (Innen: Wire1, Außen: Wire).</li>
+              <li>RTC: I2C-Verbindung und Knopfzelle prüfen; nach Uhr-Setzen Badge beobachten.</li>
+              <li>ToF: XSHUT-Pin High, Kalibrierwerkzeug plan anlegen; Kabel/Adresse 0x29 prüfen.</li>
+              <li>LED-DAC: GP8211 I2C (0x58) und 0–10V-Leitung prüfen; Last beachten.</li>
+              <li>Lüfter: PWM-Pin, 12V-Versorgung und Drehrichtung prüfen.</li>
+              <li>Stepper: Mechanik freigängig, Endlagen; Homing nur durchführen, wenn Jog ok.</li>
+              <li>Tür: Schalter verdrahtet? interner Pullup aktiv? Pegel beachten.</li>
+              <li>Nach Änderungen ggf. Neustart durchführen.</li>
+            </ul>
+          </section>
+        </div>
+      </article>
+    </main>
+    
+
+    <dialog id="toast" class="modal">
+      <article>
+        <header><strong>Status</strong></header>
+        <div class="content" style="padding: 1rem;">
+          <p id="toastMsg">-</p>
+        </div>
+        <footer style="display:flex; justify-content:flex-end; padding:.75rem 1rem;">
+          <button onclick="document.getElementById('toast').close()">OK</button>
+        </footer>
+      </article>
+    </dialog>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      function showToast(msg){ $('toastMsg').textContent = msg; $('toast').showModal(); }
+      async function fetchJSON(url, options){ const r=await fetch(url, Object.assign({headers:{'Content-Type':'application/json'}}, options||{})); if(!r.ok) throw new Error(await r.text().catch(()=> r.status+' '+r.statusText)); return await r.json().catch(()=> ({})); }
+
+      function setBadge(elId, ok, hint){
+        const el = $(elId); if(!el) return; el.classList.remove('ok','err'); el.classList.add(ok? 'ok':'err');
+        el.title = ok? 'OK' : (hint||'Bitte Verkabelung/Spannung prüfen');
+      }
+
+      let ws = null, wsTimer = null;
+      function connectWS(){
+        try{
+          const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+          ws = new WebSocket(proto + '://' + location.host + '/ws');
+          ws.addEventListener('message', ev => {
+            try{
+              const j = JSON.parse(ev.data);
+              if (j && j.health && j.health.modules){
+                const m = j.health.modules;
+                setBadge('b_i2c0', m.i2c0);
+                setBadge('b_i2c1', m.i2c1);
+                setBadge('b_sht_in', m.sht_in, 'SHT innen – bitte Kabel prüfen und Sensor erwärmen');
+                setBadge('b_sht_out', m.sht_out, 'SHT außen – bitte Kabel prüfen und Sensor erwärmen');
+                setBadge('b_tof', m.tof, 'ToF – Kabel/XSHUT prüfen');
+                setBadge('b_dac', m.dac, 'GP8211 – I2C prüfen');
+                // Fan-Badge: wenn Modul ok -> grün nur wenn läuft, sonst grau
+                if (m.fan === false) { setBadge('b_fan', false, 'PWM/Lüfter prüfen'); }
+                else {
+                  const el = $('b_fan'); if (el){ if (j.fan_on){ el.classList.add('ok'); el.classList.remove('err'); el.title='Läuft'; } else { el.classList.remove('ok','err'); el.title='Aus'; } }
+                }
+                setBadge('b_rtc', m.rtc, 'RTC – I2C/Knopfzelle prüfen'); setBadge('b_rtc_top', m.rtc);
+                setBadge('b_fs', m.fs, 'LittleFS');
+                const lines = [];
+                if (m.sht_in === false) lines.push('SHT innen fehlt');
+                if (m.sht_out === false) lines.push('SHT außen fehlt');
+                if (m.dac === false) lines.push('LED-DAC (GP8211) nicht erreichbar');
+                if (m.fan === false) lines.push('Lüfter-PWM Fehler');
+                if (m.rtc === false) lines.push('RTC (DS3231) nicht erreichbar');
+                if (m.tof === false) lines.push('ToF-Sensor nicht erreichbar');
+                if (m.fs === false) lines.push('Dateisystem (LittleFS) Fehler');
+                $('modulesMsg').textContent = lines.length ? ('Hinweise: ' + lines.join(' | ')) : '';
+              }
+              if (j){
+                const tIn = j.temp_c, hIn = j.humi_rh, tOut = j.temp_out_c, hOut = j.humi_out_rh;
+                $('shtIn').textContent  = (Number.isFinite(tIn)?tIn.toFixed(1)+' °C':'-') + ', ' + (Number.isFinite(hIn)?hIn.toFixed(1)+' %':'-');
+                $('shtOut').textContent = (Number.isFinite(tOut)?tOut.toFixed(1)+' °C':'-') + (Number.isFinite(hOut)? ', '+hOut.toFixed(1)+' %' : '');
+              }
+            }catch(_){ }
+          });
+          ws.addEventListener('close', ()=>{ ws=null; wsTimer = setTimeout(connectWS, 2000); });
+          ws.addEventListener('error', ()=>{ try{ ws && ws.close(); }catch(_){ } });
+        }catch(_){ }
+      }
+
+      async function refreshStatus(){
+        try{
+          const st = await fetchJSON('/api/setup/status');
+          $('rtcState').textContent = 'Status: ' + (st.rtc_ok ? 'RTC OK' : 'RTC nicht erreichbar');
+          const m = st.modules || {};
+          setBadge('b_i2c0', m.i2c0);
+          setBadge('b_i2c1', m.i2c1);
+          setBadge('b_sht_in', m.sht_in);
+          setBadge('b_sht_out', m.sht_out);
+          setBadge('b_tof', m.tof);
+          setBadge('b_dac', m.dac);
+          setBadge('b_fan', m.fan);
+          setBadge('b_rtc', m.rtc); setBadge('b_rtc_top', m.rtc);
+          setBadge('b_fs', m.fs);
+          const lines = [];
+          if (m.sht_in === false) lines.push('SHT innen fehlt');
+          if (m.sht_out === false) lines.push('SHT außen fehlt');
+          if (m.dac === false) lines.push('LED-DAC (GP8211) nicht erreichbar');
+          if (m.fan === false) lines.push('Lüfter-PWM Fehler');
+          if (m.rtc === false) lines.push('RTC (DS3231) nicht erreichbar');
+          if (m.tof === false) lines.push('ToF-Sensor nicht erreichbar');
+          if (m.fs === false) lines.push('Dateisystem (LittleFS) Fehler');
+          $('modulesMsg').textContent = lines.length ? ('Hinweise: ' + lines.join(' | ')) : '';
+          // Überschriften für Sensorprüfung dynamisch rot/blau bzw. ausblenden
+          const setCheckHdr = (id, bad) => { const el=$(id); if(!el) return; if (bad){ el.textContent='Sensor überprüfen'; el.classList.add('err'); } else { el.textContent=''; el.classList.remove('err'); } };
+          setCheckHdr('shtInHdr', !m.sht_in);
+          setCheckHdr('shtOutHdr', !m.sht_out);
+        }catch(e){ }
+        try{
+          const live = await fetchJSON('/api/status');
+          const tIn = live && live.temp_c, hIn = live && live.humi_rh, tOut = live && live.temp_out_c, hOut = live && live.humi_out_rh;
+          $('shtIn').textContent  = (Number.isFinite(tIn)?tIn.toFixed(1)+' °C':'-') + ', ' + (Number.isFinite(hIn)?hIn.toFixed(1)+' %':'-');
+          $('shtOut').textContent = (Number.isFinite(tOut)?tOut.toFixed(1)+' °C':'-') + (Number.isFinite(hOut)? ', '+hOut.toFixed(1)+' %' : '');
+          // Falls Werte fehlen, betroffene Badges rot setzen
+          if (!(Number.isFinite(tIn) && Number.isFinite(hIn))) setBadge('b_sht_in', false, 'Keine Werte');
+          if (!(Number.isFinite(tOut) && Number.isFinite(hOut))) setBadge('b_sht_out', false, 'Keine Werte');
+          // Fan-Badge: grau wenn aus, grün wenn an (nur wenn Modul an sich ok)
+          try{
+            if (typeof live.fan_on !== 'undefined'){
+              const fanOn = !!live.fan_on;
+              const el = $('b_fan');
+              if (el){
+                if (fanOn){ el.classList.add('ok'); el.classList.remove('err'); el.title='Läuft'; }
+                else { el.classList.remove('ok','err'); el.title='Aus'; }
+              }
+            }
+          }catch(_){ }
+          // ToF live aus Setup-Status (ergänzt) abgreifen
+          try{
+            const st2 = await fetchJSON('/api/setup/status');
+            if (typeof st2.tof_mm !== 'undefined') { const v = st2.tof_mm; $('tofLive').textContent = (v>=0? v : (v===-2? 'zu nah' : 'Fehler')); }
+            if (typeof st2.tof_offset !== 'undefined') { $('tofOff').textContent = st2.tof_offset; }
+          }catch(_){ }
+          // Prefill datetime-local with current system time if empty
+          if (!$('rtcDt').value && live && live.ntp_time){
+            // live.ntp_time: "DD-MM-YYYY HH-MM-SS" -> build Date
+            const m = live.ntp_time.match(/(\d{2})-(\d{2})-(\d{4}) (\d{2})-(\d{2})-(\d{2})/);
+            if (m){
+              const dt = new Date(Number(m[3]), Number(m[2])-1, Number(m[1]), Number(m[4]), Number(m[5]), Number(m[6]));
+              const iso = dt.toISOString().slice(0,16); // YYYY-MM-DDTHH:MM
+              $('rtcDt').value = iso;
+            }
+          }
+        }catch(e){ }
+      }
+
+      function fmtDDMMYYYY_HHMMSS(dt){
+        const dd = String(dt.getDate()).padStart(2,'0');
+        const mm = String(dt.getMonth()+1).padStart(2,'0');
+        const yyyy = dt.getFullYear();
+        const HH = String(dt.getHours()).padStart(2,'0');
+        const MM = String(dt.getMinutes()).padStart(2,'0');
+        const SS = String(dt.getSeconds()).padStart(2,'0');
+        return `${dd}-${mm}-${yyyy} ${HH}-${MM}-${SS}`;
+      }
+      $('rtcSet').addEventListener('click', async ()=>{
+        const v = $('rtcDt').value;
+        if (!v){ showToast('Bitte Datum/Zeit wählen'); return; }
+        // v: "YYYY-MM-DDTHH:MM" -> Date
+        const dt = new Date(v);
+        if (isNaN(dt.getTime())){ showToast('Ungültiges Datum/Zeit'); return; }
+        const time = fmtDDMMYYYY_HHMMSS(dt);
+        try{ const r = await fetchJSON('/api/rtc/set', { method:'POST', body: JSON.stringify({ time }) });
+          if (r.ok){ $('cb_rtc').checked = true; showToast('RTC gesetzt'); }
+          else { showToast('RTC setzen fehlgeschlagen'); }
+          refreshStatus(); updateDoneEnabled();
+        }catch(e){ showToast('Fehler: '+e.message); }
+      });
+      $('tofCal').addEventListener('click', async ()=>{
+        try{ const r=await fetchJSON('/api/tof/calibrate', { method:'POST', body:'{}' }); $('tofMsg').textContent = r.ok ? ('OK (gemessen '+r.measured+' mm, Offset '+r.offset+' mm)') : 'Fehler'; if (r.ok) $('cb_tof').checked = true; refreshStatus(); updateDoneEnabled(); }
+        catch(e){ $('tofMsg').textContent = 'Fehler: '+e.message; }
+      });
+      $('ledOff').addEventListener('click', ()=> fetch('/api/dac', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({on:false})}));
+      $('ledOn').addEventListener('click',  ()=> fetch('/api/dac', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({on:true})}));
+      $('fanOff').addEventListener('click', ()=> fetch('/api/fan', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({on:false})}));
+      $('fanOn').addEventListener('click',  ()=> fetch('/api/fan', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({on:true})}));
+      $('stepUp').addEventListener('click', async ()=>{ try{ await fetchJSON('/api/stepper/jog',{method:'POST',body:JSON.stringify({dir:'up',mm:10})}); $('stepMsg').textContent='Move hoch gestartet'; }catch(e){ $('stepMsg').textContent='Fehler: '+e.message; } });
+      $('stepDown').addEventListener('click', async ()=>{ try{ await fetchJSON('/api/stepper/jog',{method:'POST',body:JSON.stringify({dir:'down',mm:10})}); $('stepMsg').textContent='Move runter gestartet'; }catch(e){ $('stepMsg').textContent='Fehler: '+e.message; } });
+      $('stepHome').addEventListener('click', async ()=>{ try{ const r=await fetchJSON('/api/stepper/home',{method:'POST'}); $('stepMsg').textContent = r.ok? 'Homing gestartet' : 'Homing Fehler'; }catch(e){ $('stepMsg').textContent = 'Homing Fehler: '+e.message; } });
+      function updateDoneEnabled(){
+        const need = ['cb_rtc','cb_sht','cb_sht_out','cb_tof','cb_led','cb_fan','cb_step_jog','cb_step_home','cb_door'];
+        const all = need.every(id => $(id) && $(id).checked);
+        $('btnDone').disabled = !all;
+      }
+      ;['cb_rtc','cb_sht','cb_sht_out','cb_tof','cb_led','cb_fan','cb_step_jog','cb_step_home','cb_door'].forEach(id=>{
+        const el=$(id); if(el) el.addEventListener('change', updateDoneEnabled);
+      });
+
+      async function pollDoor(){
+        try{
+          const d = await fetchJSON('/api/door/status');
+          const el = $('b_door');
+          if (d && d.present){
+            const closed = !!d.closed; $('doorState').textContent = closed? 'geschlossen' : 'offen';
+            if (el){ el.classList.remove('ok','err'); el.title = closed? 'geschlossen' : 'offen'; }
+          } else {
+            $('doorState').textContent = 'nicht vorhanden'; if (el){ el.classList.remove('ok','err'); el.title='Nicht vorhanden'; }
+          }
+        }catch(_){ const el=$('b_door'); if(el){ el.classList.remove('ok','err'); el.title='Unbekannt'; } }
+      }
+
+      async function pollStepper(){
+        try{
+          const s = await fetchJSON('/api/stepper/status');
+          if (s && s.ok){ const bad = !!s.diag; setBadge('b_step', !bad, bad? 'TMC DIAG aktiv' : ''); }
+          else { const el=$('b_step'); if(el){ el.classList.remove('ok','err'); el.title='Unbekannt'; } }
+        }catch(_){ const el=$('b_step'); if(el){ el.classList.remove('ok','err'); el.title='Unbekannt'; } }
+      }
+
+      $('btnDone').addEventListener('click', async ()=>{
+        try{ const r = await fetch('/api/setup/done', { method:'POST' }); if (r.ok) { showToast('Setup abgeschlossen – Neustart…'); setTimeout(()=>location.href='/', 2500); } else { showToast('Fehler beim Abschluss'); } }
+        catch(e){ showToast('Fehler: '+e.message); }
+      });
+      $('btnAbort').addEventListener('click', async ()=>{ try{ await fetch('/api/setup/abort',{method:'POST'}); showToast('Setup abgebrochen. Du kannst später fortsetzen.'); }catch(_){ } });
+
+      connectWS();
+      refreshStatus();
+      setInterval(refreshStatus, 3000);
+      setInterval(pollDoor, 2000);
+      setInterval(pollStepper, 3000);
+      updateDoneEnabled();
+    </script>
+  </body>
+  </html>

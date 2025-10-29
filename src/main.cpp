@@ -1,4 +1,4 @@
-// LuminaGrowX main – uses centralized lumina_config
+﻿// LuminaGrowX main – uses centralized lumina_config
 
 #include <Arduino.h>
 
@@ -25,6 +25,7 @@
 #include "web_ctrl.h"
 #include "../include/health.h"
 #include "../include/version.h"
+#include "../include/setup_flag.h"
 
 using namespace vpd_calc;
 using namespace plant_ctrl;
@@ -65,6 +66,7 @@ PlantCtrl controller;
 RTC_Ctrl rtc;
 net_ctrl::NetCtrl net;
 web_ctrl::WebCtrl web;
+static bool g_setupMode = false;
 
 static inline bool approxEq(float a, float b, float eps = 0.02f) {
   return fabsf(a - b) <= eps;
@@ -146,6 +148,24 @@ void setup()
   Serial.println(ok ? F("[ToF] Init OK") : F("[ToF] Init FAILED"));
   health::set_tof(ok, ok ? String("") : F("ToF Init fehlgeschlagen"));
 
+  // SHT41 initialisieren
+  Serial.println(F("[SHT41_in] Init..."));
+  if (!sht_in.begin(Wire1, true)) {
+    Serial.println(F("[SHT41_in] Init FAILED (Sensor nicht erreichbar?)"));
+    health::set_sht_in(false, F("SHT41 innen fehlt/fehlerhaft"));
+  } else {
+    Serial.println(F("[SHT41_in] Init OK"));
+    health::set_sht_in(true);
+  }
+  Serial.println(F("[SHT41_out] Init..."));
+  if (!sht_out.begin(Wire, true)) {
+    Serial.println(F("[SHT41_out] Init FAILED (Sensor nicht erreichbar?)"));
+    health::set_sht_out(false, F("SHT41 außen fehlt/fehlerhaft"));
+  } else {
+    Serial.println(F("[SHT41_out] Init OK"));
+    health::set_sht_out(true);
+  }
+
   // ===== 3) Filesystem (mit explizitem Partition-Label "littlefs" und Mount-Pfad "/littlefs") =====
   if (!LittleFS.begin(true, "/littlefs", 10, "littlefs")) {
     Serial.println(F("[FS] LittleFS mount/format FAILED"));
@@ -157,6 +177,9 @@ void setup()
                   (unsigned)total, (unsigned)used, (unsigned)((total>used)?(total-used):0));
   health::set_fs(true);
   }
+  // Setup-Flag lesen
+  bool setupDone = setup_flag::is_done();
+  g_setupMode = !setupDone;
 
   // SHT41
   // SHT41 bereits initialisiert (früher im Setup)
@@ -169,7 +192,7 @@ void setup()
   step.setDebugMoveLogInterval(100);
 
   // Homing-Routine (optional über lumina_config.h)
-  if (lumina::startup::DO_STEPPER_HOME_ON_BOOT) {
+  if (!g_setupMode && lumina::startup::DO_STEPPER_HOME_ON_BOOT) {
     while (!step.home()) { step.tick(); }
   }
 
@@ -177,9 +200,8 @@ void setup()
   // step.moveTo(180.0f, 5); // 180mm nach unten, Geschwindigkeit Stufe 5
   // waitUntilStill(step);  // Warten bis Stillstand
 
-  // ToF: Offset laden oder automatisch kalibrieren (optional über lumina_config.h)
-  if (lumina::startup::DO_TOF_CALIBRATE_ON_BOOT) {
-    int offsetLoaded = 0;
+  // ToF: Offset laden; optional automatisch kalibrieren (je nach Flag)
+  {
     bool haveOffset = false;
     File f = LittleFS.open("/tof_offset.dat", FILE_READ);
     if (f) {
@@ -189,7 +211,7 @@ void setup()
       if (s.length() > 0) n = sscanf(s.c_str(), "%d", &val);
       if (n == 1) { tof.setOffsetMm((int16_t)val); haveOffset = true; }
     }
-    if (!haveOffset) {
+    if (!g_setupMode && lumina::startup::DO_TOF_CALIBRATE_ON_BOOT && !haveOffset) {
       // Automatische Ein-Punkt-Offset-Kalibrierung
       int measured = tof.readAvgMm(lumina::calib::TOF_CAL_SAMPLES);
       if (measured >= 0) {
@@ -208,29 +230,35 @@ void setup()
     Serial.println("[RTC] Keine Verbindung zur DS3231 (0x68).");
     health::set_rtc(false, F("RTC nicht erreichbar"));
   } else {
-    Serial.println("[RTC] Init OK (DS3231 gefunden).");
+        Serial.println("[RTC] Init OK (DS3231 gefunden).");
     health::set_rtc(true);
+  }
+
+  // Türeffner-Pin konfigurieren (nur für Setup-Tests relevant)
+  if (lumina::plant::DOOR_SWITCH_PIN >= 0) {
+    pinMode(lumina::plant::DOOR_SWITCH_PIN, INPUT_PULLUP);
   }
 
   // Netzwerkteil starten (AP immer, STA wenn konfiguriert); mDNS: luminagrowx.local (verschoben ans Ende)
 
-  // SHT41 (bereits nach FS/ToF verschoben)
-  Serial.println(F("[SHT41_in] Init..."));
-  if (!sht_in.begin(Wire1, true)) {
-    Serial.println(F("[SHT41_in] Init FAILED (Sensor nicht erreichbar?)"));
-    health::set_sht_in(false, F("SHT41 innen fehlt/fehlerhaft"));
-  } else {
-    Serial.println(F("[SHT41_in] Init OK"));
-    health::set_sht_in(true);
-  }
-  Serial.println(F("[SHT41_out] Init..."));
-  if (!sht_out.begin(Wire, true)) {
-    Serial.println(F("[SHT41_out] Init FAILED (Sensor nicht erreichbar?)"));
-    health::set_sht_out(false, F("SHT41 außen fehlt/fehlerhaft"));
-  } else {
-    Serial.println(F("[SHT41_out] Init OK"));
-    health::set_sht_out(true);
-  }
+  // #if 0 // duplicate SHT41 init removed
+  // // SHT41 (bereits nach FS/ToF verschoben)
+  // Serial.println(F("[SHT41_in] Init..."));
+  // if (!sht_in.begin(Wire1, true)) {
+  //   Serial.println(F("[SHT41_in] Init FAILED (Sensor nicht erreichbar?)"));
+  //   health::set_sht_in(false, F("SHT41 innen fehlt/fehlerhaft"));
+  // } else {
+  //   Serial.println(F("[SHT41_in] Init OK"));
+  //   health::set_sht_in(true);
+  // }
+  // Serial.println(F("[SHT41_out] Init..."));
+  // if (!sht_out.begin(Wire, true)) {
+  //   Serial.println(F("[SHT41_out] Init FAILED (Sensor nicht erreichbar?)"));
+  //   health::set_sht_out(false, F("SHT41 außen fehlt/fehlerhaft"));
+  // } else {
+  //   Serial.println(F("[SHT41_out] Init OK"));
+  //   health::set_sht_out(true);
+  // }
 
   // ===== 5) Weitere Aktoren + Controller =====
   // Zentrale Env-Defaults anwenden (aus lumina_config.h)
@@ -246,13 +274,15 @@ void setup()
   }
 
   // Controller verbinden und konfigurieren (inkl. Stepper/ToF/RTC/Tuer)
-  controller.begin(sht_in, sht_out, dac, fan, step, tof, &rtc, lumina::plant::DOOR_SWITCH_PIN);
-  controller.setStage(vpd_calc::GrowthStage::Flowering);
-  controller.setMode(DayMode::Day);
-  controller.applyLuminaConfig();
+  if (!g_setupMode) {
+    controller.begin(sht_in, sht_out, dac, fan, step, tof, &rtc, lumina::plant::DOOR_SWITCH_PIN);
+    controller.setStage(vpd_calc::GrowthStage::Flowering);
+    controller.setMode(DayMode::Day);
+    controller.applyLuminaConfig();
+  }
 
   // Nach Homing: blockierende Annäherung an Mindestabstand (optional über lumina_config.h)
-  if (lumina::startup::DO_APPROACH_MIN_DISTANCE_BOOT) {
+  if (!g_setupMode && lumina::startup::DO_APPROACH_MIN_DISTANCE_BOOT) {
     controller.runStartupApproachBlocking();
   }
 
@@ -264,6 +294,8 @@ void setup()
     net.begin(forceAP, "luminagrowx", &rtc);
   }
   web.begin(&controller, &rtc, &net);
+  // Hardware-Referenzen für Setup/Tests an WebCtrl geben (inkl. SHT41)
+  web.setHardware(&dac, &fan, &step, &tof, &sht_in, &sht_out);
   Serial.println(F("[INIT] Setup beendet!"));
 }
 
@@ -271,6 +303,12 @@ void loop()
 {
   // Keep stepper ticking every frame
   step.tick();
+
+  // Setup-Modus: nur Setup-Flow + Netzwerk/Web aktiv halten
+  if (g_setupMode) {
+    web.loop();
+    return;
+  }
 
   // Regelung nur laufen lassen, wenn kritische Sensoren OK
   if (health::critical_ok()) {

@@ -7,8 +7,15 @@
 #include <WiFiClientSecure.h>
 #include <Update.h>
 #include "../../include/version.h"
+#include "../../include/lumina_config.h"
+#include "../../include/setup_flag.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include "gp8211_ctrl.h"
+#include "fan_ctrl.h"
+#include "stepper_ctrl.h"
+#include "tof_ctrl.h"
+#include "sht41_ctrl.h"
 
 using namespace web_ctrl;
 using net_ctrl::NetCtrl;
@@ -99,6 +106,10 @@ void WebCtrl::begin(plant_ctrl::PlantCtrl* ctrl, RTC_Ctrl* rtc, NetCtrl* net) {
   http_.begin();
 }
 
+void WebCtrl::setHardware(GP8211Ctrl* dac, FanCtrl* fan, StepperCtrl* stepper, ToFCtrl* tof, SHT41Ctrl* shtIn, SHT41Ctrl* shtOut) {
+  dac_ = dac; fan_ = fan; step_ = stepper; tof_ = tof; shtIn_ = shtIn; shtOut_ = shtOut;
+}
+
 void WebCtrl::loop() {
   uint32_t now = millis();
   if (now >= nextProbeAt_) {
@@ -134,11 +145,96 @@ void WebCtrl::loop() {
 }
 
 void WebCtrl::setupRoutes_() {
-  http_.on("/", HTTP_GET, [this](AsyncWebServerRequest* req){ sendFile_(req, "/index.html", "text/html; charset=utf-8"); });
-  http_.on("/index.html", HTTP_GET, [this](AsyncWebServerRequest* req){ sendFile_(req, "/index.html", "text/html; charset=utf-8"); });
+  http_.on("/", HTTP_GET, [this](AsyncWebServerRequest* req){
+    if (!setup_flag::is_done()) { req->redirect("/setup"); return; }
+    sendFile_(req, "/index.html", "text/html; charset=utf-8");
+  });
+  http_.on("/index.html", HTTP_GET, [this](AsyncWebServerRequest* req){
+    if (!setup_flag::is_done()) { req->redirect("/setup"); return; }
+    sendFile_(req, "/index.html", "text/html; charset=utf-8");
+  });
   http_.on("/pico.min.css", HTTP_GET, [this](AsyncWebServerRequest* req){ sendFile_(req, "/pico.min.css", "text/css"); });
   http_.on("/custom.css", HTTP_GET, [this](AsyncWebServerRequest* req){ sendFile_(req, "/custom.css", "text/css"); });
   http_.on("/bg.jpg", HTTP_GET, [this](AsyncWebServerRequest* req){ sendFile_(req, "/bg.jpg", "image/jpeg"); });
+
+  // Setup-Seite und APIs
+  http_.on("/setup", HTTP_GET, [this](AsyncWebServerRequest* req){
+    if (setup_flag::is_done()) { req->redirect("/"); return; }
+    sendFile_(req, "/setup.html", "text/html; charset=utf-8");
+  });
+  http_.on("/api/setup/status", HTTP_GET, [this](AsyncWebServerRequest* req){ req->send(200, "application/json", makeSetupStatusJson_()); });
+  http_.on("/api/rtc/set", HTTP_POST, [](AsyncWebServerRequest*){}, NULL,
+           [this](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t, size_t){
+             JsonDocument doc; if (deserializeJson(doc, data, len)) { req->send(400, "application/json", "{\"error\":\"bad json\"}"); return; }
+             bool ok=false; if (rtc_ && !doc["time"].isNull()) ok = rtc_->writeTimeFromString(String((const char*)doc["time"]));
+             JsonDocument resp; resp["ok"]=ok; String out; serializeJson(resp, out); req->send(ok?200:500, "application/json", out);
+           });
+  // Body-only JSON endpoint; onRequest is empty, logic in body handler
+  http_.on("/api/tof/calibrate", HTTP_POST, [](AsyncWebServerRequest*){}, NULL,
+           [this](AsyncWebServerRequest* req, uint8_t*, size_t, size_t, size_t){
+             JsonDocument resp; bool ok=false; int measured=-1; int target=lumina::calib::TOF_CAL_TARGET_MM; int off=0;
+             if (tof_) {
+               // Vor Messung Offset neutralisieren, um RAW zu lesen
+               int16_t prevOff = tof_->getOffsetMm();
+               tof_->setOffsetMm(0);
+               for (int attempt=0; attempt<3 && measured<0; ++attempt) {
+                 measured = tof_->readAvgMm(lumina::calib::TOF_CAL_SAMPLES);
+                 if (measured < 0) { delay(10); tof_->reinit(); delay(10); }
+               }
+               if (measured >= 0) {
+                 off = measured - target; tof_->setOffsetMm((int16_t)off);
+                 LittleFS.begin(false, "/littlefs", 10, "littlefs");
+                 File fw = LittleFS.open("/tof_offset.dat", FILE_WRITE);
+                 if (fw) { fw.printf("%d\n", off); fw.close(); ok=true; }
+               } else {
+                 // Restore vorherigen Offset, wenn Messung fehlgeschlagen ist
+                 tof_->setOffsetMm(prevOff);
+               }
+             }
+             resp["ok"]=ok; resp["measured"]=measured; resp["target"]=target; resp["offset"]=off; String out; serializeJson(resp, out);
+             req->send(ok?200:500, "application/json", out);
+           });
+  http_.on("/api/dac", HTTP_POST, [](AsyncWebServerRequest*){}, NULL,
+           [this](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t, size_t){
+             JsonDocument doc; if (deserializeJson(doc, data, len)) { req->send(400, "application/json", "{\"error\":\"bad json\"}"); return; }
+             bool ok=false; bool on = doc["on"].as<bool>(); if (dac_) { dac_->setPercent(on?100.0f:0.0f); ok=true; }
+             JsonDocument resp; resp["ok"]=ok; String out; serializeJson(resp, out); req->send(ok?200:500, "application/json", out);
+           });
+  http_.on("/api/fan", HTTP_POST, [](AsyncWebServerRequest*){}, NULL,
+           [this](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t, size_t){
+             JsonDocument doc; if (deserializeJson(doc, data, len)) { req->send(400, "application/json", "{\"error\":\"bad json\"}"); return; }
+             bool ok=false; bool on = doc["on"].as<bool>(); if (fan_) { fan_->setPercent(on?100.0f:0.0f); ok=true; }
+             JsonDocument resp; resp["ok"]=ok; String out; serializeJson(resp, out); req->send(ok?200:500, "application/json", out);
+           });
+  http_.on("/api/stepper/jog", HTTP_POST, [](AsyncWebServerRequest*){}, NULL,
+           [this](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t, size_t){
+             JsonDocument doc; if (deserializeJson(doc, data, len)) { req->send(400, "application/json", "{\"error\":\"bad json\"}"); return; }
+             bool ok=false; String dir = String((const char*)doc["dir"]); float mm = doc["mm"].isNull()?10.0f:doc["mm"].as<float>();
+             if (step_) { if (dir=="up") { step_->moveUp(mm, lumina::plant::SPEED_LEVEL); ok=true; } else if (dir=="down") { step_->moveDown(mm, lumina::plant::SPEED_LEVEL); ok=true; } }
+             JsonDocument resp; resp["ok"]=ok; String out; serializeJson(resp, out); req->send(ok?200:500, "application/json", out);
+           });
+  http_.on("/api/stepper/home", HTTP_POST, [this](AsyncWebServerRequest* req){
+    bool ok=false; if (step_) { step_->resetHoming(); ok = step_->startHoming(); }
+    JsonDocument resp; resp["ok"]=ok; String out; serializeJson(resp, out); req->send(ok?200:500, "application/json", out);
+  });
+  http_.on("/api/stepper/status", HTTP_GET, [this](AsyncWebServerRequest* req){
+    JsonDocument resp; bool ok=false; if (step_) { auto st=step_->status(); ok=true; resp["ok"]=true; resp["pos_mm"]=st.position_mm; resp["moving"]=st.isMoving; resp["homing"]=st.isHoming; resp["lastDone"]=st.lastOpDone; }
+    String out; serializeJson(resp, out); req->send(ok?200:500, "application/json", out);
+  });
+  http_.on("/api/setup/done", HTTP_POST, [this](AsyncWebServerRequest* req){
+    // Persistiere aktuellen ToF-Offset sicherheitshalber erneut
+    if (tof_) {
+      LittleFS.begin(false, "/littlefs", 10, "littlefs");
+      File fw = LittleFS.open("/tof_offset.dat", FILE_WRITE);
+      if (fw) { fw.printf("%d\n", (int)tof_->getOffsetMm()); fw.close(); }
+    }
+    bool ok=setup_flag::set_done(true); if (ok) rebootAt_ = millis()+800; req->send(ok?202:500, "application/json", ok?"{\"ok\":true}":"{\"ok\":false}");
+  });
+  http_.on("/api/setup/abort", HTTP_POST, [this](AsyncWebServerRequest* req){ req->send(200, "application/json", "{\"ok\":true}"); });
+  // Türstatus
+  http_.on("/api/door/status", HTTP_GET, [this](AsyncWebServerRequest* req){
+    JsonDocument resp; int pin = lumina::plant::DOOR_SWITCH_PIN; resp["present"] = (pin >= 0); resp["pin"] = pin; bool closed=false; int raw=-1; if (pin>=0){ raw = digitalRead(pin); closed = (raw==LOW); } resp["closed"] = closed; resp["raw"]=raw; String out; serializeJson(resp, out); req->send(200, "application/json", out);
+  });
 
   // FS diagnostics
   http_.on("/api/fs/info", HTTP_GET, [this](AsyncWebServerRequest* req){ req->send(200, "application/json", fsInfoJson_()); });
@@ -364,6 +460,37 @@ void WebCtrl::sendFile_(AsyncWebServerRequest* req, const char* path, const char
   req->send(LittleFS, path, mime);
 }
 
+String WebCtrl::makeSetupStatusJson_() {
+  JsonDocument doc;
+  doc["setup_done"] = setup_flag::is_done();
+  doc["rtc_ok"] = rtc_ ? rtc_->isConnected() : false;
+  const auto& hs = health::state();
+  JsonObject mods = doc["modules"].to<JsonObject>();
+  mods["i2c0"] = hs.mod.i2c0_ok;
+  mods["i2c1"] = hs.mod.i2c1_ok;
+  mods["sht_in"] = hs.mod.sht_in_ok;
+  mods["sht_out"] = hs.mod.sht_out_ok;
+  mods["dac"] = hs.mod.dac_ok;
+  mods["fan"] = hs.mod.fan_ok;
+  mods["rtc"] = hs.mod.rtc_ok;
+  mods["tof"] = hs.mod.tof_ok;
+  mods["fs"] = hs.mod.fs_ok;
+  if (tof_) {
+    int mm = tof_->readAvgMm(5);
+    doc["tof_mm"] = mm;
+    doc["tof_offset"] = (int)tof_->getOffsetMm();
+  }
+  if (step_) {
+    auto st = step_->status();
+    JsonObject s = doc["stepper"].to<JsonObject>();
+    s["pos_mm"] = st.position_mm;
+    s["moving"] = st.isMoving;
+    s["homing"] = st.isHoming;
+    s["lastDone"] = st.lastOpDone;
+  }
+  String out; serializeJson(doc, out); return out;
+}
+
 bool WebCtrl::syncRTCFromSystem_() {
   if (!rtc_) return false;
   time_t now = time(nullptr);
@@ -410,18 +537,27 @@ String WebCtrl::makeStatusJson_() {
     doc["ntp_time"] = tstr;
   }
   // Env
-  float tIn = NAN, rhIn = NAN; double vpd = NAN; float tOut = NAN;
+  float tIn = NAN, rhIn = NAN; double vpd = NAN; float tOut = NAN; float rhOut = NAN;
   if (ctrl_) {
     tIn = (float)ctrl_->currentTemp();
     rhIn = (float)ctrl_->currentRh();
     vpd = ctrl_->currentVpd();
     tOut = (float)ctrl_->currentTempOut();
+    rhOut = (float)ctrl_->currentRhOut();
+  }
+  // Fallback im Setup-Modus: direkt aus SHT41 lesen, wenn Werte fehlen
+  if ((isnan(tIn) || isnan(rhIn)) && shtIn_) {
+    float ti= NAN, rhi = NAN; if (shtIn_->read(ti, rhi)) { tIn = ti; rhIn = rhi; }
+  }
+  if ((isnan(tOut) || isnan(rhOut)) && shtOut_) {
+    float to = NAN, rho = NAN; if (shtOut_->read(to, rho)) { if (isnan(tOut)) tOut = to; if (isnan(rhOut)) rhOut = rho; }
   }
   auto round1 = [](float x){ return isnan(x)? NAN : (float)roundf(x*10.f)/10.f; };
   doc["temp_c"] = round1(tIn);
   doc["humi_rh"] = round1(rhIn);
   doc["vpd_kpa"] = round1((float)vpd);
   doc["temp_out_c"] = round1(tOut);
+  doc["humi_out_rh"] = round1(rhOut);
   // Actuators
   float ledPct = ctrl_ ? ctrl_->currentLedPercentEffective() : 0.0f;
   float fanPct = ctrl_ ? ctrl_->currentFanPercent() : 0.0f;

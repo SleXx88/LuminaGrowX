@@ -30,6 +30,9 @@ public:
              RTC_Ctrl* rtc,
              net_ctrl::NetCtrl* net);
 
+  // Optionale Hardware-Referenzen für Setup/Tests (LED-DAC, Lüfter, Stepper, ToF)
+  void setHardware(GP8211Ctrl* dac, FanCtrl* fan, StepperCtrl* stepper, ToFCtrl* tof, SHT41Ctrl* shtIn = nullptr, SHT41Ctrl* shtOut = nullptr);
+
   void loop(); // broadcast status, reboot scheduling, probes
 
   // Config IO
@@ -48,6 +51,7 @@ private:
   String makeStatusJson_();
   String makeInfoJson_();
   static String urlEncode_(const String& s);
+  String makeSetupStatusJson_();
   
   // Update helpers (TAR-based package with optional firmware.bin and www/* assets)
   bool handlePackageUploadBegin_();
@@ -83,6 +87,12 @@ private:
   plant_ctrl::PlantCtrl* ctrl_ = nullptr;
   RTC_Ctrl* rtc_ = nullptr;
   net_ctrl::NetCtrl* net_ = nullptr;
+  GP8211Ctrl* dac_ = nullptr;
+  FanCtrl* fan_ = nullptr;
+  StepperCtrl* step_ = nullptr;
+  ToFCtrl* tof_ = nullptr;
+  SHT41Ctrl* shtIn_ = nullptr;
+  SHT41Ctrl* shtOut_ = nullptr;
 
   AsyncWebServer http_{80};
   AsyncWebSocket ws_{"/ws"};
