@@ -99,13 +99,15 @@ static void printPos(StepperCtrl& s, const char* tag) {
 void setup()
 {
   Serial.begin(115200);
-  delay(200);
+  delay(500);
   Serial.printf("[FW] Version %s (%s %s)\n", FW_VERSION, __DATE__, __TIME__);
+  Serial.println(F("[INIT] Setup startet..."));
 
   // Optional: Boot-Zurücksetzen in AP-Mode über GPIO6 (aktiv LOW für 5s, Pullup)
-  net.configureResetPin(6, /*activeHigh=*/false);
+  // AP-Mode-Reset-Pin aus lumina_config.h
+  // net.configureResetPin moved to Network section
 
-  // I2C
+  // ===== 1) Basis: I2C-Busse =====
   Wire.begin(I2C_SDA_1, I2C_SCL_1, 400000);
   Wire1.begin(I2C_SDA_2, I2C_SCL_2, I2C_FREQ_2);
   health::set_i2c0(true);
@@ -133,15 +135,7 @@ void setup()
   dac.setMinVoltAt1Percent(lumina::ledcfg::MIN_V_AT_1PCT);
   dac.setPercent(10);
 
-  // Stepper
-  // step.begin();
-  // step.enableDebug(true);
-  // step.setDebugMoveLogInterval(100);
-  // while (!step.home()) { step.tick(); }
-
-  // step.moveTo(180.0f, 5); // --------------------------------------------------------------- Nur für den Anfang, damit die LED näher an der Pflanze ist
-  // waitUntilStill(step);
-
+  // ===== 2) Hardware-Sensoren =====
   // ToF aktivieren und starten
   if (PIN_XSHUT >= 0) {
     pinMode(PIN_XSHUT, OUTPUT);
@@ -152,7 +146,7 @@ void setup()
   Serial.println(ok ? F("[ToF] Init OK") : F("[ToF] Init FAILED"));
   health::set_tof(ok, ok ? String("") : F("ToF Init fehlgeschlagen"));
 
-  // FS (mit explizitem Partition-Label "littlefs" und Mount-Pfad "/littlefs")
+  // ===== 3) Filesystem (mit explizitem Partition-Label "littlefs" und Mount-Pfad "/littlefs") =====
   if (!LittleFS.begin(true, "/littlefs", 10, "littlefs")) {
     Serial.println(F("[FS] LittleFS mount/format FAILED"));
     health::set_fs(false, F("LittleFS Fehler"));
@@ -161,34 +155,53 @@ void setup()
     size_t used  = LittleFS.usedBytes();
     Serial.printf("[FS] LittleFS bereit total=%u used=%u free=%u\n",
                   (unsigned)total, (unsigned)used, (unsigned)((total>used)?(total-used):0));
-    health::set_fs(true);
+  health::set_fs(true);
   }
 
-  // // ToF: Offset laden oder automatisch kalibrieren (Fixture mit definiertem Abstand)
-  // {
-  //   int offsetLoaded = 0;
-  //   bool haveOffset = false;
-  //   File f = LittleFS.open("/tof_offset.dat", FILE_READ);
-  //   if (f) {
-  //     String s = f.readString();
-  //     f.close();
-  //     int val = 0; int n = 0;
-  //     if (s.length() > 0) n = sscanf(s.c_str(), "%d", &val);
-  //     if (n == 1) { tof.setOffsetMm((int16_t)val); haveOffset = true; }
-  //   }
-  //   if (!haveOffset) {
-  //     // Automatische Ein-Punkt-Offset-Kalibrierung
-  //     int measured = tof.readAvgMm(lumina::calib::TOF_CAL_SAMPLES);
-  //     if (measured >= 0) {
-  //       int target = lumina::calib::TOF_CAL_TARGET_MM;
-  //       int off = measured - target; // readRawMm() zieht diesen Offset ab
-  //       tof.setOffsetMm((int16_t)off);
-  //       File fw = LittleFS.open("/tof_offset.dat", FILE_WRITE);
-  //       if (fw) { fw.printf("%d\n", off); fw.close(); }
-  //       Serial.println(F("[CAL] ToF Offset kalibriert und gespeichert"));
-  //     }
-  //   }
-  // }
+  // SHT41
+  // SHT41 bereits initialisiert (früher im Setup)
+
+  // ===== 4) Stepper + (optional) Homing/Kalibrierung =====
+  step.begin();
+  // Debugging aktivieren/deaktivieren
+  step.enableDebug(true);
+  // Log-Intervall für Debug-Moves setzen (ms)
+  step.setDebugMoveLogInterval(100);
+
+  // Homing-Routine (optional über lumina_config.h)
+  if (lumina::startup::DO_STEPPER_HOME_ON_BOOT) {
+    while (!step.home()) { step.tick(); }
+  }
+
+  // Optionales Start-Positionieren der LED (nur für Tests)
+  // step.moveTo(180.0f, 5); // 180mm nach unten, Geschwindigkeit Stufe 5
+  // waitUntilStill(step);  // Warten bis Stillstand
+
+  // ToF: Offset laden oder automatisch kalibrieren (optional über lumina_config.h)
+  if (lumina::startup::DO_TOF_CALIBRATE_ON_BOOT) {
+    int offsetLoaded = 0;
+    bool haveOffset = false;
+    File f = LittleFS.open("/tof_offset.dat", FILE_READ);
+    if (f) {
+      String s = f.readString();
+      f.close();
+      int val = 0; int n = 0;
+      if (s.length() > 0) n = sscanf(s.c_str(), "%d", &val);
+      if (n == 1) { tof.setOffsetMm((int16_t)val); haveOffset = true; }
+    }
+    if (!haveOffset) {
+      // Automatische Ein-Punkt-Offset-Kalibrierung
+      int measured = tof.readAvgMm(lumina::calib::TOF_CAL_SAMPLES);
+      if (measured >= 0) {
+        int target = lumina::calib::TOF_CAL_TARGET_MM;
+        int off = measured - target; // readRawMm() zieht diesen Offset ab
+        tof.setOffsetMm((int16_t)off);
+        File fw = LittleFS.open("/tof_offset.dat", FILE_WRITE);
+        if (fw) { fw.printf("%d\n", off); fw.close(); }
+        Serial.println(F("[CAL] ToF Offset kalibriert und gespeichert"));
+      }
+    }
+  }
 
   // RTC (vor Netzstart initialisieren, damit NetCtrl darauf zugreifen darf)
   if (!rtc.begin(Wire1)) {
@@ -199,13 +212,9 @@ void setup()
     health::set_rtc(true);
   }
 
-  // Netzwerkteil starten (AP immer, STA wenn konfiguriert); mDNS: luminagrowx.local
-  {
-    bool forceAP = net.shouldForceAPAtBoot(5000);
-    net.begin(forceAP, "luminagrowx", &rtc);
-  }
+  // Netzwerkteil starten (AP immer, STA wenn konfiguriert); mDNS: luminagrowx.local (verschoben ans Ende)
 
-  // SHT41
+  // SHT41 (bereits nach FS/ToF verschoben)
   Serial.println(F("[SHT41_in] Init..."));
   if (!sht_in.begin(Wire1, true)) {
     Serial.println(F("[SHT41_in] Init FAILED (Sensor nicht erreichbar?)"));
@@ -223,6 +232,7 @@ void setup()
     health::set_sht_out(true);
   }
 
+  // ===== 5) Weitere Aktoren + Controller =====
   // Zentrale Env-Defaults anwenden (aus lumina_config.h)
   {
     const GrowthStage stages[3] = { GrowthStage::Seedling, GrowthStage::Vegetative, GrowthStage::Flowering };
@@ -241,13 +251,20 @@ void setup()
   controller.setMode(DayMode::Day);
   controller.applyLuminaConfig();
 
-  // Nach Homing: blockierende Annäherung an Mindestabstand
-  // controller.runStartupApproachBlocking();
+  // Nach Homing: blockierende Annäherung an Mindestabstand (optional über lumina_config.h)
+  if (lumina::startup::DO_APPROACH_MIN_DISTANCE_BOOT) {
+    controller.runStartupApproachBlocking();
+  }
 
-  Serial.println(F("PlantCtrl demo startet"));
-
-  // Webserver + API starten (immer, auch bei HW-Fehlern)
+  // Netzwerk + Web am Ende
+  net.configureResetPin(lumina::netcfg::AP_RESET_PIN,
+                        /*activeHigh=*/lumina::netcfg::AP_RESET_ACTIVE_HIGH);
+  {
+    bool forceAP = net.shouldForceAPAtBoot(lumina::netcfg::AP_RESET_HOLD_MS);
+    net.begin(forceAP, "luminagrowx", &rtc);
+  }
   web.begin(&controller, &rtc, &net);
+  Serial.println(F("[INIT] Setup beendet!"));
 }
 
 void loop()

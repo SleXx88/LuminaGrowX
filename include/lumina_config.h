@@ -45,6 +45,27 @@ namespace lumina
     };
   }
 
+  // --- Netzwerk-/Boot-Konfiguration ---
+  namespace netcfg
+  {
+    // AP-Mode-Reset-Pin: Beim Booten für AP-Mode gedrückt halten.
+    // - Setze auf -1, um die Funktion zu deaktivieren.
+    // - "AP_RESET_ACTIVE_HIGH": true, wenn der Pin aktiv HIGH ist; false für aktiv LOW (mit Pullup).
+    // - "AP_RESET_HOLD_MS": Haltezeit in Millisekunden, damit der AP-Reset auslöst.
+    constexpr int      AP_RESET_PIN          = 6;       // z.B. GPIO6
+    constexpr bool     AP_RESET_ACTIVE_HIGH  = false;   // aktiv LOW (empfohlen mit Pullup)
+    constexpr uint32_t AP_RESET_HOLD_MS      = 5000;    // 5 Sekunden
+  }
+
+  // --- Startup-Optionen ---
+  namespace startup
+  {
+    // Standardmäßig aus; zum Aktivieren in true ändern
+    constexpr bool DO_STEPPER_HOME_ON_BOOT       = false; // Homing beim Booten durchführen
+    constexpr bool DO_TOF_CALIBRATE_ON_BOOT      = false; // ToF-Offset laden/kalibrieren
+    constexpr bool DO_APPROACH_MIN_DISTANCE_BOOT = false; // Nach Homing: blockierende Annäherung
+  }
+
   // --- Phasen & Modi ---
   using PlantPhase = vpd_calc::GrowthStage; // Seedling, Vegetative, Flowering
   using DayMode = plant_ctrl::DayMode;      // Day, Night, NightSilent
