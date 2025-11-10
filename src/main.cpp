@@ -241,25 +241,6 @@ void setup()
 
   // Netzwerkteil starten (AP immer, STA wenn konfiguriert); mDNS: luminagrowx.local (verschoben ans Ende)
 
-  // #if 0 // duplicate SHT41 init removed
-  // // SHT41 (bereits nach FS/ToF verschoben)
-  // Serial.println(F("[SHT41_in] Init..."));
-  // if (!sht_in.begin(Wire1, true)) {
-  //   Serial.println(F("[SHT41_in] Init FAILED (Sensor nicht erreichbar?)"));
-  //   health::set_sht_in(false, F("SHT41 innen fehlt/fehlerhaft"));
-  // } else {
-  //   Serial.println(F("[SHT41_in] Init OK"));
-  //   health::set_sht_in(true);
-  // }
-  // Serial.println(F("[SHT41_out] Init..."));
-  // if (!sht_out.begin(Wire, true)) {
-  //   Serial.println(F("[SHT41_out] Init FAILED (Sensor nicht erreichbar?)"));
-  //   health::set_sht_out(false, F("SHT41 außen fehlt/fehlerhaft"));
-  // } else {
-  //   Serial.println(F("[SHT41_out] Init OK"));
-  //   health::set_sht_out(true);
-  // }
-
   // ===== 5) Weitere Aktoren + Controller =====
   // Zentrale Env-Defaults anwenden (aus lumina_config.h)
   {

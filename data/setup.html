@@ -101,6 +101,8 @@
         align-items: center;
         gap: 0.4rem;
         font-size: 0.85rem;
+        white-space: nowrap;
+        flex-shrink: 0;
         padding: 0.25rem 0.5rem;
         border-radius: 999px;
         background: var(--glass-strong);
@@ -592,7 +594,17 @@
           setBadge("b_sht_out", m.sht_out);
           setBadge("b_tof", m.tof);
           setBadge("b_dac", m.dac);
-          setBadge("b_fan", m.fan);
+          // Fan-Badge: Modulfehler -> rot, sonst zunächst grau bis Live-Status kommt
+          (function () {
+            const el = $("b_fan");
+            if (!el) return;
+            if (m.fan === false) {
+              setBadge("b_fan", false, "PWM/Lüfter prüfen");
+            } else {
+              el.classList.remove("ok", "err");
+              el.title = "Aus";
+            }
+          })();
           setBadge("b_rtc", m.rtc);
           setBadge("b_rtc_top", m.rtc);
           setBadge("b_fs", m.fs);
