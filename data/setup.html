@@ -3,14 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Lisa Pro – Setup</title>
+    <title>Lisa Pro – Inbetriebnahme</title>
     <link rel="stylesheet" href="/pico.min.css" />
     <style>
       :root {
         --accent: #ef4444;
         --accent-2: #dc2626;
-        --glass: rgba(20, 20, 22, 0.42);
-        --glass-strong: rgba(20, 20, 22, 0.62);
+        --glass: rgba(20, 20, 22, 0.6);
+        --glass-strong: rgba(20, 20, 22, 0.85);
         --muted: rgba(255, 255, 255, 0.06);
         --border: rgba(255, 255, 255, 0.18);
         --text: #e5e7eb;
@@ -18,585 +18,382 @@
         --ok: #22c55e;
         --warn: #f59e0b;
         --err: #ef4444;
-        --radius: 18px;
+        --radius: 12px;
         --pico-background-color: transparent;
         --pico-card-background-color: transparent;
       }
-      html,
-      body {
-        height: 100%;
-      }
+      html, body { height: 100%; }
       body {
         position: relative;
         color: var(--text);
-        background: transparent;
+        background: #0b0b0c; /* Fallback */
       }
       body::before {
         content: "";
         position: fixed;
         inset: 0;
-        background: linear-gradient(rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.55)),
-          url("/bg.jpg") center/cover no-repeat #0b0b0c;
+        background: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7)),
+          url("/bg.jpg") center/cover no-repeat;
         z-index: -1;
       }
+      /* Typography & Layout */
+      h1, h2, h3, h4 { color: #fff; margin-bottom: 0.5rem; }
+      small { color: var(--text-dim); }
+      
       header.hero {
         background: var(--glass);
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-        backdrop-filter: blur(3px);
+        border-bottom: 1px solid var(--border);
+        padding: 2rem 1rem;
+        margin-bottom: 2rem;
+        text-align: center;
       }
-      header.hero h1.brand {
-        font-size: clamp(2.2rem, 6vw, 3.3rem);
-        letter-spacing: 0.04em;
-        margin: 0.25rem 0 0;
-      }
+      header.hero h1 { margin: 0; font-weight: 800; letter-spacing: 0.05em; }
+      .brand-pro { color: var(--accent); font-size: 0.6em; vertical-align: super; }
+
+      /* Step Cards */
       article {
         background: var(--glass);
         border: 1px solid var(--border);
         border-radius: var(--radius);
-        backdrop-filter: blur(3px);
-        margin-bottom: 0; /* Reset margin for grid context */
-        height: 100%;     /* Equal height in grid */
+        margin-bottom: 1.5rem;
+        padding: 0;
+        overflow: hidden;
+        transition: transform 0.2s, border-color 0.2s;
+      }
+      article:hover {
+        border-color: rgba(255,255,255,0.3);
       }
       article > header {
         background: var(--glass-strong);
         border-bottom: 1px solid var(--border);
-        border-radius: var(--radius) var(--radius) 0 0;
-        padding: 0.75rem 1rem;
-      }
-      .grid {
-        gap: 1rem;
-      }
-      .hidden {
-        display: none;
-      }
-      input,
-      select,
-      button,
-      [role="button"],
-      .button {
-        border-radius: var(--radius) !important;
-      }
-      /* Group fixes for radius */
-      [role="group"] input:not(:first-child),
-      [role="group"] button:not(:first-child) {
-        border-top-left-radius: 0 !important;
-        border-bottom-left-radius: 0 !important;
-        margin-left: -1px;
-      }
-      [role="group"] input:not(:last-child),
-      [role="group"] button:not(:last-child) {
-        border-top-right-radius: 0 !important;
-        border-bottom-right-radius: 0 !important;
-      }
-
-      input,
-      select {
-        background: rgba(255, 255, 255, 0.02) !important;
-        color: var(--text) !important;
-        border: 1px solid var(--border) !important;
-      }
-      button,
-      [role="button"],
-      .button {
-        background: rgba(20, 20, 22, 0.42);
-        color: var(--text);
-        border: 1px solid var(--border);
-        font-weight: 700;
-        font-size: 1rem;
-        line-height: 1.5; /* Uniform line-height */
-        padding: 0.55rem 0.9rem;
-        border-radius: var(--radius) !important;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        text-decoration: none;
-        white-space: nowrap;
-        min-height: 2.8rem; /* Force minimum height for A and BUTTON tags */
-        box-sizing: border-box; /* Ensure padding includes border */
-        cursor: pointer;
-      }
-      @media (min-width: 768px) {
-        button,
-        [role="button"],
-        .button {
-          font-size: 0.95rem;
-          padding: 0.5rem 0.85rem;
-        }
-      }
-      @media (min-width: 1200px) {
-        button,
-        [role="button"],
-        .button {
-          font-size: 0.9rem;
-          padding: 0.45rem 0.8rem;
-        }
-      }
-      button:hover,
-      [role="button"]:hover,
-      .button:hover {
-        background: rgba(255, 255, 255, 0.06);
-      }
-      button:active,
-      button.primary,
-      .primary {
-        background: var(--accent) !important;
-        color: #fff !important;
-        border-color: var(--accent) !important;
-      }
-      button.success, .success {
-        background: var(--ok) !important;
-        color: #fff !important;
-        border-color: var(--ok) !important;
-      }
-      button.secondary, .secondary {
-        background: transparent;
-        border-color: var(--border);
-        color: var(--text-dim);
-      }
-      button.secondary:hover, .secondary:hover {
-        color: var(--text);
-        border-color: var(--text);
-      }
-      input[type="checkbox"],
-      input[type="radio"] {
-        accent-color: var(--accent);
-      }
-      input[type="checkbox"] {
-        width: 1.1rem;
-        height: 1.1rem;
-        margin-right: 0.5rem;
-        border: 2px solid var(--border) !important;
-        background: rgba(255, 255, 255, 0.06) !important;
-        cursor: pointer;
-      }
-      input[type="checkbox"]:checked {
-        background: var(--accent) !important;
-        border-color: var(--accent) !important;
-      }
-      label > input[type="checkbox"] {
-        vertical-align: middle;
-      }
-      .ok {
-        color: var(--ok);
-      }
-      .err {
-        color: var(--err);
-      }
-      .warn {
-        color: var(--warn);
-      }
-      .card {
-        /* Remove internal padding of card div inside content, 
-           as we now use articles as cards directly in grid */
-        /* But here we have .card inside .content inside article. 
-           Keep simple. */
-      }
-      .badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.4rem;
-        font-size: 0.85rem;
-        white-space: nowrap;
-        flex-shrink: 0;
-        padding: 0.25rem 0.5rem;
-        border-radius: 999px;
-        background: var(--glass-strong);
-        border: 1px solid var(--border);
-      }
-      .brand-word {
-        color: #ffffff;
-        font-weight: 800;
-      }
-      .brand-pro {
-        color: var(--accent);
-        font-weight: 800;
-        font-size: 0.55em;
-        line-height: 1;
-        vertical-align: super;
-        position: relative;
-        top: -0.25em;
-      }
-      button:focus, [role="button"]:focus, .button:focus {
-        box-shadow: none !important;
-        outline: none !important;
-      }
-      .btn-row {
+        padding: 1.5rem 1.5rem; /* Further increased padding for better centering/spacing */
         display: flex;
-        gap: 0.5rem;
+        justify-content: space-between;
+        align-items: center;
       }
-      .btn-row > button, .btn-row > a, .btn-row > input {
-        flex: 1;
+      article > header h3 { 
+        margin: 0; 
+        font-size: 1.15rem; 
+        line-height: 1.3;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        color: #fff;
       }
-      /* Helper from custom.css mirrored here for safety/completeness */
-      .help-details {
-        margin-top: 0.75rem;
-        padding-top: 0.5rem;
-        border-top: 1px solid var(--border);
+      .content { padding: 1.25rem; display: grid; gap: 1rem; }
+
+      /* Components */
+      .badge {
+        font-size: 0.75rem; padding: 0.25rem 0.6rem; border-radius: 99px;
+        background: rgba(255,255,255,0.1); border: 1px solid var(--border);
+        font-weight: 600;
+        align-self: center; /* Center badge vertically */
       }
-      .help-details summary {
-        font-size: 0.8rem;
-        color: var(--text-dim);
-        cursor: pointer;
-        margin-bottom: 0.25rem;
+      .badge.ok { background: rgba(34, 197, 94, 0.2); border-color: var(--ok); color: var(--ok); }
+      .badge.err { background: rgba(239, 68, 68, 0.2); border-color: var(--err); color: var(--err); }
+
+      button, .button {
+        background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+        color: var(--text); border-radius: 6px; font-weight: 600; cursor: pointer;
+        padding: 0.6rem 1rem; transition: all 0.2s;
       }
-      .help-details summary::after {
-        content: " ℹ️";
-        font-size: 0.9em;
-        opacity: 0.7;
+      button:hover { background: rgba(255,255,255,0.15); border-color: #fff; }
+      button.primary { background: var(--accent); border-color: var(--accent); color: white; }
+      button.primary:hover { background: var(--accent-2); }
+      button.success { background: var(--ok); border-color: var(--ok); color: white; }
+      
+      input[type="checkbox"] { width: 1.2rem; height: 1.2rem; accent-color: var(--ok); margin-right: 0.5rem; }
+      label { cursor: pointer; display: flex; align-items: center; }
+
+      .btn-row { display: flex; gap: 0.5rem; }
+      .btn-row > * { flex: 1; }
+      
+      .grid-2 { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
+      @media(min-width: 768px) { .grid-2 { grid-template-columns: 1fr 1fr; } }
+
+      /* Instructions */
+      .instruction { 
+        background: rgba(255,255,255,0.03); 
+        padding: 0.75rem; 
+        border-radius: 8px; 
+        border-left: 3px solid var(--accent);
+        font-size: 0.9rem;
+        margin-bottom: 0.5rem;
       }
-      .help-details small {
+      .step-number {
+        flex-shrink: 0;
+        width: 1.75rem; height: 1.75rem; 
+        background: var(--text); color: #000; border-radius: 50%; 
+        text-align: center; line-height: 1.75rem; font-weight: bold;
+      }
+      
+      /* Checklist Box Style */
+      .checklist-box {
+        background: rgba(0,0,0,0.2); 
+        padding: 1rem; 
+        border-radius: 8px; 
+        display: grid; 
+        gap: 0.5rem; 
+        margin-top: 0.5rem;
+      }
+      .checklist-box strong {
         display: block;
-        margin-top: 0.25rem;
-        color: var(--text-dim);
-        font-size: 0.85rem;
-        line-height: 1.4;
+        margin-bottom: 0.25rem;
+        font-size: 0.9rem;
+        opacity: 0.9;
       }
     </style>
   </head>
   <body>
-    <header class="hero container" style="margin-top: 1rem; padding: 1rem;">
-      <h1 class="brand">
-        <span class="brand-word">LISA</span><span class="brand-pro">pro</span>
-      </h1>
-      <p class="subtitle" style="margin: 0.25rem 0 0; opacity: 0.85; color: var(--text-dim);">Setup und Einrichtung</p>
+    <header class="hero">
+      <h1>LISA<span class="brand-pro">PRO</span></h1>
+      <p style="opacity: 0.8;">Inbetriebnahme-Assistent</p>
     </header>
 
-    <main class="container" style="display: grid; gap: 1rem; margin-top: 1rem;">
-      <!-- RTC -->
+    <main class="container">
+      <p style="text-align: center; margin-bottom: 2rem;">
+        Willkommen! Bitte gehe die folgenden Schritte nacheinander durch, um sicherzustellen, dass Deine Box einwandfrei funktioniert.
+      </p>
+
+      <!-- SCHRITT 1: ZEIT -->
       <article>
-        <header
-          style="
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.5rem;
-          "
-        >
-          <h3>Uhrzeit (RTC)</h3>
-          <span class="badge" id="b_rtc_top">RTC</span>
+        <header>
+          <h3><span class="step-number">1</span> <span>Systemzeit</span></h3>
+          <span class="badge" id="b_rtc_top">Uhr</span>
         </header>
-        <div class="content" style="padding: 1rem; display: grid; gap: 1rem">
-          <small
-            id="modulesMsg"
-            class="mono"
-            style="opacity: 0.8; display: block"
-          ></small>
-          
-          <div class="btn-row">
-            <input
-              id="rtcDt"
-              type="datetime-local"
-              aria-label="Datetime local"
-            />
-            <button id="rtcSet" type="button" class="primary">
-              Setzen
-            </button>
+        <div class="content">
+          <div class="instruction">
+            Damit der Tag/Nacht-Rhythmus für Deine Pflanzen stimmt, muss die interne Uhr einmalig gestellt werden.
           </div>
+          <div class="btn-row">
+            <input id="rtcDt" type="datetime-local" aria-label="Datum und Zeit" />
+            <button id="rtcSet" type="button" class="primary">Zeit speichern</button>
+          </div>
+          <small id="rtcState" style="text-align:right;">Status: -</small>
           
-          <small id="rtcState">Status: -</small>
-          <label style="display: block;"
-            ><input type="checkbox" id="cb_rtc" /> RTC eingestellt</label
-          >
-          <details class="help-details">
-            <summary>Hilfe</summary>
-            <small>I2C-Verbindung und Knopfzelle prüfen; nach Uhr-Setzen Badge beobachten.</small>
-          </details>
+          <div class="checklist-box">
+            <strong>Checkliste:</strong>
+            <label><input type="checkbox" id="cb_rtc" /> Uhrzeit wurde erfolgreich gespeichert</label>
+          </div>
         </div>
       </article>
 
-      <!-- SHT SENSORS ROW -->
-      <div class="grid">
-        <!-- SHT IN -->
+      <!-- SCHRITT 2: SENSOREN -->
+      <div class="grid-2">
         <article>
-          <header
-            style="
-              display: flex;
-              align-items: center;
-              justify-content: space-between;
-              gap: 0.5rem;
-            "
-          >
-            <h3>SHT Innen</h3>
-            <span class="badge" id="b_sht_in">Innen</span>
+          <header>
+            <h3><span class="step-number">2</span> <span>Klima Innen</span></h3>
+            <span class="badge" id="b_sht_in">Sensor Innen</span>
           </header>
-          <div class="content" style="padding: 1rem; display: grid; gap: 1rem">
-            <h4 id="shtInHdr"></h4>
-            <div>Messwert: <strong id="shtIn">-</strong></div>
-            <label style="display: block;"
-              ><input type="checkbox" id="cb_sht" /> Geprüft</label
-            >
-            <details class="help-details">
-              <summary>Hilfe</summary>
-              <small>Sensor kurz anpusten/erwärmen; Verkabelung an I2C (Wire1) prüfen.</small>
-            </details>
-          </div>
-        </article>
-
-        <!-- SHT OUT -->
-        <article>
-          <header
-            style="
-              display: flex;
-              align-items: center;
-              justify-content: space-between;
-              gap: 0.5rem;
-            "
-          >
-            <h3>SHT Außen</h3>
-            <span class="badge" id="b_sht_out">Außen</span>
-          </header>
-          <div class="content" style="padding: 1rem; display: grid; gap: 1rem">
-            <h4 id="shtOutHdr"></h4>
-            <div>Messwert: <strong id="shtOut">-</strong></div>
-            <label style="display: block;"
-              ><input type="checkbox" id="cb_sht_out" /> Geprüft</label
-            >
-            <details class="help-details">
-              <summary>Hilfe</summary>
-              <small>Sensor kurz anpusten/erwärmen; Verkabelung an I2C (Wire) prüfen.</small>
-            </details>
-          </div>
-        </article>
-      </div>
-
-      <!-- ToF & Door ROW -->
-      <div class="grid">
-        <!-- ToF -->
-        <article>
-          <header
-            style="
-              display: flex;
-              align-items: center;
-              justify-content: space-between;
-              gap: 0.5rem;
-            "
-          >
-            <h3>ToF Sensor</h3>
-            <span class="badge" id="b_tof">ToF</span>
-          </header>
-          <div class="content" style="padding: 1rem; display: grid; gap: 1rem">
-            <p style="margin-bottom:0.5rem">Kalibrierwerkzeug (50mm) anlegen.</p>
-            <div class="btn-row">
-              <button id="tofCal" type="button" class="primary">
-                Kalibrieren
-              </button>
-            </div>
-            <small id="tofMsg">–</small>
+          <div class="content">
+            <div class="instruction">Hauche den Sensor kurz an. Steigt die Feuchtigkeit?</div>
+            <p>Aktuelle Werte in der Box:</p>
+            <div style="font-size: 1.2rem; font-weight: bold; text-align: center;" id="shtIn">-</div>
+            <h4 id="shtInHdr" style="text-align:center; font-size:0.9rem;"></h4>
             
-            <div>
-              Aktuell: <strong id="tofLive">-</strong> mm
-              <small>(Off: <span id="tofOff">0</span>)</small>
+            <div class="checklist-box">
+              <strong>Checkliste:</strong>
+              <label><input type="checkbox" id="cb_sht" /> Werte sind plausibel</label>
             </div>
-            <label style="display: block;"
-              ><input type="checkbox" id="cb_tof" /> Kalibriert</label
-            >
-            <details class="help-details">
-              <summary>Hilfe</summary>
-              <small>XSHUT-Pin High, Kalibrierwerkzeug plan anlegen; Kabel/Adresse 0x29 prüfen.</small>
-            </details>
           </div>
         </article>
 
-        <!-- Tür -->
         <article>
-          <header
-            style="
-              display: flex;
-              align-items: center;
-              justify-content: space-between;
-              gap: 0.5rem;
-            "
-          >
-            <h3>Tür</h3>
-            <span class="badge" id="b_door">Tür</span>
+          <header>
+            <h3><span class="step-number">3</span> <span>Klima Außen</span></h3>
+            <span class="badge" id="b_sht_out">Sensor Außen</span>
           </header>
-          <div class="content" style="padding: 1rem; display: grid; gap: 1rem">
-            <div>Status: <strong id="doorState">unbekannt</strong></div>
-            <label style="display: block;"
-              ><input type="checkbox" id="cb_door" /> Türerkennung ok</label
-            >
-            <details class="help-details">
-              <summary>Hilfe</summary>
-              <small>Schalter verdrahtet? interner Pullup aktiv? Pegel beachten (LOW = geschlossen).</small>
-            </details>
+          <div class="content">
+            <div class="instruction">Prüfe die Werte der Umgebungsluft. Sind sie realistisch?</div>
+            <p>Werte der Umgebungsluft:</p>
+            <div style="font-size: 1.2rem; font-weight: bold; text-align: center;" id="shtOut">-</div>
+            <h4 id="shtOutHdr" style="text-align:center; font-size:0.9rem;"></h4>
+            
+            <div class="checklist-box">
+              <strong>Checkliste:</strong>
+              <label><input type="checkbox" id="cb_sht_out" /> Werte sind plausibel</label>
+            </div>
           </div>
         </article>
       </div>
 
-      <!-- FANS ROW -->
-      <div class="grid">
-        <!-- Lüfter 1 -->
+      <!-- SCHRITT 4: AKTTOREN (Lüfter & Licht) -->
+      <div class="grid-2">
         <article>
-          <header
-            style="
-              display: flex;
-              align-items: center;
-              justify-content: space-between;
-              gap: 0.5rem;
-            "
-          >
-            <h3>Lüfter 1</h3>
-            <span class="badge" id="b_fan">Fan 1</span>
+          <header>
+            <h3><span class="step-number">4</span> <span>Belüftung</span></h3>
+            <!-- Removed Badge here as requested -->
           </header>
-          <div class="content" style="padding: 1rem; display: grid; gap: 1rem">
+          <div class="content">
+            <div class="instruction">Teste beide Lüfter. Sie sollten hörbar anlaufen.</div>
+            
+            <!-- Lüfter 1 -->
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <strong>Lüfter 1</strong>
+              <span class="badge" id="b_fan">Lüfter 1</span>
+            </div>
             <div class="btn-row">
               <button id="fanOff" type="button" class="primary">Aus</button>
-              <button id="fanOn" type="button" class="secondary">
-                An
-              </button>
+              <button id="fanOn" type="button" class="secondary">An (Test)</button>
             </div>
-            <div>Drehzahl: <strong id="fanRpm">-</strong> RPM</div>
-            <label style="display: block;"
-              ><input type="checkbox" id="cb_fan" /> Test ok</label
-            >
-            <details class="help-details">
-              <summary>Hilfe</summary>
-              <small>Lüfter nicht angeschlossen, Lüfter defekt oder Tacho/PWM vertauscht?</small>
-            </details>
-          </div>
-        </article>
-
-        <!-- Lüfter 2 -->
-        <article>
-          <header
-            style="
-              display: flex;
-              align-items: center;
-              justify-content: space-between;
-              gap: 0.5rem;
-            "
-          >
-            <h3>Lüfter 2</h3>
-            <span class="badge" id="b_fan2">Fan 2</span>
-          </header>
-          <div class="content" style="padding: 1rem; display: grid; gap: 1rem">
+            <div style="text-align: center;">Drehzahl: <strong id="fanRpm">0</strong> RPM</div>
+            
+            <hr style="opacity: 0.1; margin: 0.5rem 0;">
+            
+            <!-- Lüfter 2 -->
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <strong>Lüfter 2</strong>
+              <span class="badge" id="b_fan2">Lüfter 2</span>
+            </div>
             <div class="btn-row">
               <button id="fan2Off" type="button" class="primary">Aus</button>
-              <button id="fan2On" type="button" class="secondary">
-                An
-              </button>
+              <button id="fan2On" type="button" class="secondary">An (Test)</button>
             </div>
-            <div>Drehzahl: <strong id="fan2Rpm">-</strong> RPM</div>
-            <label style="display: block;"
-              ><input type="checkbox" id="cb_fan2" /> Test ok</label
-            >
-            <details class="help-details">
-              <summary>Hilfe</summary>
-              <small>Lüfter nicht angeschlossen, Lüfter defekt oder Tacho/PWM vertauscht?</small>
-            </details>
+            <div style="text-align: center;">Drehzahl: <strong id="fan2Rpm">0</strong> RPM</div>
+
+            <div class="checklist-box">
+              <strong>Checkliste:</strong>
+              <label><input type="checkbox" id="cb_fan" /> Lüfter 1 dreht sich</label>
+              <label><input type="checkbox" id="cb_fan2" /> Lüfter 2 dreht sich</label>
+            </div>
           </div>
         </article>
-      </div>
 
-      <!-- LED & Stepper ROW -->
-      <div class="grid">
-        <!-- LED (DAC) -->
         <article>
-          <header
-            style="
-              display: flex;
-              align-items: center;
-              justify-content: space-between;
-              gap: 0.5rem;
-            "
-          >
-            <h3>LED (DAC)</h3>
+          <header>
+            <h3><span class="step-number">5</span> <span>Beleuchtung</span></h3>
             <span class="badge" id="b_dac">LED</span>
           </header>
-          <div class="content" style="padding: 1rem; display: grid; gap: 1rem">
+          <div class="content">
+            <div class="instruction">
+              Vorsicht: Das Licht kann sehr hell sein! Nicht direkt hineinblicken.
+            </div>
             <div class="btn-row">
               <button id="ledOff" type="button" class="primary">Aus</button>
-              <button id="ledOn" type="button" class="secondary">
-                An
-              </button>
+              <button id="ledOn" type="button" class="secondary">An (Test)</button>
             </div>
-            <label style="display: block;"
-              ><input type="checkbox" id="cb_led" /> Test ok</label
-            >
-            <details class="help-details">
-              <summary>Hilfe</summary>
-              <small>GP8211 I2C (0x58) und 0–10V-Leitung prüfen; Last beachten.</small>
-            </details>
-          </div>
-        </article>
-
-        <!-- Stepper -->
-        <article>
-          <header
-            style="
-              display: flex;
-              align-items: center;
-              justify-content: space-between;
-              gap: 0.5rem;
-            "
-          >
-            <h3>Steppermotor</h3>
-            <span class="badge" id="b_step">Stepper</span>
-          </header>
-          <div class="content" style="padding: 1rem; display: grid; gap: 1rem">
-            <button id="stepHome" type="button" class="primary">Homing Starten</button>
-            <div class="btn-row">
-              <button id="stepDown" type="button" class="primary" disabled>▼ 1 cm</button>
-              <button id="stepUp" type="button" class="primary" disabled>
-                ▲ 1 cm
-              </button>
-            </div>
-            <small id="stepMsg" style="display: block; min-height: 1.2em;">–</small>
             
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-              <label><input type="checkbox" id="cb_step_home" /> Homing ok</label>
-              <label><input type="checkbox" id="cb_step_jog" /> Jog ok</label>
+            <div class="checklist-box">
+              <strong>Checkliste:</strong>
+              <label><input type="checkbox" id="cb_led" /> Licht lässt sich schalten</label>
             </div>
-            <details class="help-details">
-              <summary>Hilfe</summary>
-              <small>Mechanik freigängig, Endlagen; Homing nur durchführen, wenn Jog ok.</small>
-            </details>
           </div>
         </article>
       </div>
 
-      <!-- Abschluss -->
+      <!-- SCHRITT 6: STEPPER -->
       <article>
-        <header
-          style="
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.5rem;
-          "
-        >
-          <h3>Abschluss</h3>
+        <header>
+          <h3><span class="step-number">6</span> <span>Höhenverstellung (LED-Plattform)</span></h3>
+          <span class="badge" id="b_step">Motor</span>
         </header>
-        <div class="content" style="padding: 1rem; display: grid; gap: 1rem">
-          <p style="font-size: 0.9rem; opacity: 0.8; margin-bottom: 0;">
-             Sind alle Tests erfolgreich abgeschlossen? Nach dem Klick auf "Abschließen" startet das System neu.
-          </p>
-          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
-            <a href="/settings" role="button" class="secondary" style="margin-right: auto;">Zurück</a>
-            <button id="btnAbort" type="button" class="secondary">Abbruch</button>
-            <button id="btnDone" type="button" class="primary" disabled>
-              Abschließen & Neustart
-            </button>
+        <div class="content">
+          <div class="instruction">
+            Damit die Automatik funktioniert, muss die Lampe wissen, wo "Oben" ist.
+            <br><strong>Schritt A:</strong> Starte die Kalibrierung. Die Lampe fährt nach ganz oben an den Anschlag.
+          </div>
+          
+          <button id="stepHome" type="button" class="primary" style="width: 100%; padding: 1rem;">
+            Referenzfahrt starten (Kalibrierung)
+          </button>
+          <small id="stepMsg" style="text-align: center; display: block; min-height: 1.2em; color: var(--accent);">–</small>
+
+          <hr style="opacity: 0.1;">
+
+          <div class="instruction">
+            <strong>Schritt B:</strong> Wenn die Lampe oben gestoppt hat, teste vorsichtig die Bewegung.
+          </div>
+          <div class="btn-row">
+            <button id="stepDown" type="button" class="primary" disabled>▼ 1 cm Abwärts</button>
+            <button id="stepUp" type="button" class="primary" disabled>▲ 1 cm Aufwärts</button>
+          </div>
+
+          <div class="checklist-box">
+            <strong>Checkliste:</strong>
+            <label><input type="checkbox" id="cb_step_home" /> Lampe ist oben angekommen?</label>
+            <label><input type="checkbox" id="cb_step_down" /> Abwärts-Taste funktioniert?</label>
+            <label><input type="checkbox" id="cb_step_up" /> Aufwärts-Taste funktioniert?</label>
           </div>
         </div>
       </article>
+
+      <!-- SCHRITT 7: TOF & TÜR -->
+      <article>
+        <header>
+          <h3><span class="step-number">7</span> <span>Abstand & Sicherheit</span></h3>
+          <span class="badge" id="b_tof">Sensor</span>
+        </header>
+        <div class="content">
+          <div class="grid-2" style="gap: 1rem;">
+            <!-- ToF -->
+            <div>
+              <div class="instruction" style="margin-bottom:1rem;">Der Abstandssensor misst die Distanz zur Pflanze. Kalibriere ihn leer.</div>
+              <strong>Abstandssensor (ToF)</strong>
+              <p style="font-size: 0.9rem; margin-top: 0.5rem;">
+                Misst die Entfernung zur Pflanze. Lege das Kalibrier-Hilfsmittel (50mm) flach auf den Sensorboden.
+              </p>
+              <div class="btn-row">
+                <button id="tofCal" type="button" class="primary">Kalibrieren (50mm)</button>
+              </div>
+              <small id="tofMsg">–</small>
+              <div style="margin-top: 0.5rem;">Aktuell gemessen: <strong id="tofLive">-</strong> mm</div>
+              
+              <div class="checklist-box">
+                <strong>Checkliste:</strong>
+                <label><input type="checkbox" id="cb_tof" /> Kalibrierung OK</label>
+              </div>
+            </div>
+            
+            <!-- Tür -->
+            <div style="border-left: 1px solid rgba(255,255,255,0.1); padding-left: 1rem;">
+              <div class="instruction" style="margin-bottom:1rem;">Öffne und schließe die Tür, um den Sensor zu testen.</div>
+              <strong>Tür-Erkennung</strong>
+              <div style="margin: 1rem 0;">Status: <strong id="doorState" style="color: var(--accent);">Unbekannt</strong></div>
+              
+              <div class="checklist-box">
+                <strong>Checkliste:</strong>
+                <label><input type="checkbox" id="cb_door" /> Türstatus wechselt korrekt</label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <!-- ABSCHLUSS -->
+      <article style="border-color: var(--ok);">
+        <header style="background: rgba(34, 197, 94, 0.1);">
+          <h3><span class="step-number" style="background: var(--ok); color: white;">✓</span> <span>Abschluss</span></h3>
+        </header>
+        <div class="content">
+          <p>
+             Hast Du alle Haken gesetzt? Dann ist Deine LisaPro bereit!
+             Mit dem Klick auf "Fertigstellen" wird das System neu gestartet und der Regelbetrieb beginnt.
+          </p>
+          <div class="btn-row">
+            <button id="btnAbort" type="button" class="secondary">Abbruch (Testmodus bleiben)</button>
+            <button id="btnDone" type="button" class="success" disabled style="font-weight: 800;">
+              Fertigstellen & Neustart
+            </button>
+          </div>
+          <div style="text-align: center; margin-top: 1rem;">
+            <a href="/settings" style="color: var(--text-dim); text-decoration: underline;">Zurück zu den Einstellungen</a>
+          </div>
+        </div>
+      </article>
+      
+      <!-- Hidden module msg for debugging -->
+      <small id="modulesMsg" class="hidden"></small>
+
     </main>
 
     <dialog id="toast" class="modal">
-      <article>
-        <header><strong>Status</strong></header>
+      <article style="margin: 0; min-width: 300px;">
+        <header><strong>Hinweis</strong></header>
         <div class="content" style="padding: 1rem">
           <p id="toastMsg">-</p>
         </div>
-        <footer
-          style="
-            display: flex;
-            justify-content: flex-end;
-            padding: 0.75rem 1rem;
-          "
-        >
-          <button onclick="document.getElementById('toast').close()">OK</button>
+        <footer style="padding: 1rem; text-align: right;">
+          <button onclick="document.getElementById('toast').close()" class="primary">OK</button>
         </footer>
       </article>
     </dialog>
@@ -627,11 +424,16 @@
         if (!el) return;
         el.classList.remove("ok", "err");
         el.classList.add(ok ? "ok" : "err");
-        el.title = ok ? "OK" : hint || "Bitte Verkabelung/Spannung prüfen";
+        // Simplified tooltips
+        el.title = ok ? "OK" : hint || "Prüfung erforderlich";
       }
 
-      let ws = null,
-        wsTimer = null;
+      let ws = null, wsTimer = null;
+      let stepHomed = false;
+      let stepHomingActive = false;
+      let stepDownEver = false;
+      let jogPending = false;
+
       function connectWS() {
         try {
           const proto = location.protocol === "https:" ? "wss" : "ws";
@@ -641,44 +443,12 @@
               const j = JSON.parse(ev.data);
               if (j && j.health && j.health.modules) {
                 const m = j.health.modules;
-                setBadge("b_i2c0", m.i2c0);
-                setBadge("b_i2c1", m.i2c1);
-                setBadge(
-                  "b_sht_in",
-                  m.sht_in,
-                  "SHT innen – bitte Kabel prüfen und Sensor erwärmen"
-                );
-                setBadge(
-                  "b_sht_out",
-                  m.sht_out,
-                  "SHT außen – bitte Kabel prüfen und Sensor erwärmen"
-                );
-                setBadge("b_tof", m.tof, "ToF – Kabel/XSHUT prüfen");
-                setBadge("b_dac", m.dac, "GP8211 – I2C prüfen");
-                
-                // Fan 1 Module check (only basic module check here)
-                if (m.fan === false) setBadge("b_fan", false, "PWM/Lüfter prüfen");
-                
-                setBadge("b_rtc", m.rtc, "RTC – I2C/Knopfzelle prüfen");
+                setBadge("b_sht_in", m.sht_in);
+                setBadge("b_sht_out", m.sht_out);
+                setBadge("b_tof", m.tof);
+                setBadge("b_dac", m.dac);
                 setBadge("b_rtc_top", m.rtc);
-                setBadge("b_fs", m.fs, "LittleFS");
-                
-                const lines = [];
-                if (m.sht_in === false) lines.push("SHT innen fehlt");
-                if (m.sht_out === false) lines.push("SHT außen fehlt");
-                if (m.dac === false)
-                  lines.push("LED-DAC (GP8211) nicht erreichbar");
-                if (m.fan === false) lines.push("Lüfter-PWM Fehler");
-                if (m.rtc === false)
-                  lines.push("RTC (DS3231) nicht erreichbar");
-                if (m.tof === false) lines.push("ToF-Sensor nicht erreichbar");
-                if (m.fs === false) lines.push("Dateisystem (LittleFS) Fehler");
-                $("modulesMsg").textContent = lines.length
-                  ? "Hinweise: " + lines.join(" | ")
-                  : "";
-              }
-              if (j) {
-                // Live updates here if needed, but polling refreshStatus handles badges mostly
+                // Fan badge logic moved to refreshStatus (RPM based)
               }
             } catch (_) {}
           });
@@ -687,180 +457,93 @@
             wsTimer = setTimeout(connectWS, 2000);
           });
           ws.addEventListener("error", () => {
-            try {
-              ws && ws.close();
-            } catch (_) {}
+            try { ws && ws.close(); } catch (_) {}
           });
         } catch (_) {}
       }
 
+      // UI Helpers
       function updateToggleBtns(offId, onId, isOn) {
         const off = $(offId);
         const on = $(onId);
         if (off && on) {
           if (isOn) {
-            // ON: On=Green(Success), Off=Transparent
-            on.classList.add("success");
-            on.classList.remove("secondary", "primary"); 
-            off.classList.remove("primary", "success");
-            off.classList.add("secondary");
+            on.classList.add("success"); on.classList.remove("secondary");
+            off.classList.remove("primary"); off.classList.add("secondary");
           } else {
-            // OFF: Off=Red(Primary), On=Transparent
-            off.classList.add("primary");
-            off.classList.remove("secondary", "success");
-            on.classList.remove("primary", "success");
-            on.classList.add("secondary");
+            off.classList.add("primary"); off.classList.remove("secondary");
+            on.classList.remove("success"); on.classList.add("secondary");
           }
         }
       }
 
-      async function refreshStatus() {
-        let st = {};
-        try {
-          st = await fetchJSON("/api/setup/status");
-          $("rtcState").textContent =
-            "Status: " + (st.rtc_ok ? "RTC OK" : "RTC nicht erreichbar");
-          const m = st.modules || {};
-          setBadge("b_i2c0", m.i2c0);
-          setBadge("b_i2c1", m.i2c1);
-          setBadge("b_sht_in", m.sht_in);
-          setBadge("b_sht_out", m.sht_out);
-          setBadge("b_tof", m.tof);
-          setBadge("b_dac", m.dac);
-          
-          // Basic module status first
-          if (m.fan === false) setBadge("b_fan", false, "PWM/Lüfter prüfen");
-          else {
-             const fb = $("b_fan");
-             if(fb) { fb.classList.remove("ok","err"); fb.title="Aus"; }
-          }
+      function updateFanBadge(id, rpm, on) {
+        const el = $(id);
+        if (!el) return;
+        el.classList.remove("ok", "err");
+        if (on) {
+          if (rpm > 0) el.classList.add("ok");
+          else el.classList.add("err");
+        }
+      }
 
-          setBadge("b_rtc", m.rtc);
-          setBadge("b_rtc_top", m.rtc);
-          setBadge("b_fs", m.fs);
-          
-          const setCheckHdr = (id, bad) => {
-            const el = $(id);
-            if (!el) return;
-            if (bad) {
-              el.textContent = "Sensor überprüfen";
-              el.classList.add("err");
-            } else {
-              el.textContent = "";
-              el.classList.remove("err");
-            }
-          };
-          setCheckHdr("shtInHdr", !m.sht_in);
-          setCheckHdr("shtOutHdr", !m.sht_out);
+      async function refreshStatus() {
+        // Setup specific status
+        try {
+          const st = await fetchJSON("/api/setup/status");
+          $("rtcState").textContent = (st.rtc_ok ? "Uhrzeit läuft" : "Fehler: RTC fehlt");
+          if (typeof st.tof_mm !== "undefined") {
+            const v = st.tof_mm;
+            $("tofLive").textContent = v >= 0 ? v : "Fehler";
+          }
         } catch (e) {}
+
+        // Global status (live values)
         try {
           const live = await fetchJSON("/api/status");
-          const tIn = live && live.temp_c,
-            hIn = live && live.humi_rh,
-            tOut = live && live.temp_out_c,
-            hOut = live && live.humi_out_rh;
-          $("shtIn").textContent =
-            (Number.isFinite(tIn) ? tIn.toFixed(1) + " °C" : "-") +
-            ", " +
-            (Number.isFinite(hIn) ? hIn.toFixed(1) + " %" : "-");
-          $("shtOut").textContent =
-            (Number.isFinite(tOut) ? tOut.toFixed(1) + " °C" : "-") +
-            (Number.isFinite(hOut) ? ", " + hOut.toFixed(1) + " %" : "");
-          // Falls Werte fehlen, betroffene Badges rot setzen
-          if (!(Number.isFinite(tIn) && Number.isFinite(hIn)))
-            setBadge("b_sht_in", false, "Keine Werte");
-          if (!(Number.isFinite(tOut) && Number.isFinite(hOut)))
-            setBadge("b_sht_out", false, "Keine Werte");
           
-          // Fan 1 & 2 Badge Logic
-          try {
-            // Fan 1
-            const fanRpm = (st.fan_rpm || (live && live.fan_rpm)) ? (st.fan_rpm || live.fan_rpm) : 0;
-            const fanOn = (live && !!live.fan_on); 
-            updateToggleBtns("fanOff", "fanOn", fanOn);
-            $("fanRpm").textContent = fanRpm;
-            
-            const el = $("b_fan");
-            if (el) {
-              // Priority: Module Error -> Red. Done above in st block.
-              // If module ok, check state:
-              if (!el.classList.contains("err") || el.title.includes("0 RPM") || el.title.includes("Aus")) { 
-                  el.classList.remove("ok", "err"); // Reset to neutral (white/grey)
-                  
-                  if (fanRpm > 0) {
-                     el.classList.add("ok");
-                     el.title = "Läuft (" + fanRpm + " RPM)";
-                  } else if (fanOn && fanRpm === 0) {
-                     el.classList.add("err");
-                     el.title = "An aber 0 RPM!";
-                  } else {
-                     // Off -> Neutral
-                     el.title = "Aus";
-                  }
-              }
-            }
-
-            // Fan 2 (No global badge yet, just UI text)
-            const fan2Rpm = (st.fan2_rpm || (live && live.fan2_rpm)) ? (st.fan2_rpm || live.fan2_rpm) : 0;
-            const fan2On = (live && !!live.fan2_on);
-            updateToggleBtns("fan2Off", "fan2On", fan2On);
-            const el2 = $("fan2Rpm");
-            if (el2) el2.textContent = fan2Rpm;
-            
-            const b2 = $("b_fan2");
-            if (b2) {
-               // Fan 2 Logic mirroring Fan 1
-               // Default (OFF) -> White/Neutral
-               b2.classList.remove("ok", "err");
-               b2.title = "Aus";
-               
-               if (fan2Rpm > 0) {
-                  b2.classList.add("ok");
-                  b2.title = "Läuft (" + fan2Rpm + " RPM)";
-               } else if (fan2On && fan2Rpm === 0) {
-                  b2.classList.add("err");
-                  b2.title = "An aber 0 RPM!";
-               }
-            }
-          } catch (_) {}
+          // SHT
+          const tIn = live && live.temp_c, hIn = live && live.humi_rh;
+          const tOut = live && live.temp_out_c, hOut = live && live.humi_out_rh;
           
-          // LED Buttons
-          if (live) {
-             updateToggleBtns("ledOff", "ledOn", !!live.light_on);
-          }
+          $("shtIn").textContent = (Number.isFinite(tIn) ? tIn.toFixed(1) + "°C " : "") + (Number.isFinite(hIn) ? hIn.toFixed(0) + "%" : "-");
+          $("shtOut").textContent = (Number.isFinite(tOut) ? tOut.toFixed(1) + "°C " : "") + (Number.isFinite(hOut) ? hOut.toFixed(0) + "%" : "-");
 
-          // ToF live
-          try {
-            const st2 = await fetchJSON("/api/setup/status");
-            if (typeof st2.tof_mm !== "undefined") {
-              const v = st2.tof_mm;
-              $("tofLive").textContent =
-                v >= 0 ? v : v === -2 ? "zu nah" : "Fehler";
-            }
-            if (typeof st2.tof_offset !== "undefined") {
-              $("tofOff").textContent = st2.tof_offset;
-            }
-          } catch (_) {}
+          // Fans
+          // Fan 1
+          const valFan1 = (live && live.fan_rpm !== undefined) ? live.fan_rpm : 0;
+          const fanRpm = parseInt(valFan1) || 0;
+          const fanOn = (live && !!live.fan_on); 
+          
+          updateToggleBtns("fanOff", "fanOn", fanOn);
+          $("fanRpm").textContent = fanRpm;
+          updateFanBadge("b_fan", fanRpm, fanOn);
+          
+          // Fan 2
+          const valFan2 = (live && live.fan2_rpm !== undefined) ? live.fan2_rpm : 0;
+          const fan2Rpm = parseInt(valFan2) || 0;
+          const fan2On = (live && !!live.fan2_on);
+          
+          updateToggleBtns("fan2Off", "fan2On", fan2On);
+          $("fan2Rpm").textContent = fan2Rpm;
+          updateFanBadge("b_fan2", fan2Rpm, fan2On);
 
-          // Prefill datetime
+          // LED
+          updateToggleBtns("ledOff", "ledOn", !!live.light_on);
+
+          // RTC Prefill if empty
           if (!$("rtcDt").value && live && live.ntp_time) {
-            const m = live.ntp_time.match(/(\d{1,2})[\.\-](\d{1,2})[\.\-](\d{2,4})\s+(\d{1,2})[\:\-](\d{1,2})[\:\-](\d{1,2})/);
-            if (m) {
-              let y = Number(m[3]);
-              if (y < 100) y += 2000;
-              const iso = 
-                y + '-' + 
-                String(Number(m[2])).padStart(2,'0') + '-' + 
-                String(Number(m[1])).padStart(2,'0') + 'T' + 
-                String(Number(m[4])).padStart(2,'0') + ':' + 
-                String(Number(m[5])).padStart(2,'0');
-              $("rtcDt").value = iso;
-            }
+             const m = live.ntp_time.match(/(\d{1,2})[\.\-](\d{1,2})[\.\-](\d{2,4})\s+(\d{1,2})[\:\-](\d{1,2})[\:\-](\d{1,2})/);
+             if (m) {
+               let y = Number(m[3]); if(y<100) y+=2000;
+               const iso = y+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[1]).padStart(2,'0')+'T'+String(m[4]).padStart(2,'0')+':'+String(m[5]).padStart(2,'0');
+               $("rtcDt").value = iso;
+             }
           }
         } catch (e) {}
       }
 
-      function fmtDDMMYYYY_HHMMSS(dt) {
+      function fmtDT(dt) {
         const dd = String(dt.getDate()).padStart(2, "0");
         const mm = String(dt.getMonth() + 1).padStart(2, "0");
         const yyyy = dt.getFullYear();
@@ -869,194 +552,77 @@
         const SS = String(dt.getSeconds()).padStart(2, "0");
         return `${dd}-${mm}-${yyyy} ${HH}-${MM}-${SS}`;
       }
+
+      // --- EVENT LISTENERS ---
+
+      // 1. RTC
       $("rtcSet").addEventListener("click", async () => {
         const v = $("rtcDt").value;
-        if (!v) {
-          showToast("Bitte Datum/Zeit wählen");
-          return;
-        }
-        const dt = new Date(v);
-        if (isNaN(dt.getTime())) {
-          showToast("Ungültiges Datum/Zeit");
-          return;
-        }
-        const time = fmtDDMMYYYY_HHMMSS(dt);
+        if (!v) return showToast("Bitte Datum wählen");
         try {
-          const r = await fetchJSON("/api/rtc/set", {
-            method: "POST",
-            body: JSON.stringify({ time }),
-          });
-          if (r.ok) {
-            $("cb_rtc").checked = true;
-            showToast("RTC gesetzt");
-          } else {
-            showToast("RTC setzen fehlgeschlagen");
-          }
-          refreshStatus();
+          const r = await fetchJSON("/api/rtc/set", { method: "POST", body: JSON.stringify({ time: fmtDT(new Date(v)) }) });
+          if (r.ok) { $("cb_rtc").checked = true; showToast("Zeit gespeichert"); } 
+          else showToast("Fehler beim Speichern");
           updateDoneEnabled();
-        } catch (e) {
-          showToast("Fehler: " + e.message);
-        }
-      });
-      $("tofCal").addEventListener("click", async () => {
-        try {
-          const r = await fetchJSON("/api/tof/calibrate", {
-            method: "POST",
-            body: "{}",
-          });
-          $("tofMsg").textContent = r.ok
-            ? "OK (gemessen " + r.measured + " mm, Offset " + r.offset + " mm)"
-            : "Fehler";
-          if (r.ok) $("cb_tof").checked = true;
-          refreshStatus();
-          updateDoneEnabled();
-        } catch (e) {
-          $("tofMsg").textContent = "Fehler: " + e.message;
-        }
-      });
-      $("ledOff").addEventListener("click", () =>
-        fetch("/api/dac", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ on: false }),
-        })
-      );
-      $("ledOn").addEventListener("click", () =>
-        fetch("/api/dac", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ on: true }),
-        })
-      );
-      $("fanOff").addEventListener("click", () =>
-        fetch("/api/fan", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ on: false }),
-        })
-      );
-      $("fanOn").addEventListener("click", () =>
-        fetch("/api/fan", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ on: true }),
-        })
-      );
-      $("fan2Off").addEventListener("click", () =>
-        fetch("/api/fan2", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ on: false }),
-        })
-      );
-      $("fan2On").addEventListener("click", () =>
-        fetch("/api/fan2", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ on: true }),
-        })
-      );
-      $("stepUp").addEventListener("click", async () => {
-        const b = $("stepUp");
-        if(b) { b.textContent="Fährt..."; b.classList.add("success"); b.dataset.moving="1"; b.disabled=true; }
-        try {
-          await fetchJSON("/api/stepper/jog", {
-            method: "POST",
-            body: JSON.stringify({ dir: "up", mm: 10 }),
-          });
-          $("stepMsg").textContent = "Move hoch gestartet";
-        } catch (e) {
-          $("stepMsg").textContent = "Fehler: " + e.message;
-          if(b) { b.textContent="▲ 1 cm"; b.classList.remove("success"); delete b.dataset.moving; b.disabled=false; }
-        }
-      });
-      $("stepDown").addEventListener("click", async () => {
-        const b = $("stepDown");
-        if(b) { b.textContent="Fährt..."; b.classList.add("success"); b.dataset.moving="1"; b.disabled=true; }
-        try {
-          await fetchJSON("/api/stepper/jog", {
-            method: "POST",
-            body: JSON.stringify({ dir: "down", mm: 10 }),
-          });
-          $("stepMsg").textContent = "Move runter gestartet";
-        } catch (e) {
-          $("stepMsg").textContent = "Fehler: " + e.message;
-          if(b) { b.textContent="▼ 1 cm"; b.classList.remove("success"); delete b.dataset.moving; b.disabled=false; }
-        }
-      });
-      $("stepHome").addEventListener("click", async () => {
-        try {
-          const btn = $("stepHome");
-          if(btn) btn.disabled = true; // Disable immediately to prevent double-click
-          const r = await fetchJSON("/api/stepper/home", { method: "POST" });
-          $("stepMsg").textContent = r.ok
-            ? "Homing gestartet"
-            : "Homing konnte nicht gestartet werden";
-        } catch (e) {
-          // If message is JSON object, parse it
-          let msg = e.message;
-          if (msg.includes("ok")) msg = "Fehler (Busy?)";
-          $("stepMsg").textContent = "Homing Info: " + msg;
-        }
-      });
-      function updateDoneEnabled() {
-        const need = [
-          "cb_rtc",
-          "cb_sht",
-          "cb_sht_out",
-          "cb_tof",
-          "cb_led",
-          "cb_fan",
-          "cb_fan2",
-          "cb_step_jog",
-          "cb_step_home",
-          "cb_door",
-        ];
-        const all = need.every((id) => $(id) && $(id).checked);
-        $("btnDone").disabled = !all;
-      }
-      [
-        "cb_rtc",
-        "cb_sht",
-        "cb_sht_out",
-        "cb_tof",
-        "cb_led",
-        "cb_fan",
-        "cb_fan2",
-        "cb_step_jog",
-        "cb_step_home",
-        "cb_door",
-      ].forEach((id) => {
-        const el = $(id);
-        if (el) el.addEventListener("change", updateDoneEnabled);
+        } catch (e) { showToast("Fehler: " + e.message); }
       });
 
-      async function pollDoor() {
+      // 4. Fans & 5. LED
+      const simpleToggle = (id, api, on) => $(id).addEventListener("click", () => 
+        fetch(api, { method: "POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({on}) })
+      );
+      simpleToggle("fanOff", "/api/fan", false);
+      simpleToggle("fanOn", "/api/fan", true);
+      simpleToggle("fan2Off", "/api/fan2", false);
+      simpleToggle("fan2On", "/api/fan2", true);
+      simpleToggle("ledOff", "/api/dac", false);
+      simpleToggle("ledOn", "/api/dac", true);
+
+      // 6. Stepper
+      $("stepHome").addEventListener("click", async () => {
+        const btn = $("stepHome");
+        btn.disabled = true; 
+        btn.classList.add("success"); btn.classList.remove("primary");
+        btn.textContent = "Fährt nach oben...";
+        
+        stepHomed = false; stepDownEver = false; stepHomingActive = true;
         try {
-          const d = await fetchJSON("/api/door/status");
-          const el = $("b_door");
-          if (d && d.present) {
-            const closed = !!d.closed;
-            $("doorState").textContent = closed ? "geschlossen" : "offen";
-            if (el) {
-              el.classList.remove("ok", "err");
-              el.title = closed ? "geschlossen" : "offen";
-            }
-          } else {
-            $("doorState").textContent = "nicht vorhanden";
-            if (el) {
-              el.classList.remove("ok", "err");
-              el.title = "Nicht vorhanden";
-            }
-          }
-        } catch (_) {
-          const el = $("b_door");
-          if (el) {
-            el.classList.remove("ok", "err");
-            el.title = "Unbekannt";
-          }
+          const r = await fetchJSON("/api/stepper/home", { method: "POST" });
+          $("stepMsg").textContent = r.ok ? "Kalibrierung läuft..." : "Fehler beim Starten";
+        } catch (e) {
+          $("stepMsg").textContent = "Info: " + e.message;
         }
-      }
+      });
+
+      $("stepUp").addEventListener("click", async () => {
+        const b = $("stepUp");
+        b.textContent="Fährt..."; b.classList.add("success"); b.dataset.moving="up"; b.disabled=true;
+        jogPending = true;
+        try {
+          await fetchJSON("/api/stepper/jog", { method: "POST", body: JSON.stringify({ dir: "up", mm: 10 }) });
+          $("stepMsg").textContent = "Fährt hoch...";
+        } catch (e) {
+          $("stepMsg").textContent = "Fehler: " + e.message;
+          b.textContent="▲ 1 cm Aufwärts"; b.classList.remove("success"); delete b.dataset.moving; b.disabled=false;
+        } finally {
+          setTimeout(() => { jogPending = false; }, 400);
+        }
+      });
+
+      $("stepDown").addEventListener("click", async () => {
+        const b = $("stepDown");
+        b.textContent="Fährt..."; b.classList.add("success"); b.dataset.moving="down"; b.disabled=true;
+        jogPending = true;
+        try {
+          await fetchJSON("/api/stepper/jog", { method: "POST", body: JSON.stringify({ dir: "down", mm: 10 }) });
+          $("stepMsg").textContent = "Fährt runter...";
+        } catch (e) {
+          $("stepMsg").textContent = "Fehler: " + e.message;
+          b.textContent="▼ 1 cm Abwärts"; b.classList.remove("success"); delete b.dataset.moving; b.disabled=false;
+        } finally {
+          setTimeout(() => { jogPending = false; }, 400);
+        }
+      });
 
       async function pollStepper() {
         try {
@@ -1064,45 +630,37 @@
           if (s && s.ok) {
             const bad = !!s.diag;
             const uartOk = !!s.uart_ok;
-            const title = "Stepper" + (uartOk ? "" : " (UART Fehler!)");
-            setBadge("b_step", !bad && uartOk, bad ? "TMC DIAG aktiv" : (uartOk ? "OK" : "UART Verbindung fehlgeschlagen"));
-            
-            const bBadge = $("b_step");
-            if (bBadge) bBadge.textContent = title;
+            setBadge("b_step", !bad && uartOk, bad ? "Motor klemmt (DIAG)" : (uartOk ? "OK" : "Kabel prüfen"));
 
-            // Homing Button State
-            const btnH = $("stepHome");
-            if (btnH) {
-               if (s.homing) {
-                  btnH.classList.add("success");
-                  btnH.classList.remove("primary");
-                  btnH.textContent = "Homing...";
-                  btnH.disabled = true;
-               } else {
-                  btnH.classList.add("primary");
-                  btnH.classList.remove("success");
-                  btnH.textContent = "Homing Starten";
-                  btnH.disabled = s.moving; // Disable if moving otherwise
-               }
+            if (s.homing && !stepHomingActive) {
+              stepHomingActive = true; stepHomed = false; stepDownEver = false;
             }
-            
-            // Jog Buttons
-            const canJog = s.lastDone && !s.homing && !s.moving;
+            if (stepHomingActive && !s.homing && s.lastDone) {
+              stepHomingActive = false; stepHomed = true;
+              // Reset Home Button
+              const btnH = $("stepHome");
+              btnH.classList.add("primary"); btnH.classList.remove("success");
+              btnH.textContent = "Referenzfahrt wiederholen";
+              btnH.disabled = false;
+              $("stepMsg").textContent = "Kalibrierung OK (Lampe oben)";
+            }
+
+            // Jog Logic
+            const canJog = stepHomed && s.lastDone && !s.homing && !s.moving;
             const btnUp = $("stepUp");
             const btnDown = $("stepDown");
-            
+
             if (btnUp) {
                if (!btnUp.dataset.moving) {
-                   btnUp.disabled = !canJog;
-                   // Ensure idle state is primary (Blue/Red/Filled) as requested
+                   btnUp.disabled = !canJog || !stepDownEver;
                    if (!s.moving) btnUp.classList.add("primary");
                }
-               // Reset text/color if not moving (and was moving)
-               if (!s.moving && btnUp.dataset.moving) {
-                  btnUp.textContent = "▲ 1 cm";
+               if (!s.moving && btnUp.dataset.moving && !jogPending) {
+                  btnUp.textContent = "▲ 1 cm Aufwärts";
                   btnUp.classList.remove("success");
-                  btnUp.classList.add("primary"); // Restore filled state
+                  btnUp.classList.add("primary");
                   delete btnUp.dataset.moving;
+                  $("stepMsg").textContent = "OK";
                }
             }
             if (btnDown) {
@@ -1110,55 +668,74 @@
                    btnDown.disabled = !canJog;
                    if (!s.moving) btnDown.classList.add("primary");
                }
-               if (!s.moving && btnDown.dataset.moving) {
-                  btnDown.textContent = "▼ 1 cm";
+               if (!s.moving && btnDown.dataset.moving && !jogPending) {
+                  btnDown.textContent = "▼ 1 cm Abwärts";
                   btnDown.classList.remove("success");
-                  btnDown.classList.add("primary"); // Restore filled state
+                  btnDown.classList.add("primary");
+                  if (btnDown.dataset.moving === "down") stepDownEver = true;
                   delete btnDown.dataset.moving;
+                  $("stepMsg").textContent = "OK";
                }
             }
-            
-          } else {
-            const el = $("b_step");
-            if (el) {
-              el.classList.remove("ok", "err");
-              el.title = "Unbekannt";
-            }
           }
-        } catch (_) {
-          const el = $("b_step");
-          if (el) {
-            el.classList.remove("ok", "err");
-            el.title = "Unbekannt";
-          }
-        }
+        } catch (_) {}
       }
 
+      // 7. ToF & Door
+      $("tofCal").addEventListener("click", async () => {
+        try {
+          const r = await fetchJSON("/api/tof/calibrate", { method: "POST", body: "{}" });
+          if (r.ok) {
+             $("tofMsg").textContent = "OK (Erkannt: " + r.measured + "mm)";
+             $("cb_tof").checked = true;
+             updateDoneEnabled();
+          } else {
+             $("tofMsg").textContent = "Fehler (Sensor verdeckt?)";
+          }
+        } catch (e) { $("tofMsg").textContent = "Fehler"; }
+      });
+
+      async function pollDoor() {
+        try {
+          const d = await fetchJSON("/api/door/status");
+          $("doorState").textContent = d.closed ? "Geschlossen" : "Offen";
+          $("doorState").style.color = d.closed ? "var(--ok)" : "var(--accent)";
+        } catch (_) {}
+      }
+
+      // Global Check
+      function updateDoneEnabled() {
+        const need = [
+          "cb_rtc", "cb_sht", "cb_sht_out", "cb_fan", "cb_fan2", // Added cb_fan2 explicitly
+          "cb_led", "cb_step_home", "cb_step_down", "cb_step_up", 
+          "cb_tof", "cb_door"
+        ];
+        const all = need.every((id) => $(id) && $(id).checked);
+        $("btnDone").disabled = !all;
+      }
+      // Add Listeners to all checkboxes
+      document.querySelectorAll('input[type="checkbox"]').forEach(el => el.addEventListener("change", updateDoneEnabled));
+
+      // Finish
       $("btnDone").addEventListener("click", async () => {
         try {
           const r = await fetch("/api/setup/done", { method: "POST" });
           if (r.ok) {
-            showToast("Setup abgeschlossen – Neustart…");
-            setTimeout(() => (location.href = "/"), 2500);
-          } else {
-            showToast("Fehler beim Abschluss");
-          }
-        } catch (e) {
-          showToast("Fehler: " + e.message);
-        }
+            showToast("Einrichtung abgeschlossen. Neustart...");
+            setTimeout(() => (location.href = "/"), 3000);
+          } else showToast("Fehler");
+        } catch (e) { showToast(e.message); }
       });
       $("btnAbort").addEventListener("click", async () => {
-        try {
-          await fetch("/api/setup/abort", { method: "POST" });
-          showToast("Setup abgebrochen. Du kannst später fortsetzen.");
-        } catch (_) {}
+        fetch("/api/setup/abort", { method: "POST" });
+        showToast("Einrichtung pausiert.");
       });
 
       connectWS();
       refreshStatus();
-      setInterval(refreshStatus, 500); // Speed up
-      setInterval(pollDoor, 1000);
-      setInterval(pollStepper, 500); // Speed up
+      setInterval(refreshStatus, 1000);
+      setInterval(pollDoor, 800);
+      setInterval(pollStepper, 300); // Fast poll for stepper
       updateDoneEnabled();
     </script>
   </body>
