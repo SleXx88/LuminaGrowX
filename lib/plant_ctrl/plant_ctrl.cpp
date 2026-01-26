@@ -160,10 +160,21 @@ void PlantCtrl::detectDoorOrTransient(float t_now, float rh_now, uint32_t now_ms
 }
 
 void PlantCtrl::updateFanSignFromDewpoints() {
+  // Passive Zuluft unten, Abluft oben: Mehr Lüfter -> Innenklima nähert sich Außenklima
+  // Außen feuchter (dpOut > dpIn): Mehr Lüfter -> RH steigt -> VPD sinkt -> fanSign +1
+  // Außen trockener (dpOut < dpIn): Mehr Lüfter -> RH sinkt -> VPD steigt -> fanSign -1
   float gap = (float)(dpOut_ - dpIn_);
-  if (gap > 0.5f)       fanSign_ = -1; // au�en feuchter
-  else if (gap < -0.5f) fanSign_ = +1; // au�en trockener
+  if (gap > 0.5f)       fanSign_ = +1; // außen feuchter: Lüfter senkt VPD
+  else if (gap < -0.5f) fanSign_ = -1; // außen trockener: Lüfter erhöht VPD
   // nahe 0: Vorzeichen beibehalten
+}
+
+void PlantCtrl::setDryingMode(bool active) {
+  dryingMode_ = active;
+}
+
+void PlantCtrl::setGrowActive(bool active) {
+  growActive_ = active;
 }
 
 bool PlantCtrl::update() {
@@ -179,6 +190,92 @@ bool PlantCtrl::update() {
   if (!sensorOut_->read(tC_out, rh_out)) return false;
   tIn_ = tC_in; rhIn_ = rh_in;
   tOut_ = tC_out; rhOut_ = rh_out;
+
+  // Tür-Status aktualisieren (unabhängig vom Modus)
+  if (doorPin_ >= 0) {
+    bool closed = (digitalRead(doorPin_) == LOW);
+    if (closed != lastDoorClosed_) {
+      lastDoorClosed_ = closed;
+      doorLastChangeMs_ = now;
+      if (closed) {
+        Serial.println(F("[DOOR] geschlossen"));
+      } else {
+        Serial.println(F("[DOOR] offen"));
+      }
+    }
+  }
+
+  // Wenn weder Grow noch Trocknung aktiv: Alle Hardware deaktivieren
+  if (!growActive_ && !dryingMode_) {
+    vpdIn_ = computeVpd(tIn_, rhIn_);
+    dpIn_  = computeDewPoint(tIn_, rhIn_);
+    dpOut_ = computeDewPoint(tOut_, rhOut_);
+    if (isnan(vpdFilt_)) vpdFilt_ = vpdIn_;
+    else if (emaAlpha_ > 0.0f && emaAlpha_ < 1.0f) vpdFilt_ = emaAlpha_ * vpdIn_ + (1.0f - emaAlpha_) * vpdFilt_;
+    else vpdFilt_ = vpdIn_;
+
+    // Alle Aktoren ausschalten
+    if (ledOut_ != 0.0f || fanOut_ != 0.0f) {
+      ledOut_ = 0.0f;
+      led_->setPercent(0.0f);
+      ledApplied_ = 0.0f;
+
+      fanOut_ = 0.0f;
+      fan_->setPercent(0.0f);
+      lastFanOut_ = 0.0f;
+
+      Serial.println(F("[CTRL] Kein Grow/Trocknung aktiv - Hardware deaktiviert"));
+    }
+
+    // Stepper/LED-Abstandsregelung deaktiviert
+    return true;
+  }
+
+  // Trocknungsmodus: Einfache Regelung für 45-55% RH, LED 0%, min. 20% Lüfter
+  if (dryingMode_) {
+    // VPD berechnen (für Monitoring)
+    vpdIn_ = computeVpd(tIn_, rhIn_);
+    dpIn_  = computeDewPoint(tIn_, rhIn_);
+    dpOut_ = computeDewPoint(tOut_, rhOut_);
+    if (isnan(vpdFilt_)) vpdFilt_ = vpdIn_;
+    else if (emaAlpha_ > 0.0f && emaAlpha_ < 1.0f) vpdFilt_ = emaAlpha_ * vpdIn_ + (1.0f - emaAlpha_) * vpdFilt_;
+    else vpdFilt_ = vpdIn_;
+
+    // LED immer aus
+    ledOut_ = lumina::drying::LED_PERCENT;
+    led_->setPercent(ledOut_);
+    ledApplied_ = ledOut_;
+
+    // Lüfterregelung für Ziel 45-55% RH
+    const float targetRhMin = lumina::drying::TARGET_RH_MIN;
+    const float targetRhMax = lumina::drying::TARGET_RH_MAX;
+    const float targetRhMid = (targetRhMin + targetRhMax) / 2.0f;
+    const float fanMin = lumina::drying::FAN_MIN_PERCENT;
+    const float fanMax = lumina::drying::FAN_MAX_PERCENT;
+
+    // Einfache Proportionalregelung: je höher RH über Ziel, desto mehr Lüfter
+    float fanCmd = fanMin;
+    if (rhIn_ < targetRhMin) {
+      // Zu trocken: Minimallüfter
+      fanCmd = fanMin;
+    } else if (rhIn_ > targetRhMax) {
+      // Zu feucht: Maximal
+      fanCmd = fanMax;
+    } else {
+      // Im Bereich: linear interpolieren
+      float ratio = (rhIn_ - targetRhMin) / (targetRhMax - targetRhMin);
+      fanCmd = fanMin + ratio * (fanMax - fanMin);
+    }
+
+    // Rate limiting
+    fanCmd = limitRate(fanCmd, lastFanOut_, dt_s);
+    lastFanOut_ = fanOut_ = fanCmd;
+    fan_->setPercent(fanOut_);
+
+    // Während Trocknung: Stepper/LED-Abstandsregelung DEAKTIVIERT
+    // Motor bleibt aus, egal ob Tür offen/zu
+    return true;
+  }
 
   // 2) VPD (innen) & Taupunkte
   vpdIn_ = computeVpd(tIn_, rhIn_);
@@ -333,11 +430,13 @@ bool PlantCtrl::update() {
   // FIX: Heat-Emergency BEFORE humid-block - bei Hitze trotzdem kuehlen
   const bool heatEmergency = (tIn_ > (maxTemp_ + 0.5f));
   if (!heatEmergency && blockOutsideHumid_ && (!isnan(dpIn_) && !isnan(dpOut_)) && (dpOut_ >= dpIn_ + dpHumidHyst_)) {
-    float fanCmd = 0.0f;
+    // Mindest-Luftwechsel beibehalten (15%) für CO2-Nachschub, auch wenn außen feuchter
+    // Kleine Box braucht kontinuierlichen Luftaustausch für Pflanzenstoffwechsel
+    float fanCmd = 15.0f; // war 0.0f - vollständige Blockade riskiert CO2-Mangel
     fanCmd = limitRate(fanCmd, lastFanOut_, dt_s);
     lastFanOut_ = fanOut_ = fanCmd;
     fan_->setPercent(fanOut_);
-    // Decay the integrator a bit so that it doesn’t wind up during the block.
+    // Decay the integrator a bit so that it doesn't wind up during the block.
     iTermFan_ *= 0.98f;
     // Still tick the distance controller while the fan is blocked
     distanceTick_(now);
@@ -374,8 +473,8 @@ bool PlantCtrl::update() {
     // commanded per percentage point of RH overshoot and per degree of dewpoint
     // gap deficit.  These values have been chosen empirically and can be
     // exposed via a setter if you wish to fine‑tune them later.
-    const float wRH = 1.5f; // % fan increase per 1 %RH overshoot
-    const float wDP = 3.0f; // % fan increase per 1 °C dewpoint gap deficit
+    const float wRH = 1.2f; // % fan increase per 1 %RH overshoot
+    const float wDP = 2.0f; // % fan increase per 1 °C dewpoint gap deficit
 
     // Compute the additional fan demand.  Start from the minimum fan for this
     // phase and add scaled overshoot contributions.  Note that this may

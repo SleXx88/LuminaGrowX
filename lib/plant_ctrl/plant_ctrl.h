@@ -88,6 +88,15 @@ public:
   // Zentrale Konfiguration anwenden
   void applyLuminaConfig();
 
+  // Trocknungsmodus aktivieren/deaktivieren
+  void setDryingMode(bool active);
+  bool isDryingMode() const { return dryingMode_; }
+  bool isDoorOpen() const { return !lastDoorClosed_; }
+
+  // Grow-Modus aktivieren/deaktivieren
+  void setGrowActive(bool active);
+  bool isGrowActive() const { return growActive_; }
+
   // Periodisches Update; gibt false zurück, wenn Sensorabfrage fehlgeschlagen
   bool update();
 
@@ -181,6 +190,10 @@ private:
   // Sperren wenn außen feuchter
   bool  blockOutsideHumid_  = true;
   float dpHumidHyst_        = 0.5f;
+
+  // Trocknungsmodus
+  bool  dryingMode_         = false;
+  bool  growActive_         = false;
 
   // Tür/Transiente
   float doorDeltaRh_        = 8.0f;

@@ -46,6 +46,7 @@ SHT41Ctrl sht_in;
 SHT41Ctrl sht_out;
 GP8211Ctrl dac;
 FanCtrl fan;
+FanCtrl fan2;
 ToFCtrl tof;
 
 // Stepper aus zentraler Config
@@ -101,7 +102,7 @@ static void printPos(StepperCtrl& s, const char* tag) {
 void setup()
 {
   Serial.begin(115200);
-  delay(500);
+  delay(2000);
   Serial.printf("[FW] Version %s (%s %s)\n", FW_VERSION, __DATE__, __TIME__);
   Serial.println(F("[INIT] Setup startet..."));
 
@@ -115,15 +116,27 @@ void setup()
   health::set_i2c0(true);
   health::set_i2c1(true);
 
-  // Fan
+  // Fan 1
   FanCtrl::Config cfg;
-  cfg.pwmPin = FAN_PWM_PIN;
+  cfg.pwmPin = lumina::pins::FAN_PWM;
   cfg.ledcChannel = 0;
   cfg.pwmFreq = 25000;
   cfg.resolutionBits = 8;
   cfg.invert = false;
+  cfg.tachoPin = lumina::pins::FAN_TACHO; 
   fan.begin(cfg);
   fan.setPercent(0);
+
+  // Fan 2 (zusätzlich)
+  FanCtrl::Config cfg2;
+  cfg2.pwmPin = lumina::pins::FAN2_PWM;
+  cfg2.ledcChannel = 1; // Wichtig: Anderer Channel!
+  cfg2.pwmFreq = 25000;
+  cfg2.resolutionBits = 8;
+  cfg2.invert = false;
+  cfg2.tachoPin = lumina::pins::FAN2_TACHO;
+  fan2.begin(cfg2);
+  fan2.setPercent(0);
 
   // LED Initialisierung (GP8211)
   if (!dac.begin(Wire1)) {
@@ -187,7 +200,7 @@ void setup()
   // ===== 4) Stepper + (optional) Homing/Kalibrierung =====
   step.begin();
   // Debugging aktivieren/deaktivieren
-  step.enableDebug(true);
+  step.enableDebug(false);
   // Log-Intervall für Debug-Moves setzen (ms)
   step.setDebugMoveLogInterval(100);
 
@@ -275,8 +288,20 @@ void setup()
     net.begin(forceAP, "luminagrowx", &rtc);
   }
   web.begin(&controller, &rtc, &net);
-  // Hardware-Referenzen für Setup/Tests an WebCtrl geben (inkl. SHT41)
-  web.setHardware(&dac, &fan, &step, &tof, &sht_in, &sht_out);
+  // Hardware-Referenzen für Setup/Tests an WebCtrl geben (inkl. SHT41, Fan2)
+  web.setHardware(&dac, &fan, &fan2, &step, &tof, &sht_in, &sht_out);
+
+  // Drying-Status laden und in Controller setzen
+  if (!g_setupMode) {
+    web_ctrl::DryingState dryState;
+    if (web.loadDrying(dryState)) {
+      controller.setDryingMode(dryState.active);
+      if (dryState.active) {
+        Serial.println(F("[INIT] Trocknungsmodus aktiv"));
+      }
+    }
+  }
+
   Serial.println(F("[INIT] Setup beendet!"));
 }
 

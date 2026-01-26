@@ -23,14 +23,19 @@ namespace lumina
 
     // I2C-Bus 2
     constexpr int I2C2_SDA = 20;
-    constexpr int I2C2_SCL = 19;
+    constexpr int I2C2_SCL = 14;
     constexpr uint32_t I2C2_FREQ = 400000; // 400 kHz
 
     // 4-Pin-Lüfter (PWM)
-    constexpr uint8_t FAN_PWM = 2;
+    constexpr uint8_t FAN_PWM = 21;
+    constexpr uint8_t FAN2_PWM = 7;
+    
+    // Tacho-Pins (optional)
+    constexpr int8_t FAN_TACHO = 15;
+    constexpr int8_t FAN2_TACHO = 16;
 
     // ToF (VL53L0X) – XSHUT (optional)
-    constexpr int TOF_XSHUT = 4;
+    constexpr int TOF_XSHUT = 3;
 
     // Stepper / TMC2209
     struct Stepper
@@ -118,11 +123,25 @@ namespace lumina
             {0.0f, 10.0f, 40.0f, 0.80f, 1.10f}    // NightSilent
         },
         // FLOWERING (Ziel 1.2–1.4 kPa, passive Feuchtequellen)
+        // FanMax erhöht für bessere Entfeuchtung bei passivem Einlass
+        // VPD-Range angepasst für realistischere Regelung bei Temp-Schwankungen
         {
-            {90.0f, 20.0f, 70.0f, 1.10f, 1.40f}, // Day (VPD 1.10–1.40), FanMin 15, FanMax 70
-            {0.0f, 20.0f, 70.0f, 1.10f, 1.40f},  // Night, Fan 20/70
-            {0.0f, 10.0f, 50.0f, 1.10f, 1.40f}   // NightSilent, Fan 10/50
+            {90.0f, 20.0f, 90.0f, 1.15f, 1.45f}, // Day - FanMax 90% (war 70), VPD 1.15-1.45
+            {0.0f, 20.0f, 80.0f, 1.15f, 1.45f},  // Night - FanMax 80% (war 70)
+            {0.0f, 10.0f, 60.0f, 1.15f, 1.45f}   // NightSilent - FanMax 60% (war 50)
         }};
+  }
+
+  // --- Drying mode parameters ---
+  namespace drying
+  {
+    // Trocknung: 14 Tage (fest), 45-55% RH, LED 0%, mindestens 20% Lüfter
+    constexpr uint16_t DURATION_DAYS = 14;
+    constexpr float TARGET_RH_MIN = 45.0f;
+    constexpr float TARGET_RH_MAX = 55.0f;
+    constexpr float LED_PERCENT = 0.0f;
+    constexpr float FAN_MIN_PERCENT = 20.0f;
+    constexpr float FAN_MAX_PERCENT = 100.0f;
   }
 
   // --- Plant distance / door / ToF parameters ---
@@ -219,13 +238,14 @@ namespace lumina
       uint32_t hp_cooldown_ms;     // Mindestverweilzeit nach HP-Exit
     };
 
-    // Sanftere, schnellere Defaults für höhere Update-Rate, plus Schimmelpräventions-Parameter
+    // Konservative Parameter für träge Systeme (kleine Box, hohe Totzeit)
+    // Kleine Box (160L) mit passivem Einlass reagiert langsam -> niedrige Verstärkung nötig
     constexpr Params PARAMS{
-        /*Kp*/ 8.0f,
-        /*Ki*/ 0.030f,             // (%/s)/kPa
-        /*deadband_kPa*/ 0.08f,
-        /*rate_limit_pct_s*/ 3.0f,
-        /*ema_alpha*/ 0.30f,
+        /*Kp*/ 4.0f,               // Halbiert für träges System (war 8.0)
+        /*Ki*/ 0.010f,             // Stark reduziert (war 0.030) - Totzeit vermeidet Windup
+        /*deadband_kPa*/ 0.12f,    // Vergrößert für Stabilität (war 0.08)
+        /*rate_limit_pct_s*/ 1.5f, // Langsamer (war 3.0) - System braucht Zeit zu reagieren
+        /*ema_alpha*/ 0.15f,       // Mehr Glättung (war 0.30) gegen Sensorrauschen
 
         /*outside_block*/ true,         // Lüfter blockieren wenn außen feuchter
         /*dp_hyst_C*/ 0.5f,             // Hysterese für Taupunktvergleich

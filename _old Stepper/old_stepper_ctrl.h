@@ -1,12 +1,16 @@
 #pragma once
 #include <Arduino.h>
-#include <TMCTiny.h>
+#include <TMCStepper.h>
+#include <FastAccelStepper.h>
 
 /*
-  StepperCtrl – ESP32-S3 + TMC2209 (via TMCTiny)
+  StepperCtrl – ESP32-S3 + TMC2209 (Adafruit 0,11 Ω) + FastAccelStepper (ISR/RMT)
   -------------------------------------------------------------------------------
-  - Replaces TMCStepper and FastAccelStepper with local TMCTiny lib.
-  - Maintains the same high-level API.
+  - Nicht-blockierende Zustandsmaschine (tick()-basiert) – Schrittimpulse über ISR
+  - Sensorloses Homing über SG_RESULT (Baseline + EMA + Mindestweg + Backoff)
+  - Softlimits (0 .. max_travel_mm), logisch ↔ motorisch zuordenbar
+  - Komfort-API: home/rehome, goTop/goBottom, moveUp/moveDown, moveTo, jogUp/jogDown/jogStop
+  - Debug-Layer mit aussagekräftigen Logs (Homing, Position, Ziel, Softlimits, Jog)
 */
 
 struct StepperPins {
@@ -36,17 +40,17 @@ struct TMC2209Config {
   uint8_t driver_addr   = 0b00;
   uint16_t irun_mA      = 500;
   uint16_t ihold_mA     = 100;
-  uint8_t  sg_thrs_diag = 240;   // TMCTiny SGTHRS (0..255). Lower = less sensitive.
+  uint8_t  sg_thrs_diag = 240;   // DIAG nur (Fehler), NICHT Stall
 };
 
 struct HomingParams {
   float    speed_fast_hz     = 2500.0f;
-  float    speed_slow_hz     = 1200.0f;
+  float    speed_slow_hz     = 1200.0f;  // Rückfahrt
   float    backoff_mm        = 3.0f;
   uint32_t sg_ignore_ms      = 50;
   uint32_t sg_poll_ms        = 10;
   uint32_t sg_baseline_ms    = 200;
-  uint16_t sg_abs_thr        = 80;
+  uint16_t sg_abs_thr        = 80;        // 0=aus
   float    sg_drop_pct       = 0.30f;
   float    min_stall_mm      = 3.0f;
 };
@@ -57,11 +61,10 @@ struct SpeedTable {
 
 struct StepperStatus {
   float position_mm = 0.0f;
-  bool  diag        = false;
+  bool  diag        = false;  // Treiberfehler-Pin
   bool  isMoving    = false;
   bool  isHoming    = false;
-  bool  lastOpDone  = false;
-  bool  uart_ok     = false;
+  bool  lastOpDone  = false;  // letzte Ziel-/Jog-/Homing-Op abgeschlossen?
 };
 
 class StepperCtrl {
@@ -73,41 +76,56 @@ public:
               const HomingParams& hp = HomingParams(),
               const SpeedTable& spd = SpeedTable());
 
+  // Grundlaufzeit
   void begin();
   void tick();
-  bool testConnection(); // New method
 
+  // --- Komfort-API (empfohlen) ---
+  // Homing: Startet/überwacht Homing. Liefert true, sobald abgeschlossen.
   bool startHoming();
   inline bool home() { return startHoming(); }
+
+  // Homing zurücksetzen (danach kann erneut gehomed werden)
   void resetHoming();
   inline void rehome() { resetHoming(); }
 
-  std::pair<float,bool> goTop(uint8_t speedLevel);
-  std::pair<float,bool> goBottom(uint8_t speedLevel);
+  // Endlagen (Softlimits)
+  std::pair<float,bool> goTop(uint8_t speedLevel);    // -> max_travel_mm
+  std::pair<float,bool> goBottom(uint8_t speedLevel); // -> 0 mm
+
+  // Relative Fahrten
   std::pair<float,bool> moveUp(float mm, uint8_t speedLevel);
   std::pair<float,bool> moveDown(float mm, uint8_t speedLevel);
+
+  // Absolute Fahrt
   std::pair<float,bool> moveTo(float pos_mm, uint8_t speedLevel);
 
+  // Jog (Dauergeschwindigkeit, bis jogStop())
   void jogUp(uint8_t speedLevel);
   void jogDown(uint8_t speedLevel);
   void jogStop();
+
+  // Sofort stoppen
   void stop();
 
+  // Status/Config
   StepperStatus status() const;
   float getPositionMm() const;
   void  enableDebug(bool on);
-  void  setDebugMoveLogInterval(uint16_t ms);
+  void  setDebugMoveLogInterval(uint16_t ms); // Standard 100 ms
   void  setCurrents(uint16_t irun_mA, uint16_t ihold_mA);
   void  setMicrosteps(uint8_t microsteps);
-  void  setAxisUpDir(int axis_up_dir);
+  void  setAxisUpDir(int axis_up_dir /* +1 oder -1 */);
   void  setMaxTravelMm(float max_travel_mm);
 
-  // Legacy/Technical API
+  // --- Technische API (weiter verfügbar) ---
+  // (Bleibt für Kompatibilität, die Komfort-Wrapper sind einfacher.)
   std::pair<float,bool> goToEnd(int logicalDir, uint8_t speedLevel);
   std::pair<float,bool> moveBy(int logicalDir, float mm, uint8_t speedLevel);
 
 private:
   enum class Mode { IDLE, CONTINUOUS, GOTO, HOMING };
+  // Neuer PRE_BACKOFF Zustand: fahre 3mm runter vor schnellem Homing
   enum class HomeState { IDLE, PRE_BACKOFF, FAST, BACKOFF, DONE };
 
   inline long  mmToSteps(float mm) const;
@@ -121,15 +139,16 @@ private:
   void updateHoming_();
   void enforceSoftLimits_();
 
+  // Starte eine kontinuierliche Bewegung in gegebener logischer Richtung mit gegebener Geschwindigkeit.
+  // Wenn keepMode true ist, wird der mode_ nicht geändert (nützlich beim Homing),
+  // andernfalls wird Mode::CONTINUOUS gesetzt.
   void startContinuousLogical_(float speedHz, int logicalDir, bool keepMode = false);
   void moveRelativeLogicalMM_(float mmLogical, float maxHz);
   void moveRelativeMM_motor_(float mm, float maxHz);
   void moveToAbsMM_(float mm, float maxHz);
-  void homeMoveRelativeMM_(float mmLogical, float maxHz);
-  void recomputeSoftLimits_();
-  void debugPrintLimits() const;
 
 private:
+  // Konfig
   StepperPins       p_;
   StepperKinematics k_;
   StepperLimits     l_;
@@ -137,10 +156,11 @@ private:
   HomingParams      h_;
   SpeedTable        s_;
 
-  // TMCTiny Implementation
-  TMCTiny::TMCTinyStepper stepper_;
-  
-  bool debug_ = false;
+  // Laufzeit
+  TMC2209Stepper          driver_;
+  FastAccelStepperEngine  engine_;
+  FastAccelStepper*       fas_ = nullptr;
+  bool                    debug_ = false;
 
   Mode      mode_         = Mode::IDLE;
   HomeState hState_       = HomeState::IDLE;
@@ -154,16 +174,22 @@ private:
   long      softMaxSteps_ = 0;
   long      homingStartSteps_ = 0;
 
-  int       AXIS_UP_DIR_  = -1;
-  int       homingDirLogical_ = -1;
+  int       AXIS_UP_DIR_  = +1; // Standard: oben ist Motor-
+  int       homingDirLogical_ = +1; // Homing in logischer +1 Richtung
   bool      lastOpDone_   = false;
   bool      homingFinished_ = false;
   bool      homingBackoffActive_ = false;
 
+  // Debug: Positions-Logs drosseln
   uint32_t  lastDebugPosMs_ = 0;
   uint16_t  debugMoveLogIntervalMs_ = 100;
-  uint32_t  lastMotorActivityMs_ = 0;
 
+  // DIAG (Fehler) – ISR
   static volatile bool diagTriggered_;
   static void IRAM_ATTR onDiagRiseISR_();
+
+  // intern: Homing-Backoff ohne Mode-Wechsel
+  void homeMoveRelativeMM_(float mmLogical, float maxHz);
+  void recomputeSoftLimits_();   // setzt softMinSteps_ / softMaxSteps_ abhängig von AXIS_UP_DIR_
+  void debugPrintLimits() const;
 };

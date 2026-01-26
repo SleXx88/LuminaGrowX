@@ -22,6 +22,7 @@ using net_ctrl::NetCtrl;
 
 static const char* APP_CFG_PATH   = "/cfg/app.json";
 static const char* GROW_CFG_PATH  = "/cfg/grow.json";
+static const char* DRYING_CFG_PATH= "/cfg/drying.json";
 static const char* NOTIFY_CFG_PATH= "/cfg/notify.json";
 static const char* UPDATE_CFG_PATH= "/cfg/update.json";
 // Version kommt aus include/version.h (FW_VERSION)
@@ -72,6 +73,17 @@ bool WebCtrl::saveGrow(const GrowState& g) {
   JsonDocument doc; doc["started"] = g.started; doc["start_epoch"] = g.start_epoch; doc["total_days"] = g.total_days; String out; serializeJson(doc, out);
   bool ok = writeTextFile(GROW_CFG_PATH, out); if (ok) grow_ = g; return ok;
 }
+bool WebCtrl::loadDrying(DryingState& out) {
+  String s; if (!readTextFile(DRYING_CFG_PATH, s)) return false;
+  JsonDocument doc; if (deserializeJson(doc, s)) return false;
+  out.active = doc["active"].as<bool>();
+  out.start_epoch = doc["start_epoch"].as<uint32_t>();
+  drying_ = out; return true;
+}
+bool WebCtrl::saveDrying(const DryingState& d) {
+  JsonDocument doc; doc["active"] = d.active; doc["start_epoch"] = d.start_epoch; String out; serializeJson(doc, out);
+  bool ok = writeTextFile(DRYING_CFG_PATH, out); if (ok) drying_ = d; return ok;
+}
 bool WebCtrl::loadNotify(NotifyCfg& out) {
   String s; if (!readTextFile(NOTIFY_CFG_PATH, s)) return false;
   JsonDocument doc; if (deserializeJson(doc, s)) return false;
@@ -91,7 +103,17 @@ void WebCtrl::begin(plant_ctrl::PlantCtrl* ctrl, RTC_Ctrl* rtc, NetCtrl* net) {
   ctrl_ = ctrl; rtc_ = rtc; net_ = net;
   AppCfg tmpA; loadAppCfg(tmpA);
   GrowState tmpG; loadGrow(tmpG);
+  grow_ = tmpG;
+  DryingState tmpD; loadDrying(tmpD);
+  drying_ = tmpD;
   NotifyCfg tmpN; loadNotify(tmpN);
+  notify_ = tmpN;
+
+  // Initialen Grow/Drying-Status an PlantCtrl weiterleiten
+  if (ctrl_) {
+    ctrl_->setGrowActive(grow_.started);
+    ctrl_->setDryingMode(drying_.active);
+  }
 
   ws_.onEvent([this](AsyncWebSocket* wss, AsyncWebSocketClient* c, AwsEventType t, void* arg, uint8_t* data, size_t len) {
     if (t == WS_EVT_CONNECT) { c->text(makeStatusJson_()); }
@@ -106,8 +128,8 @@ void WebCtrl::begin(plant_ctrl::PlantCtrl* ctrl, RTC_Ctrl* rtc, NetCtrl* net) {
   http_.begin();
 }
 
-void WebCtrl::setHardware(GP8211Ctrl* dac, FanCtrl* fan, StepperCtrl* stepper, ToFCtrl* tof, SHT41Ctrl* shtIn, SHT41Ctrl* shtOut) {
-  dac_ = dac; fan_ = fan; step_ = stepper; tof_ = tof; shtIn_ = shtIn; shtOut_ = shtOut;
+void WebCtrl::setHardware(GP8211Ctrl* dac, FanCtrl* fan, FanCtrl* fan2, StepperCtrl* stepper, ToFCtrl* tof, SHT41Ctrl* shtIn, SHT41Ctrl* shtOut) {
+  dac_ = dac; fan_ = fan; fan2_ = fan2; step_ = stepper; tof_ = tof; shtIn_ = shtIn; shtOut_ = shtOut;
 }
 
 void WebCtrl::loop() {
@@ -116,6 +138,20 @@ void WebCtrl::loop() {
     if (net_) net_->probeInternet();
     nextProbeAt_ = now + 60000;
   }
+
+  // System-Zeit aus RTC setzen wenn NTP nicht verfügbar
+  static bool systemTimeSetFromRTC = false;
+  if (!systemTimeSetFromRTC && rtc_) {
+    time_t tnow = time(nullptr);
+    // Wenn Systemzeit noch nicht gesetzt (vor 2023), aus RTC initialisieren
+    if (tnow < 1700000000) {
+      if (syncSystemFromRTC_()) {
+        systemTimeSetFromRTC = true;
+        Serial.println(F("[WEB] Systemzeit aus RTC initialisiert"));
+      }
+    }
+  }
+
   // Periodische RTC-Synchronisierung: einmal nach erstem Internet (SNTP) und danach täglich gegen 03:05 Lokalzeit
   if (net_ && net_->internetOK() && rtc_) {
     time_t tnow = time(nullptr);
@@ -206,6 +242,12 @@ void WebCtrl::setupRoutes_() {
              bool ok=false; bool on = doc["on"].as<bool>(); if (fan_) { fan_->setPercent(on?100.0f:0.0f); ok=true; }
              JsonDocument resp; resp["ok"]=ok; String out; serializeJson(resp, out); req->send(ok?200:500, "application/json", out);
            });
+  http_.on("/api/fan2", HTTP_POST, [](AsyncWebServerRequest*){}, NULL,
+           [this](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t, size_t){
+             JsonDocument doc; if (deserializeJson(doc, data, len)) { req->send(400, "application/json", "{\"error\":\"bad json\"}"); return; }
+             bool ok=false; bool on = doc["on"].as<bool>(); if (fan2_) { fan2_->setPercent(on?100.0f:0.0f); ok=true; }
+             JsonDocument resp; resp["ok"]=ok; String out; serializeJson(resp, out); req->send(ok?200:500, "application/json", out);
+           });
   http_.on("/api/stepper/jog", HTTP_POST, [](AsyncWebServerRequest*){}, NULL,
            [this](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t, size_t){
              JsonDocument doc; if (deserializeJson(doc, data, len)) { req->send(400, "application/json", "{\"error\":\"bad json\"}"); return; }
@@ -218,7 +260,7 @@ void WebCtrl::setupRoutes_() {
     JsonDocument resp; resp["ok"]=ok; String out; serializeJson(resp, out); req->send(ok?200:500, "application/json", out);
   });
   http_.on("/api/stepper/status", HTTP_GET, [this](AsyncWebServerRequest* req){
-    JsonDocument resp; bool ok=false; if (step_) { auto st=step_->status(); ok=true; resp["ok"]=true; resp["pos_mm"]=st.position_mm; resp["moving"]=st.isMoving; resp["homing"]=st.isHoming; resp["lastDone"]=st.lastOpDone; }
+    JsonDocument resp; bool ok=false; if (step_) { auto st=step_->status(); ok=true; resp["ok"]=true; resp["pos_mm"]=st.position_mm; resp["moving"]=st.isMoving; resp["homing"]=st.isHoming; resp["lastDone"]=st.lastOpDone; resp["uart_ok"]=st.uart_ok; }
     String out; serializeJson(resp, out); req->send(ok?200:500, "application/json", out);
   });
   http_.on("/api/setup/done", HTTP_POST, [this](AsyncWebServerRequest* req){
@@ -229,6 +271,16 @@ void WebCtrl::setupRoutes_() {
       if (fw) { fw.printf("%d\n", (int)tof_->getOffsetMm()); fw.close(); }
     }
     bool ok=setup_flag::set_done(true); if (ok) rebootAt_ = millis()+800; req->send(ok?202:500, "application/json", ok?"{\"ok\":true}":"{\"ok\":false}");
+  });
+  http_.on("/api/setup/reset", HTTP_POST, [this](AsyncWebServerRequest* req){
+    // Setup-Flag zurücksetzen und Neustart auslösen
+    bool ok = setup_flag::set_done(false);
+    if (ok) {
+      rebootAt_ = millis() + 800;
+      req->send(202, "application/json", "{\"ok\":true}");
+    } else {
+      req->send(500, "application/json", "{\"ok\":false}");
+    }
   });
   http_.on("/api/setup/abort", HTTP_POST, [this](AsyncWebServerRequest* req){ req->send(200, "application/json", "{\"ok\":true}"); });
   // Türstatus
@@ -420,13 +472,48 @@ void WebCtrl::setupRoutes_() {
              String action = String((const char*)doc["action"]);
              time_t now = time(nullptr);
              if (action == "start") {
+               // Prüfen ob Trocknung aktiv ist
+               if (drying_.active) {
+                 req->send(400, "application/json", "{\"error\":\"Drying mode active\"}");
+                 return;
+               }
                grow_.started = true; grow_.start_epoch = (uint32_t)now;
                if (!doc["total_days"].isNull()) grow_.total_days = (uint16_t)doc["total_days"].as<uint16_t>();
                saveGrow(grow_);
+               if (ctrl_) ctrl_->setGrowActive(true);
                req->send(200, "application/json", "{\"ok\":true}");
                if (ws_.count() > 0) ws_.textAll(makeStatusJson_());
              } else if (action == "stop") {
                grow_.started = false; grow_.start_epoch = 0; saveGrow(grow_);
+               if (ctrl_) ctrl_->setGrowActive(false);
+               req->send(200, "application/json", "{\"ok\":true}");
+               if (ws_.count() > 0) ws_.textAll(makeStatusJson_());
+             } else {
+               req->send(400, "application/json", "{\"error\":\"unknown action\"}");
+             }
+           });
+
+  http_.on("/api/drying", HTTP_POST, [](AsyncWebServerRequest*){}, NULL,
+           [this](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t, size_t){
+             JsonDocument doc; if (deserializeJson(doc, data, len)) { req->send(400, "application/json", "{\"error\":\"bad json\"}"); return; }
+             String action = String((const char*)doc["action"]);
+             time_t now = time(nullptr);
+             if (action == "start") {
+               // Prüfen ob Grow aktiv ist
+               if (grow_.started) {
+                 req->send(400, "application/json", "{\"error\":\"Grow mode active\"}");
+                 return;
+               }
+               drying_.active = true; drying_.start_epoch = (uint32_t)now;
+               saveDrying(drying_);
+               // PlantCtrl über Trocknungsmodus informieren
+               if (ctrl_) ctrl_->setDryingMode(true);
+               req->send(200, "application/json", "{\"ok\":true}");
+               if (ws_.count() > 0) ws_.textAll(makeStatusJson_());
+             } else if (action == "stop") {
+               drying_.active = false; drying_.start_epoch = 0; saveDrying(drying_);
+               // PlantCtrl Trocknungsmodus beenden
+               if (ctrl_) ctrl_->setDryingMode(false);
                req->send(200, "application/json", "{\"ok\":true}");
                if (ws_.count() > 0) ws_.textAll(makeStatusJson_());
              } else {
@@ -480,6 +567,12 @@ String WebCtrl::makeSetupStatusJson_() {
     doc["tof_mm"] = mm;
     doc["tof_offset"] = (int)tof_->getOffsetMm();
   }
+  if (fan_) {
+    doc["fan_rpm"] = fan_->getRPM();
+  }
+  if (fan2_) {
+    doc["fan2_rpm"] = fan2_->getRPM();
+  }
   if (step_) {
     auto st = step_->status();
     JsonObject s = doc["stepper"].to<JsonObject>();
@@ -487,6 +580,7 @@ String WebCtrl::makeSetupStatusJson_() {
     s["moving"] = st.isMoving;
     s["homing"] = st.isHoming;
     s["lastDone"] = st.lastOpDone;
+    s["uart_ok"] = st.uart_ok;
   }
   String out; serializeJson(doc, out); return out;
 }
@@ -501,6 +595,30 @@ bool WebCtrl::syncRTCFromSystem_() {
            tmL.tm_mday, tmL.tm_mon + 1, tmL.tm_year + 1900,
            tmL.tm_hour, tmL.tm_min, tmL.tm_sec);
   return rtc_->writeTimeFromString(String(buf));
+}
+
+bool WebCtrl::syncSystemFromRTC_() {
+  if (!rtc_) return false;
+  uint16_t y; uint8_t mo, d, hh, mi, ss;
+  if (!rtc_->readComponents(y, mo, d, hh, mi, ss)) return false;
+
+  // Konvertiere RTC-Zeit zu Unix-Timestamp
+  struct tm tmRTC = {0};
+  tmRTC.tm_year = y - 1900;
+  tmRTC.tm_mon = mo - 1;
+  tmRTC.tm_mday = d;
+  tmRTC.tm_hour = hh;
+  tmRTC.tm_min = mi;
+  tmRTC.tm_sec = ss;
+  tmRTC.tm_isdst = -1; // Auto-DST
+
+  time_t rtcTime = mktime(&tmRTC);
+  if (rtcTime == -1) return false;
+
+  // Setze Systemzeit
+  struct timeval tv = { .tv_sec = rtcTime, .tv_usec = 0 };
+  settimeofday(&tv, nullptr);
+  return true;
 }
 
 static String fmtDateTime_local(time_t t) {
@@ -527,8 +645,8 @@ String WebCtrl::makeStatusJson_() {
       struct tm tmL;
       localtime_r(&now, &tmL);
       char buf[24];
-      snprintf(buf, sizeof(buf), "%02d-%02d-%04d %02d-%02d-%02d",
-               tmL.tm_mday, tmL.tm_mon + 1, tmL.tm_year + 1900,
+      snprintf(buf, sizeof(buf), "%02d.%02d.%02d %02d:%02d:%02d",
+               tmL.tm_mday, tmL.tm_mon + 1, (tmL.tm_year + 1900) % 100,
                tmL.tm_hour, tmL.tm_min, tmL.tm_sec);
       tstr = String(buf);
     } else {
@@ -558,12 +676,36 @@ String WebCtrl::makeStatusJson_() {
   doc["vpd_kpa"] = round1((float)vpd);
   doc["temp_out_c"] = round1(tOut);
   doc["humi_out_rh"] = round1(rhOut);
+
+  // Taupunkt berechnen (Magnus-Formel)
+  float dewC = NAN;
+  if (!isnan(tIn) && !isnan(rhIn) && rhIn > 0.0f) {
+    const float a = 17.27f, b = 237.7f;
+    float gamma = (a * tIn) / (b + tIn) + logf(rhIn / 100.0f);
+    dewC = (b * gamma) / (a - gamma);
+  }
+  doc["dew_c"] = round1(dewC);
+
   // Actuators
   float ledPct = ctrl_ ? ctrl_->currentLedPercentEffective() : 0.0f;
   float fanPct = ctrl_ ? ctrl_->currentFanPercent() : 0.0f;
+  int fanRpm = fan_ ? fan_->getRPM() : 0;
+  int fan2Rpm = fan2_ ? fan2_->getRPM() : 0;
+  float fan2Pct = fan2_ ? fan2_->getPercent() : 0.0f;
+  
   doc["light_on"] = ledPct > 0.5f;
+  doc["light_pct"] = round1(ledPct);
   doc["fan_on"]   = fanPct > 0.5f;
+  doc["fan_pct"]  = round1(fanPct);
+  doc["fan_rpm"]  = fanRpm;
+  doc["fan2_on"]  = fan2Pct > 0.5f;
+  doc["fan2_pct"] = round1(fan2Pct);
+  doc["fan2_rpm"] = fan2Rpm;
   doc["pump_on"]  = false; // kein Pumpen-State integriert
+
+  // Tür-Status
+  bool doorOpen = ctrl_ ? ctrl_->isDoorOpen() : false;
+  doc["door_open"] = doorOpen;
 
   JsonObject healthObj = doc["health"].to<JsonObject>();
   const auto& hs = health::state();
@@ -600,6 +742,21 @@ String WebCtrl::makeStatusJson_() {
   const char* phase = "";
   if (day > 0) { if (day <= 14) phase = "Keimung/Seedling"; else if (day <= 35) phase = "Vegetationsphase"; else phase = "BlÃ¼tephase"; }
   g["phase"] = phase;
+
+  // Drying block
+  JsonObject dry = doc["drying"].to<JsonObject>();
+  dry["active"] = drying_.active;
+  dry["start_epoch"] = drying_.active ? drying_.start_epoch : 0;
+  uint16_t dryDay = 0;
+  if (drying_.active && drying_.start_epoch) {
+    time_t now = time(nullptr);
+    if (now >= drying_.start_epoch) {
+      uint32_t days = (uint32_t)((now - drying_.start_epoch)/86400UL) + 1;
+      if (days > lumina::drying::DURATION_DAYS) days = lumina::drying::DURATION_DAYS;
+      dryDay = (uint16_t)days;
+    }
+  }
+  dry["day"] = dryDay;
 
   // Notify (mask apikey)
   JsonObject ntf = doc["notify"].to<JsonObject>();

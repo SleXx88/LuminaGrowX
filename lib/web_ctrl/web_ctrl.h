@@ -20,6 +20,7 @@ namespace web_ctrl {
 
 struct AppCfg { String seed = "Northern Lights"; };
 struct GrowState { bool started=false; uint32_t start_epoch=0; uint16_t total_days=90; };
+struct DryingState { bool active=false; uint32_t start_epoch=0; };
 struct NotifyCfg { bool enabled=false; String phone; String apikey; };
 
 class WebCtrl {
@@ -31,7 +32,7 @@ public:
              net_ctrl::NetCtrl* net);
 
   // Optionale Hardware-Referenzen für Setup/Tests (LED-DAC, Lüfter, Stepper, ToF)
-  void setHardware(GP8211Ctrl* dac, FanCtrl* fan, StepperCtrl* stepper, ToFCtrl* tof, SHT41Ctrl* shtIn = nullptr, SHT41Ctrl* shtOut = nullptr);
+  void setHardware(GP8211Ctrl* dac, FanCtrl* fan, FanCtrl* fan2, StepperCtrl* stepper, ToFCtrl* tof, SHT41Ctrl* shtIn = nullptr, SHT41Ctrl* shtOut = nullptr);
 
   void loop(); // broadcast status, reboot scheduling, probes
 
@@ -40,6 +41,8 @@ public:
   bool saveAppCfg(const AppCfg& c);
   bool loadGrow(GrowState& out);
   bool saveGrow(const GrowState& g);
+  bool loadDrying(DryingState& out);
+  bool saveDrying(const DryingState& d);
   bool loadNotify(NotifyCfg& out);
   bool saveNotify(const NotifyCfg& n);
 
@@ -89,6 +92,7 @@ private:
   net_ctrl::NetCtrl* net_ = nullptr;
   GP8211Ctrl* dac_ = nullptr;
   FanCtrl* fan_ = nullptr;
+  FanCtrl* fan2_ = nullptr;
   StepperCtrl* step_ = nullptr;
   ToFCtrl* tof_ = nullptr;
   SHT41Ctrl* shtIn_ = nullptr;
@@ -99,6 +103,7 @@ private:
 
   AppCfg app_;
   GrowState grow_;
+  DryingState drying_;
   NotifyCfg notify_;
 
   uint32_t nextPushAt_ = 0;
@@ -108,6 +113,7 @@ private:
   uint32_t lastRtcSyncYMD_ = 0; // YYYYMMDD of last RTC sync
   bool rtcSyncedOnce_ = false;
   bool syncRTCFromSystem_();
+  bool syncSystemFromRTC_();
 
   // Temporary file for package upload/download
   String pkgTempPath_ = "/.update_pkg.tar";

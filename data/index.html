@@ -116,8 +116,6 @@
       .grow-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-dim); }
       .progress { height: 10px; background: rgba(255, 255, 255, 0.12); border-radius: 999px; overflow: hidden; border: 1px solid var(--border); }
       .progress > span { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
-      /* Aktionen am Seitenende (über dem Footer) */
-      .page-actions { display: flex; gap: 0.5rem; justify-content: flex-end; padding: 1rem; margin-top: auto; }
     </style>
   </head>
   <body>
@@ -126,10 +124,8 @@
         <ul>
           <li>
             <h1 class="brand"><span class="brand-word">LISA</span><span class="brand-pro">pro</span></h1>
-                  <p class="subtitle">Automatisierte Growbox</p>
-      <div id="healthBanner" class="health-banner ok"></div>
+            <p class="subtitle">Automatisierte Growbox</p>
           </li>
-          
         </ul>
         <ul class="nav-status">
           <li class="nav-status-row">
@@ -143,11 +139,9 @@
           <li class="nav-status-row">
             <span class="badge" title="Datum/Uhrzeit"><span id="ntpTop" class="mono">--</span></span>
           </li>
-          <li class="nav-status-row">
-            <span class="badge" title="Raumtemperatur (SHT OUT)"><span id="tempIcon" class="icon"></span><span id="tempText" class="mono">--.- °C</span></span>
-          </li>
         </ul>
       </nav>
+      <div id="healthBanner" class="health-banner ok"></div>
     </header>
 
     <main class="container">
@@ -161,53 +155,158 @@
               <span>Start: <strong><span id="growStart">-</span></strong></span>
             </div>
             <div class="progress"><span id="growProgress"></span></div>
-            <div id="seedRow">Sorte: <input id="seed" placeholder="Northern Lights" /> <small>Aktuell: <span id="seedNow">-</span></small></div>
             <div style="display: flex; gap: 0.5rem">
-              <button id="toggleGrow" type="button" class="primary">START</button>
-              <button id="btnSeedSave" type="button">Sorte speichern</button>
+              <button id="toggleGrow" type="button">START</button>
+            </div>
+          </div>
+        </article>
+
+        <article>
+          <header><h2>Trocknung</h2></header>
+          <div class="content" style="padding: 1rem; display: grid; gap: 0.8rem">
+            <h3 id="dryTitle" class="grow-title">Nicht aktiv</h3>
+            <div class="grow-meta">
+              <span>Dauer: <strong>14 Tage</strong></span>
+              <span>Start: <strong><span id="dryStart">-</span></strong></span>
+            </div>
+            <div class="progress"><span id="dryProgress"></span></div>
+            <p style="font-size: 0.9rem; color: var(--text-dim); margin: 0;">
+              <strong>Bedingungen:</strong> 45-55% RH, LED aus, min. 20% Lüfter für Luftaustausch
+            </p>
+            <div style="display: flex; gap: 0.5rem">
+              <button id="toggleDry" type="button">TROCKNUNG STARTEN</button>
             </div>
           </div>
         </article>
 
         <article>
           <header><h2>Live Status</h2></header>
-          <div class="content" style="padding: 1rem">
-            <div class="grid status-grid">
-              <div>
-                <h3>Umgebung</h3>
-                <ul>
-                  <li>Temp: <span class="mono" id="stT">-</span> °C</li>
-                  <li>rF: <span class="mono" id="stH">-</span> %</li>
-                  <li>VPD: <span class="mono" id="stVpd">-</span> kPa</li>
-                </ul>
+          <div class="content" style="padding: 0.75rem; display: grid; gap: 0.75rem;">
+            <!-- Growbox -->
+            <div style="padding: 0.5rem; background: rgba(239, 68, 68, 0.08); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
+              <div style="font-size: 0.75rem; font-weight: 600; color: var(--accent); margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.3rem;">
+                <span style="display: inline-flex; width: 0.9rem; height: 0.9rem; color: var(--accent);" id="iconGrowbox"></span>
+                <span>Growbox</span>
               </div>
-              <div>
-                <h3>Aktoren</h3>
-                <ul>
-                  <li>Licht: <span id="stLight">-</span></li>
-                  <li>Lüfter: <span id="stFan">-</span></li>
-                  <li>Pumpe: <span id="stPump">-</span></li>
-                </ul>
+
+              <!-- Umgebungsdaten -->
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0.5rem; margin-bottom: 0.5rem;">
+                <div style="padding: 0.5rem; background: var(--muted); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
+                  <div style="font-size: 0.7rem; color: var(--text-dim); margin-bottom: 0.15rem;">Temperatur</div>
+                  <div style="font-size: 1.1rem; font-weight: 700; color: var(--text);" class="mono" id="stT">-</div>
+                  <div style="font-size: 0.65rem; color: var(--text-dim);">°C</div>
+                </div>
+                <div style="padding: 0.5rem; background: var(--muted); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
+                  <div style="font-size: 0.7rem; color: var(--text-dim); margin-bottom: 0.15rem;">Luftfeuchte</div>
+                  <div style="font-size: 1.1rem; font-weight: 700; color: var(--text);" class="mono" id="stH">-</div>
+                  <div style="font-size: 0.65rem; color: var(--text-dim);">% rF</div>
+                </div>
+                <div style="padding: 0.5rem; background: var(--muted); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
+                  <div style="font-size: 0.7rem; color: var(--text-dim); margin-bottom: 0.15rem;">VPD</div>
+                  <div style="font-size: 1.1rem; font-weight: 700; color: var(--text);" class="mono" id="stVpd">-</div>
+                  <div style="font-size: 0.65rem; color: var(--text-dim);">kPa</div>
+                </div>
+                <div style="padding: 0.5rem; background: var(--muted); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
+                  <div style="font-size: 0.7rem; color: var(--text-dim); margin-bottom: 0.15rem;">Taupunkt</div>
+                  <div style="font-size: 1.1rem; font-weight: 700; color: var(--text);" class="mono" id="stDew">-</div>
+                  <div style="font-size: 0.65rem; color: var(--text-dim);">°C</div>
+                </div>
+              </div>
+
+              <!-- Aktoren -->
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0.5rem;">
+                <div style="padding: 0.5rem; background: var(--muted); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
+                  <div style="display: flex; align-items: center; gap: 0.3rem; margin-bottom: 0.2rem;">
+                    <span class="dot" id="dotLight"></span>
+                    <div style="font-size: 0.7rem; color: var(--text-dim);">LED</div>
+                  </div>
+                  <div style="font-size: 1rem; font-weight: 700; color: var(--text);" class="mono" id="stLightPct">-</div>
+                  <div style="font-size: 0.65rem; color: var(--text-dim);" id="stLightState">-</div>
+                </div>
+                <div style="padding: 0.5rem; background: var(--muted); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
+                  <div style="display: flex; align-items: center; gap: 0.3rem; margin-bottom: 0.2rem;">
+                    <span class="dot" id="dotFan"></span>
+                    <div style="font-size: 0.7rem; color: var(--text-dim);">Lüfter</div>
+                  </div>
+                  <div style="font-size: 1rem; font-weight: 700; color: var(--text);" class="mono" id="stFanPct">-</div>
+                  <div style="font-size: 0.65rem; color: var(--text-dim);" id="stFanState">-</div>
+                </div>
+                <div style="padding: 0.5rem; background: var(--muted); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
+                  <div style="display: flex; align-items: center; gap: 0.3rem; margin-bottom: 0.2rem;">
+                    <span class="dot" id="dotPump"></span>
+                    <div style="font-size: 0.7rem; color: var(--text-dim);">Pumpe</div>
+                  </div>
+                  <div style="font-size: 1rem; font-weight: 700; color: var(--text);" class="mono" id="stPumpState">AUS</div>
+                </div>
+                <div style="padding: 0.5rem; background: var(--muted); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
+                  <div style="display: flex; align-items: center; gap: 0.3rem; margin-bottom: 0.2rem;">
+                    <span class="dot" id="dotDoor"></span>
+                    <div style="font-size: 0.7rem; color: var(--text-dim);">Tür</div>
+                  </div>
+                  <div style="font-size: 1rem; font-weight: 700; color: var(--text);" class="mono" id="stDoor">-</div>
+                  <div style="font-size: 0.65rem; color: var(--text-dim);">Status</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Umgebungsdaten AUSSEN -->
+            <div style="padding: 0.5rem; background: rgba(59, 130, 246, 0.08); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
+              <div style="font-size: 0.75rem; font-weight: 600; color: #60a5fa; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.3rem;">
+                <span style="display: inline-flex; width: 0.9rem; height: 0.9rem; color: #60a5fa;" id="iconAussen"></span>
+                <span>AUSSEN (Raum)</span>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0.5rem;">
+                <div style="padding: 0.5rem; background: var(--muted); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
+                  <div style="font-size: 0.7rem; color: var(--text-dim); margin-bottom: 0.15rem;">Temperatur</div>
+                  <div style="font-size: 1.1rem; font-weight: 700; color: var(--text);" class="mono" id="stTOut">-</div>
+                  <div style="font-size: 0.65rem; color: var(--text-dim);">°C</div>
+                </div>
+                <div style="padding: 0.5rem; background: var(--muted); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
+                  <div style="font-size: 0.7rem; color: var(--text-dim); margin-bottom: 0.15rem;">Luftfeuchte</div>
+                  <div style="font-size: 1.1rem; font-weight: 700; color: var(--text);" class="mono" id="stHOut">-</div>
+                  <div style="font-size: 0.65rem; color: var(--text-dim);">% rF</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- System -->
+            <div style="padding: 0.5rem; background: rgba(156, 163, 175, 0.08); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
+              <div style="font-size: 0.75rem; font-weight: 600; color: #9ca3af; margin-bottom: 0.4rem;">System</div>
+              <div style="display: grid; gap: 0.5rem;">
+                <div style="padding: 0.5rem; background: var(--muted); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
+                  <div style="font-size: 0.7rem; color: var(--text-dim); margin-bottom: 0.15rem; display: flex; align-items: center; gap: 0.3rem;">
+                    <span style="display: inline-flex; width: 0.7rem; height: 0.7rem; color: var(--text-dim);" id="iconUptime"></span>
+                    <span>Uptime</span>
+                  </div>
+                  <div style="font-size: 1rem; font-weight: 600; color: var(--text);" class="mono" id="stUp">-</div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                  <div style="padding: 0.5rem; background: var(--muted); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
+                    <div style="font-size: 0.7rem; color: var(--text-dim); margin-bottom: 0.15rem; display: flex; align-items: center; gap: 0.3rem;">
+                      <span style="display: inline-flex; width: 0.7rem; height: 0.7rem; color: var(--text-dim);" id="iconIp"></span>
+                      <span>IP-Adresse</span>
+                    </div>
+                    <div style="font-size: 0.9rem; font-weight: 600; color: var(--text);" class="mono" id="stIp">-</div>
+                    <div style="font-size: 0.65rem; color: var(--text-dim); margin-top: 0.15rem;" id="stNet">-</div>
+                  </div>
+                  <div style="padding: 0.5rem; background: var(--muted); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
+                    <div style="font-size: 0.7rem; color: var(--text-dim); margin-bottom: 0.15rem; display: flex; align-items: center; gap: 0.3rem;">
+                      <span style="display: inline-flex; width: 0.7rem; height: 0.7rem; color: var(--text-dim);" id="iconRssi"></span>
+                      <span>RSSI</span>
+                    </div>
+                    <div style="font-size: 0.9rem; font-weight: 600; color: var(--text);" class="mono" id="stRssi">-</div>
+                    <div style="font-size: 0.65rem; color: var(--text-dim); margin-top: 0.15rem;">dBm</div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </article>
 
-        <article>
-          <header><h2>System</h2></header>
-          <div class="content" style="padding: 1rem">
-            <ul>
-              <li>Uptime: <span class="mono" id="stUp">-</span></li>
-              <li>IP: <span class="mono" id="stIp">-</span> (<span id="stNet">-</span>)</li>
-              <li>RSSI: <span class="mono" id="stRssi">-</span> dBm</li>
-            </ul>
-          </div>
-        </article>
-
       </div>
-      <div class="page-actions">
-        <a href="/update" class="button" role="button">Update</a>
+      <div style="display: flex; gap: 0.5rem; padding: 1rem 0; margin-top: auto;">
         <a href="/settings" class="button" role="button">Einstellungen</a>
+        <a href="/update" class="button" role="button">Update</a>
       </div>
     </main>
 
@@ -287,6 +386,11 @@
         wifi: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18"/><path d="M12 3a14 14 0 0 0 0 18"/></svg>',
         mail: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" ry="2"/><path d="M3 7l9 6 9-6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
         thermo: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 14.76V5a2 2 0 1 0-4 0v9.76a4 4 0 1 0 4 0Z"/></svg>',
+        plant: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 22v-9m0 0c-1.5-2-4-3-7-3 0 5 3 7 7 7Zm0 0c1.5-2 4-3 7-3 0 5-3 7-7 7ZM12 13V2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        home: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
+        clock: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        network: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>',
+        signal: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 18v-6m4 6V9m4 9V6m4 12v-9" stroke-linecap="round" stroke-linejoin="round"/></svg>',
       };
       const live = { ws: null, timer: null, lastStatus: null };
       let netDialogOpen = false;
@@ -299,6 +403,7 @@
       function ipv4ok(s) { const parts = (s || "").split(".").map((n) => +n); return (parts.length === 4 && parts.every((n) => Number.isInteger(n) && n >= 0 && n <= 255)); }
       function phoneOk(s) { return /^\+\d{6,16}$/.test((s || "").trim()); }
       function format1(n) { return n == null || isNaN(n) ? "-" : (+n).toFixed(1); }
+      function format0(n) { return n == null || isNaN(n) ? "-" : Math.round(+n).toString(); }
       function formatUptime(sec) {
         if (sec == null || isNaN(sec)) return "-";
         sec = Math.floor(+sec);
@@ -309,8 +414,8 @@
         if (h > 0) return `${h}h ${m}m ${s}s`;
         return `${m}m ${s}s`;
       }
-      function updateToggleButton(started) { $("toggleGrow").textContent = started ? "STOP" : "START"; $("toggleGrow").classList.toggle("primary", !started); }
-      function updateSeedVisibility(started) { const row = $("seedRow"); if (row) row.classList.toggle("hidden", !!started); }
+      function updateToggleButton(started) { $("toggleGrow").textContent = started ? "STOP" : "START"; $("toggleGrow").classList.toggle("primary", started); }
+      function updateDryButton(active) { $("toggleDry").textContent = active ? "TROCKNUNG STOPPEN" : "TROCKNUNG STARTEN"; $("toggleDry").classList.toggle("primary", active); }
 
       function updateStatus(s) {
         live.lastStatus = s;
@@ -329,10 +434,6 @@
           const enabled = !!(s && s.notify && s.notify.enabled);
           waEl.classList.add(enabled ? "ok" : "err");
         }
-        // Temperatur-Badge (SHT OUT)
-        const tEl = $("tempIcon"); if (tEl && !tEl.innerHTML) tEl.innerHTML = icons.thermo;
-        const tTxt = $("tempText");
-        if (tTxt) tTxt.textContent = (s && s.temp_out_c != null && !isNaN(s.temp_out_c)) ? (format1(s.temp_out_c) + " °C") : "--.- °C";
 
         if (s.grow) {
           $("growTitle").textContent = s.grow.started ? ("Tag " + s.grow.day + " - " + (s.grow.phase || "")) : "Noch nicht gestartet";
@@ -342,16 +443,47 @@
           const pct = total > 0 ? Math.min(100, Math.round((day / total) * 100)) : 0;
           $("growProgress").style.width = pct + "%";
           updateToggleButton(s.grow.started);
-          updateSeedVisibility(s.grow.started);
+        }
+        // Trocknung
+        if (s.drying) {
+          const dryActive = !!s.drying.active;
+          $("dryTitle").textContent = dryActive ? ("Tag " + (s.drying.day || 0) + " von 14") : "Nicht aktiv";
+          $("dryStart").textContent = s.drying.start_epoch ? new Date(s.drying.start_epoch * 1000).toLocaleString() : "-";
+          const dryDay = s.drying.day || 0;
+          const dryPct = Math.min(100, Math.round((dryDay / 14) * 100));
+          $("dryProgress").style.width = dryPct + "%";
+          updateDryButton(dryActive);
+          // Gegenseitige Sperre: Grow-Button disabled wenn Trocknung aktiv
+          const growBtn = $("toggleGrow");
+          if (growBtn) {
+            growBtn.disabled = dryActive;
+            if (dryActive) growBtn.title = "Nicht verfügbar während Trocknung";
+            else growBtn.title = "";
+          }
+          // Trocknungs-Button disabled wenn Grow aktiv
+          const dryBtn = $("toggleDry");
+          if (dryBtn && s.grow) {
+            dryBtn.disabled = s.grow.started;
+            if (s.grow.started) dryBtn.title = "Nicht verfügbar während Grow";
+            else dryBtn.title = "";
+          }
         }
         // System/Env/Aktoren
         const up = (typeof s.uptime_s !== 'undefined') ? s.uptime_s : s.uptime;
         $("stUp").textContent = formatUptime(up);
         if ($("stNtp")) $("stNtp").textContent = s.ntp_time || "-";
         const ntpTopEl = document.getElementById("ntpTop"); if (ntpTopEl) ntpTopEl.textContent = s.ntp_time || "--";
+
+        // Umgebung - BOX (Innen)
         $("stT").textContent = format1(s.temp_c);
         $("stH").textContent = format1(s.humi_rh);
         $("stVpd").textContent = format1(s.vpd_kpa);
+        if ($("stDew")) $("stDew").textContent = format1(s.dew_c);
+
+        // Umgebung - AUSSEN (Raum)
+        if ($("stTOut")) $("stTOut").textContent = format1(s.temp_out_c);
+        if ($("stHOut")) $("stHOut").textContent = format1(s.humi_out_rh);
+
         // Firmware im Hero
         const fwTop = document.getElementById('fwTop'); if (fwTop) fwTop.textContent = (s.fw || '-');
         const fwTopUpd = document.getElementById('fwTopUpd');
@@ -363,15 +495,55 @@
             fwTopUpd.style.display = 'none'; fwTopUpd.textContent = '';
           }
         }
-        // Aktoren
-        $("stLight").textContent = s.light_on ? "AN" : "AUS";
-        $("stFan").textContent = s.fan_on ? "AN" : "AUS";
-        $("stPump").textContent = s.pump_on ? "AN" : "AUS";
+
+        // Aktoren - LED
+        const lightOn = !!s.light_on;
+        const lightPct = s.light_pct != null ? s.light_pct : 0;
+        if ($("stLightPct")) $("stLightPct").textContent = format1(lightPct) + " %";
+        if ($("stLightState")) $("stLightState").textContent = lightOn ? "AN" : "AUS";
+        const dotLight = $("dotLight");
+        if (dotLight) {
+          dotLight.classList.remove("ok", "warn", "err");
+          if (lightOn) dotLight.classList.add("ok");
+          else dotLight.classList.add("err");
+        }
+
+        // Aktoren - Lüfter
+        const fanOn = !!s.fan_on;
+        const fanPct = s.fan_pct != null ? s.fan_pct : 0;
+        if ($("stFanPct")) $("stFanPct").textContent = format0(fanPct) + " %";
+        if ($("stFanState")) $("stFanState").textContent = fanOn ? "AN" : "AUS";
+        const dotFan = $("dotFan");
+        if (dotFan) {
+          dotFan.classList.remove("ok", "warn", "err");
+          if (fanOn) dotFan.classList.add("ok");
+          else dotFan.classList.add("err");
+        }
+
+        // Aktoren - Pumpe
+        const pumpOn = !!s.pump_on;
+        if ($("stPumpState")) $("stPumpState").textContent = pumpOn ? "AN" : "AUS";
+        const dotPump = $("dotPump");
+        if (dotPump) {
+          dotPump.classList.remove("ok", "warn", "err");
+          if (pumpOn) dotPump.classList.add("ok");
+          else dotPump.classList.add("err");
+        }
+
+        // Tür
+        const doorOpen = !!s.door_open;
+        if ($("stDoor")) $("stDoor").textContent = doorOpen ? "AUF" : "ZU";
+        const dotDoor = $("dotDoor");
+        if (dotDoor) {
+          dotDoor.classList.remove("ok", "warn", "err");
+          if (doorOpen) dotDoor.classList.add("warn");
+          else dotDoor.classList.add("ok");
+        }
+
         // Netzwerk
         $("stIp").textContent = s.ip || "-";
         $("stNet").textContent = s.wifi_connected ? "verbunden" : "AP-Only";
         $("stRssi").textContent = (s.rssi != null ? s.rssi : "-");
-        if (typeof s.seed !== "undefined") { const sn = $("seedNow"); if (sn) sn.textContent = s.seed || "-"; }
         // Health banner
         const hb = $("healthBanner");
         try {
@@ -443,11 +615,14 @@
         const body = action === "start" && Number.isFinite(total_days) ? { action, total_days } : { action };
         try { await fetch("/api/grow", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); } catch (_) {}
       });
-      // Seed save
-      document.getElementById("btnSeedSave").addEventListener("click", async () => {
-        const seed = (document.getElementById("seed").value || "").trim();
-        try { await fetch("/api/seed", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ seed }) }); showToast("Sorte gespeichert"); } catch (e) { showToast("Fehler beim Speichern: " + e.message); }
+
+      // Trocknung start/stop
+      document.getElementById("toggleDry").addEventListener("click", async () => {
+        const active = !!(live.lastStatus && live.lastStatus.drying && live.lastStatus.drying.active);
+        const action = active ? "stop" : "start";
+        try { await fetch("/api/drying", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) }); } catch (_) {}
       });
+
       async function saveNotify() {
         const enabled = $("notifyEnabled").checked; const phone = $("notifyPhone").value.trim(); const rawKey = $("notifyKey").value.trim();
         const hasSavedKey = !!(live.lastStatus && live.lastStatus.notify && live.lastStatus.notify.apikey === "***");
@@ -495,6 +670,15 @@
         showToastHtml('WLAN gespeichert. Bitte jetzt ins Heimnetz wechseln und <a href="http://luminagrowx.local/" target="_blank">http://luminagrowx.local/</a> aufrufen.');
         try { fetch("/api/network", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); } catch (_) {}
       });
+      // Icons initialisieren
+      function initIcons() {
+        const iconGrowbox = $("iconGrowbox"); if (iconGrowbox) iconGrowbox.innerHTML = icons.plant;
+        const iconAussen = $("iconAussen"); if (iconAussen) iconAussen.innerHTML = icons.home;
+        const iconUptime = $("iconUptime"); if (iconUptime) iconUptime.innerHTML = icons.clock;
+        const iconIp = $("iconIp"); if (iconIp) iconIp.innerHTML = icons.network;
+        const iconRssi = $("iconRssi"); if (iconRssi) iconRssi.innerHTML = icons.signal;
+      }
+      initIcons();
       (async function () { await loadInfo(); startWS(); try { const s = await fetchJSON("/api/status"); updateStatus(s); } catch (_) {} })();
     </script>
   </body>
