@@ -292,7 +292,7 @@ void WebCtrl::setupRoutes_() {
     bool closed=false; 
     int raw=-1; 
     if (pin>=0){ 
-      pinMode(pin, INPUT_PULLUP); // Ensure pin is configured
+      pinMode(pin, INPUT); // External pull-up present
       raw = digitalRead(pin); 
       closed = (raw==LOW); 
     } 
