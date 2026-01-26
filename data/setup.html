@@ -317,44 +317,44 @@
         </div>
       </article>
 
-      <!-- SCHRITT 7: TOF & TÜR -->
+      <!-- SCHRITT 7: ABSTAND (ToF) -->
       <article>
         <header>
-          <h3><span class="step-number">7</span> <span>Abstand & Sicherheit</span></h3>
+          <h3><span class="step-number">7</span> <span>Abstand (ToF)</span></h3>
           <span class="badge" id="b_tof">Sensor</span>
         </header>
         <div class="content">
-          <div class="grid-2" style="gap: 1rem;">
-            <!-- ToF -->
-            <div>
-              <div class="instruction" style="margin-bottom:1rem;">Der Abstandssensor misst die Distanz zur Pflanze. Kalibriere ihn leer.</div>
-              <strong>Abstandssensor (ToF)</strong>
-              <p style="font-size: 0.9rem; margin-top: 0.5rem;">
-                Misst die Entfernung zur Pflanze. Lege das Kalibrier-Hilfsmittel (50mm) flach auf den Sensorboden.
-              </p>
-              <div class="btn-row">
-                <button id="tofCal" type="button" class="primary">Kalibrieren (50mm)</button>
-              </div>
-              <small id="tofMsg">–</small>
-              <div style="margin-top: 0.5rem;">Aktuell gemessen: <strong id="tofLive">-</strong> mm</div>
-              
-              <div class="checklist-box">
-                <strong>Checkliste:</strong>
-                <label><input type="checkbox" id="cb_tof" /> Kalibrierung OK</label>
-              </div>
-            </div>
-            
-            <!-- Tür -->
-            <div style="border-left: 1px solid rgba(255,255,255,0.1); padding-left: 1rem;">
-              <div class="instruction" style="margin-bottom:1rem;">Öffne und schließe die Tür, um den Sensor zu testen.</div>
-              <strong>Tür-Erkennung</strong>
-              <div style="margin: 1rem 0;">Status: <strong id="doorState" style="color: var(--accent);">Unbekannt</strong></div>
-              
-              <div class="checklist-box">
-                <strong>Checkliste:</strong>
-                <label><input type="checkbox" id="cb_door" /> Türstatus wechselt korrekt</label>
-              </div>
-            </div>
+          <div class="instruction">Der Abstandssensor misst die Distanz zur Pflanze. Kalibriere ihn leer.</div>
+          <strong>Abstandssensor (ToF)</strong>
+          <p style="font-size: 0.9rem; margin-top: 0.5rem;">
+            Misst die Entfernung zur Pflanze. Lege das Kalibrier-Hilfsmittel (50mm) flach auf den Sensorboden.
+          </p>
+          <div class="btn-row">
+            <button id="tofCal" type="button" class="primary">Kalibrieren (50mm)</button>
+          </div>
+          <small id="tofMsg">–</small>
+          <div style="margin-top: 0.5rem;">Aktuell gemessen: <strong id="tofLive">-</strong> mm</div>
+          
+          <div class="checklist-box">
+            <strong>Checkliste:</strong>
+            <label><input type="checkbox" id="cb_tof" /> Kalibrierung OK</label>
+          </div>
+        </div>
+      </article>
+
+      <!-- SCHRITT 8: TÜR -->
+      <article>
+        <header>
+          <h3><span class="step-number">8</span> <span>Tür-Erkennung</span></h3>
+        </header>
+        <div class="content">
+          <div class="instruction">Öffne und schließe die Tür, um den Sensor zu testen.</div>
+          <strong>Tür-Kontakt (GPIO 5)</strong>
+          <div style="margin: 1rem 0; font-size: 1.1em;">Status: <strong id="doorState" style="color: var(--accent);">Unbekannt</strong></div>
+          
+          <div class="checklist-box">
+            <strong>Checkliste:</strong>
+            <label><input type="checkbox" id="cb_door" /> Türstatus wechselt korrekt</label>
           </div>
         </div>
       </article>

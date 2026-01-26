@@ -285,7 +285,21 @@ void WebCtrl::setupRoutes_() {
   http_.on("/api/setup/abort", HTTP_POST, [this](AsyncWebServerRequest* req){ req->send(200, "application/json", "{\"ok\":true}"); });
   // Türstatus
   http_.on("/api/door/status", HTTP_GET, [this](AsyncWebServerRequest* req){
-    JsonDocument resp; int pin = lumina::plant::DOOR_SWITCH_PIN; resp["present"] = (pin >= 0); resp["pin"] = pin; bool closed=false; int raw=-1; if (pin>=0){ raw = digitalRead(pin); closed = (raw==LOW); } resp["closed"] = closed; resp["raw"]=raw; String out; serializeJson(resp, out); req->send(200, "application/json", out);
+    JsonDocument resp; 
+    int pin = lumina::plant::DOOR_SWITCH_PIN; 
+    resp["present"] = (pin >= 0); 
+    resp["pin"] = pin; 
+    bool closed=false; 
+    int raw=-1; 
+    if (pin>=0){ 
+      pinMode(pin, INPUT_PULLUP); // Ensure pin is configured
+      raw = digitalRead(pin); 
+      closed = (raw==LOW); 
+    } 
+    resp["closed"] = closed; 
+    resp["raw"]=raw; 
+    String out; serializeJson(resp, out); 
+    req->send(200, "application/json", out);
   });
 
   // FS diagnostics
