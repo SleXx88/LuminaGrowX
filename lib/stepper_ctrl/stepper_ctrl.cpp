@@ -26,6 +26,8 @@ void StepperCtrl::recomputeSoftLimits_()
 
 void StepperCtrl::begin()
 {
+  mutex_ = xSemaphoreCreateMutex();
+
   pinMode(p_.pin_diag, INPUT_PULLUP);
 
   // Initialize TMCTiny Stepper
@@ -135,6 +137,8 @@ void StepperCtrl::setupDriver_()
 
 void StepperCtrl::tick()
 {
+  if (mutex_) xSemaphoreTake(mutex_, portMAX_DELAY);
+
   // --- Auto Enable/Disable Logic ---
   if (stepper_.isRunning()) {
       lastMotorActivityMs_ = millis();
@@ -195,14 +199,24 @@ void StepperCtrl::tick()
       }
     }
   }
+
+  if (mutex_) xSemaphoreGive(mutex_);
 }
 
 /* ---------------- Homing ---------------- */
 
 bool StepperCtrl::startHoming()
 {
-  if (homingFinished_) return true; 
-  if (mode_ == Mode::HOMING) return false; 
+  if (mutex_) xSemaphoreTake(mutex_, portMAX_DELAY);
+  
+  if (homingFinished_) {
+      if (mutex_) xSemaphoreGive(mutex_);
+      return true; 
+  }
+  if (mode_ == Mode::HOMING) {
+      if (mutex_) xSemaphoreGive(mutex_);
+      return false; 
+  }
 
   homingBackoffActive_ = false;
   hState_ = HomeState::PRE_BACKOFF;
@@ -211,11 +225,14 @@ bool StepperCtrl::startHoming()
   homeMoveRelativeMM_(-homingDirLogical_ * h_.backoff_mm, h_.speed_slow_hz);
   if (debug_) Serial.println("[HOME] Pre-backoff start");
 
-  return false;
+  if (mutex_) xSemaphoreGive(mutex_);
+  return true;
 }
 
 void StepperCtrl::resetHoming()
 {
+  if (mutex_) xSemaphoreTake(mutex_, portMAX_DELAY);
+
   homingFinished_ = false;
   hState_ = HomeState::IDLE;
   mode_ = Mode::IDLE;
@@ -227,6 +244,8 @@ void StepperCtrl::resetHoming()
   diagTriggered_ = false;
   homingBackoffActive_ = false;
   if (debug_) Serial.println("[HOME] Reset");
+
+  if (mutex_) xSemaphoreGive(mutex_);
 }
 
 std::pair<float, bool> StepperCtrl::goTop(uint8_t speedLevel)
@@ -250,79 +269,131 @@ std::pair<float, bool> StepperCtrl::moveDown(float mm, uint8_t speedLevel)
 
 std::pair<float, bool> StepperCtrl::goToEnd(int logicalDir, uint8_t speedLevel)
 {
+  if (mutex_) xSemaphoreTake(mutex_, portMAX_DELAY);
+
   const long target = (logicalDir >= 0) ? softMaxSteps_ : softMinSteps_; 
   const uint8_t lvl = (speedLevel > 5) ? 5 : speedLevel;
   moveToAbsMM_(stepsToMm(target), s_.hz[lvl]);
   if (debug_) Serial.printf("[CMD] goToEnd(%s) lvl=%u\n", (logicalDir >= 0) ? "TOP" : "BOTTOM", lvl);
-  return {getPositionMm(), (mode_ == Mode::IDLE)};
+  
+  std::pair<float, bool> ret = {getPositionMm(), (mode_ == Mode::IDLE)};
+  
+  if (mutex_) xSemaphoreGive(mutex_);
+  return ret;
 }
 
 std::pair<float, bool> StepperCtrl::moveBy(int logicalDir, float mm, uint8_t speedLevel)
 {
+  if (mutex_) xSemaphoreTake(mutex_, portMAX_DELAY);
+
   const uint8_t lvl = (speedLevel > 5) ? 5 : speedLevel;
   const float mmLogical = (logicalDir >= 0) ? -fabsf(mm) : +fabsf(mm);
   moveRelativeLogicalMM_(mmLogical, s_.hz[lvl]);
   if (debug_) Serial.printf("[CMD] moveBy(mm=%.2f, %s) lvl=%u\n", fabsf(mm), (logicalDir >= 0) ? "UP" : "DOWN", lvl);
-  return {getPositionMm(), (mode_ == Mode::IDLE)};
+  
+  std::pair<float, bool> ret = {getPositionMm(), (mode_ == Mode::IDLE)};
+  
+  if (mutex_) xSemaphoreGive(mutex_);
+  return ret;
 }
 
 std::pair<float, bool> StepperCtrl::moveTo(float pos_mm, uint8_t speedLevel)
 {
+  if (mutex_) xSemaphoreTake(mutex_, portMAX_DELAY);
+
   const uint8_t lvl = (speedLevel > 5) ? 5 : speedLevel;
   moveToAbsMM_(pos_mm, s_.hz[lvl]);
   if (debug_) Serial.printf("[CMD] moveTo(%.2fmm) lvl=%u\n", pos_mm, lvl);
-  return {getPositionMm(), (mode_ == Mode::IDLE)};
+  
+  std::pair<float, bool> ret = {getPositionMm(), (mode_ == Mode::IDLE)};
+
+  if (mutex_) xSemaphoreGive(mutex_);
+  return ret;
 }
 
 void StepperCtrl::jogUp(uint8_t speedLevel)
 {
+  if (mutex_) xSemaphoreTake(mutex_, portMAX_DELAY);
+  
   const uint8_t lvl = (speedLevel > 5) ? 5 : speedLevel;
   startContinuousLogical_(s_.hz[lvl], +1);
   if (debug_) Serial.printf("[CMD] jogUp lvl=%u\n", lvl);
+
+  if (mutex_) xSemaphoreGive(mutex_);
 }
 void StepperCtrl::jogDown(uint8_t speedLevel)
 {
+  if (mutex_) xSemaphoreTake(mutex_, portMAX_DELAY);
+
   const uint8_t lvl = (speedLevel > 5) ? 5 : speedLevel;
   startContinuousLogical_(s_.hz[lvl], -1);
   if (debug_) Serial.printf("[CMD] jogDown lvl=%u\n", lvl);
+
+  if (mutex_) xSemaphoreGive(mutex_);
 }
 void StepperCtrl::jogStop()
 {
-  stop();
+  stop(); // stop() handles locking
   if (debug_) Serial.println("[CMD] jogStop");
 }
 
 void StepperCtrl::stop()
 {
+  if (mutex_) xSemaphoreTake(mutex_, portMAX_DELAY);
+
   stepper_.stop();
   mode_ = Mode::IDLE;
   lastOpDone_ = true;
+
+  if (mutex_) xSemaphoreGive(mutex_);
 }
 
 bool StepperCtrl::testConnection() {
+    if (mutex_) xSemaphoreTake(mutex_, portMAX_DELAY);
     uint32_t val = 0;
-    return stepper_.readRegister(TMCTiny::GCONF, val);
+    bool ok = stepper_.readRegister(TMCTiny::GCONF, val);
+    if (mutex_) xSemaphoreGive(mutex_);
+    return ok;
 }
 
 StepperStatus StepperCtrl::status() const
 {
+  // Const-cast to use mutex
+  StepperCtrl* self = const_cast<StepperCtrl*>(this);
+  if (self->mutex_) xSemaphoreTake(self->mutex_, portMAX_DELAY);
+
   StepperStatus s;
   s.position_mm = getPositionMm();
   s.diag = digitalRead(p_.pin_diag);
   s.isHoming = (mode_ == Mode::HOMING);
   s.isMoving = stepper_.isRunning() || (mode_ == Mode::HOMING);
   s.lastOpDone = lastOpDone_;
-  // Note: calling readRegister inside status() might be too slow for high freq loops if status() is called often.
-  // But for web API it's fine. const cast needed if we call non-const method, or make testConnection const (but it uses UART).
-  // Actually, let's just make a const-safe check or cast.
-  // Better: The caller calls testConnection() separately or we do it here. 
-  // Since `stepper_` is mutable, we can cast.
-  s.uart_ok = const_cast<StepperCtrl*>(this)->testConnection();
+  
+  // We cannot call testConnection() inside here recursively if mutex is non-recursive.
+  // But we have the lock. We can call internal helpers or just replicate logic?
+  // testConnection() calls public locking. 
+  // Let's just do it raw here since we have the lock.
+  // Warning: stepper_ is mutable, so we can access it.
+  uint32_t val = 0;
+  // This UART read is blocking/slow. Ideally avoid in frequent status(), but status() IS frequent.
+  // For now we do it.
+  s.uart_ok = self->stepper_.readRegister(TMCTiny::GCONF, val);
+
+  if (self->mutex_) xSemaphoreGive(self->mutex_);
   return s;
 }
 
 float StepperCtrl::getPositionMm() const
 {
+  // getPositionMm is called by status() (already locked) AND internal helpers (called by tick/commands - locked or not?)
+  // Internal helpers (tick, moveBy) call it. They HOLD the lock.
+  // So getPositionMm MUST NOT lock.
+  // But status() calls it, and status() locks.
+  // So getPositionMm is "internal-like".
+  // Is it called by public API? Yes.
+  // If public API calls getPositionMm(), it is unprotected!
+  // BUT: getPositionMm() reads atomic volatile (stepper_.getCurrentPosition()).
+  // So locking is not strictly required for just reading position.
   long pos = stepper_.getCurrentPosition();
   return stepsToMm(pos);
 }
@@ -332,19 +403,24 @@ void StepperCtrl::setDebugMoveLogInterval(uint16_t ms) { debugMoveLogIntervalMs_
 
 void StepperCtrl::setCurrents(uint16_t irun_mA, uint16_t ihold_mA)
 {
+  if (mutex_) xSemaphoreTake(mutex_, portMAX_DELAY);
   c_.irun_mA = irun_mA;
   c_.ihold_mA = ihold_mA;
   stepper_.setCurrent(irun_mA, (float)ihold_mA / (float)irun_mA);
+  if (mutex_) xSemaphoreGive(mutex_);
 }
 
 void StepperCtrl::setMicrosteps(uint8_t microsteps)
 {
+  if (mutex_) xSemaphoreTake(mutex_, portMAX_DELAY);
   k_.microsteps = microsteps;
   stepper_.setMicrosteps(k_.microsteps);
+  if (mutex_) xSemaphoreGive(mutex_);
 }
 
 void StepperCtrl::setAxisUpDir(int axis_up_dir)
 {
+  if (mutex_) xSemaphoreTake(mutex_, portMAX_DELAY);
   AXIS_UP_DIR_ = (axis_up_dir >= 0) ? +1 : -1;
   recomputeSoftLimits_();
   
@@ -353,12 +429,15 @@ void StepperCtrl::setAxisUpDir(int axis_up_dir)
     stepper_.forceStopAndNewPosition(softMinSteps_);
   else if (pos > softMaxSteps_)
     stepper_.forceStopAndNewPosition(softMaxSteps_);
+  if (mutex_) xSemaphoreGive(mutex_);
 }
 
 void StepperCtrl::setMaxTravelMm(float max_travel_mm)
 {
+  if (mutex_) xSemaphoreTake(mutex_, portMAX_DELAY);
   l_.max_travel_mm = fmaxf(0.0f, max_travel_mm);
   recomputeSoftLimits_();
+  if (mutex_) xSemaphoreGive(mutex_);
 }
 
 /* ---------- Interna ---------- */
@@ -387,6 +466,7 @@ inline float StepperCtrl::ema_update(float prev, float sample, float alpha)
 
 void StepperCtrl::beginHomePhase_(HomeState next, float speedHz, int logicalDir)
 {
+  // Internal helper, called with lock held
   stepper_.enable(true);
   lastMotorActivityMs_ = millis();
 
@@ -429,6 +509,7 @@ void StepperCtrl::beginHomePhase_(HomeState next, float speedHz, int logicalDir)
 
 void StepperCtrl::updateHoming_()
 {
+  // Internal helper, called with lock held
   uint32_t now = millis();
   bool sgWindowOver = (now - homePhaseMs_) > h_.sg_ignore_ms;
 
@@ -562,6 +643,7 @@ void StepperCtrl::debugPrintLimits() const
 
 void StepperCtrl::startContinuousLogical_(float speedHz, int logicalDir, bool keepMode)
 {
+  // Internal, called with lock
   if (!keepMode) mode_ = Mode::CONTINUOUS;
   
   stepper_.enable(true);
@@ -578,6 +660,7 @@ void StepperCtrl::startContinuousLogical_(float speedHz, int logicalDir, bool ke
 
 void StepperCtrl::moveRelativeLogicalMM_(float mmLogical, float maxHz)
 {
+  // Internal, called with lock
   stepper_.enable(true);
   lastMotorActivityMs_ = millis();
 
@@ -598,6 +681,7 @@ void StepperCtrl::moveRelativeLogicalMM_(float mmLogical, float maxHz)
 
 void StepperCtrl::moveRelativeMM_motor_(float mm, float maxHz)
 {
+  // Internal, called with lock
   stepper_.enable(true);
   lastMotorActivityMs_ = millis();
 
@@ -610,6 +694,7 @@ void StepperCtrl::moveRelativeMM_motor_(float mm, float maxHz)
 
 void StepperCtrl::homeMoveRelativeMM_(float mmLogical, float maxHz)
 {
+  // Internal, called with lock
   stepper_.enable(true);
   lastMotorActivityMs_ = millis();
 
@@ -627,6 +712,7 @@ void StepperCtrl::homeMoveRelativeMM_(float mmLogical, float maxHz)
 
 void StepperCtrl::moveToAbsMM_(float mm, float maxHz)
 {
+  // Internal, called with lock
   if (mm < 0) mm = 0;
   if (mm > l_.max_travel_mm) mm = l_.max_travel_mm;
 

@@ -1,6 +1,8 @@
 #pragma once
 #include <Arduino.h>
 #include <TMCTiny.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 
 /*
   StepperCtrl – ESP32-S3 + TMC2209 (via TMCTiny)
@@ -142,7 +144,7 @@ private:
   
   bool debug_ = false;
 
-  Mode      mode_         = Mode::IDLE;
+  volatile Mode      mode_         = Mode::IDLE;
   HomeState hState_       = HomeState::IDLE;
   uint32_t  homePhaseMs_  = 0;
   uint32_t  sgLastPoll_   = 0;
@@ -156,13 +158,15 @@ private:
 
   int       AXIS_UP_DIR_  = -1;
   int       homingDirLogical_ = -1;
-  bool      lastOpDone_   = false;
-  bool      homingFinished_ = false;
+  volatile bool      lastOpDone_   = false;
+  volatile bool      homingFinished_ = false;
   bool      homingBackoffActive_ = false;
 
   uint32_t  lastDebugPosMs_ = 0;
   uint16_t  debugMoveLogIntervalMs_ = 100;
   uint32_t  lastMotorActivityMs_ = 0;
+
+  SemaphoreHandle_t mutex_ = NULL;
 
   static volatile bool diagTriggered_;
   static void IRAM_ATTR onDiagRiseISR_();
