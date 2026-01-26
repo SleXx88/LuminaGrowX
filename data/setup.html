@@ -91,6 +91,9 @@
       }
       .badge.ok { background: rgba(34, 197, 94, 0.2); border-color: var(--ok); color: var(--ok); }
       .badge.err { background: rgba(239, 68, 68, 0.2); border-color: var(--err); color: var(--err); }
+      
+      .text-ok { color: var(--ok) !important; }
+      .text-err { color: var(--err) !important; }
 
       button, .button {
         background: rgba(255,255,255,0.05); border: 1px solid var(--border);
@@ -225,7 +228,7 @@
             <!-- Removed Badge here as requested -->
           </header>
           <div class="content">
-            <div class="instruction">Teste beide Lüfter. Sie sollten hörbar anlaufen.</div>
+            <div class="instruction">Teste beide Lüfter. Sie sollten hörbar anlaufen sowie ein fühlbarer Wind aus den Ablüftungskanälen kommen.</div>
             
             <!-- Lüfter 1 -->
             <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -296,7 +299,7 @@
           <button id="stepHome" type="button" class="primary" style="width: 100%; padding: 1rem;">
             Referenzfahrt starten (Kalibrierung)
           </button>
-          <small id="stepMsg" style="text-align: center; display: block; min-height: 1.2em; color: var(--accent);">–</small>
+          <small id="stepMsg" style="text-align: center; display: block; min-height: 1.2em;">–</small>
 
           <hr style="opacity: 0.1;">
 
@@ -487,6 +490,15 @@
         }
       }
 
+      function setStepMsg(txt, type) {
+        const el = $("stepMsg");
+        if (!el) return;
+        el.textContent = txt;
+        el.classList.remove("text-ok", "text-err");
+        if (type === "ok") el.classList.add("text-ok");
+        if (type === "err") el.classList.add("text-err");
+      }
+
       async function refreshStatus() {
         // Setup specific status
         try {
@@ -588,9 +600,10 @@
         stepHomed = false; stepDownEver = false; stepHomingActive = true;
         try {
           const r = await fetchJSON("/api/stepper/home", { method: "POST" });
-          $("stepMsg").textContent = r.ok ? "Kalibrierung läuft..." : "Fehler beim Starten";
+          if (r.ok) setStepMsg("Kalibrierung läuft...", "");
+          else setStepMsg("Fehler beim Starten", "err");
         } catch (e) {
-          $("stepMsg").textContent = "Info: " + e.message;
+          setStepMsg("Info: " + e.message, "");
         }
       });
 
@@ -600,9 +613,9 @@
         jogPending = true;
         try {
           await fetchJSON("/api/stepper/jog", { method: "POST", body: JSON.stringify({ dir: "up", mm: 10 }) });
-          $("stepMsg").textContent = "Fährt hoch...";
+          setStepMsg("Fährt hoch...", "");
         } catch (e) {
-          $("stepMsg").textContent = "Fehler: " + e.message;
+          setStepMsg("Fehler: " + e.message, "err");
           b.textContent="▲ 1 cm Aufwärts"; b.classList.remove("success"); delete b.dataset.moving; b.disabled=false;
         } finally {
           setTimeout(() => { jogPending = false; }, 400);
@@ -615,9 +628,9 @@
         jogPending = true;
         try {
           await fetchJSON("/api/stepper/jog", { method: "POST", body: JSON.stringify({ dir: "down", mm: 10 }) });
-          $("stepMsg").textContent = "Fährt runter...";
+          setStepMsg("Fährt runter...", "");
         } catch (e) {
-          $("stepMsg").textContent = "Fehler: " + e.message;
+          setStepMsg("Fehler: " + e.message, "err");
           b.textContent="▼ 1 cm Abwärts"; b.classList.remove("success"); delete b.dataset.moving; b.disabled=false;
         } finally {
           setTimeout(() => { jogPending = false; }, 400);
@@ -642,7 +655,7 @@
               btnH.classList.add("primary"); btnH.classList.remove("success");
               btnH.textContent = "Referenzfahrt wiederholen";
               btnH.disabled = false;
-              $("stepMsg").textContent = "Kalibrierung OK (Lampe oben)";
+              setStepMsg("Kalibrierung OK", "ok");
             }
 
             // Jog Logic
@@ -660,7 +673,7 @@
                   btnUp.classList.remove("success");
                   btnUp.classList.add("primary");
                   delete btnUp.dataset.moving;
-                  $("stepMsg").textContent = "OK";
+                  setStepMsg("OK", "ok");
                }
             }
             if (btnDown) {
@@ -674,7 +687,7 @@
                   btnDown.classList.add("primary");
                   if (btnDown.dataset.moving === "down") stepDownEver = true;
                   delete btnDown.dataset.moving;
-                  $("stepMsg").textContent = "OK";
+                  setStepMsg("OK", "ok");
                }
             }
           }
