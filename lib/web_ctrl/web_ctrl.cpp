@@ -691,7 +691,6 @@ String WebCtrl::makeStatusJson_() {
   float fanPct = fan_ ? fan_->getPercent() : 0.0f;
   int fanRpm = fan_ ? fan_->getRPM() : 0;
   int fan2Rpm = fan2_ ? fan2_->getRPM() : 0;
-  int fan2Rpm = fan2_ ? fan2_->getRPM() : 0;
   float fan2Pct = fan2_ ? fan2_->getPercent() : 0.0f;
   
   doc["light_on"] = ledPct > 0.5f;
