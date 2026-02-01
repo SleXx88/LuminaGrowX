@@ -115,7 +115,7 @@ void PlantCtrl::applyLuminaConfig() {
   setDoorDetection(p.door_dRh, p.door_dT, p.door_hold_ms);
   setModeChangeHold(p.mode_hold_ms);
 
-  // Schimmelprävention / Per-Phase-Parameter übernehmen
+  // Schimmelprï¿½vention / Per-Phase-Parameter ï¿½bernehmen
 
   // Schimmelpr?vention / Per-Phase-Parameter ?bernehmen
   rhCap_[0] = p.seedling_rh_cap;
@@ -160,12 +160,12 @@ void PlantCtrl::detectDoorOrTransient(float t_now, float rh_now, uint32_t now_ms
 }
 
 void PlantCtrl::updateFanSignFromDewpoints() {
-  // Passive Zuluft unten, Abluft oben: Mehr Lüfter -> Innenklima nähert sich Außenklima
-  // Außen feuchter (dpOut > dpIn): Mehr Lüfter -> RH steigt -> VPD sinkt -> fanSign +1
-  // Außen trockener (dpOut < dpIn): Mehr Lüfter -> RH sinkt -> VPD steigt -> fanSign -1
+  // Passive Zuluft unten, Abluft oben: Mehr Lï¿½fter -> Innenklima nï¿½hert sich Auï¿½enklima
+  // Auï¿½en feuchter (dpOut > dpIn): Mehr Lï¿½fter -> RH steigt -> VPD sinkt -> fanSign +1
+  // Auï¿½en trockener (dpOut < dpIn): Mehr Lï¿½fter -> RH sinkt -> VPD steigt -> fanSign -1
   float gap = (float)(dpOut_ - dpIn_);
-  if (gap > 0.5f)       fanSign_ = +1; // außen feuchter: Lüfter senkt VPD
-  else if (gap < -0.5f) fanSign_ = -1; // außen trockener: Lüfter erhöht VPD
+  if (gap > 0.5f)       fanSign_ = +1; // auï¿½en feuchter: Lï¿½fter senkt VPD
+  else if (gap < -0.5f) fanSign_ = -1; // auï¿½en trockener: Lï¿½fter erhï¿½ht VPD
   // nahe 0: Vorzeichen beibehalten
 }
 
@@ -191,7 +191,7 @@ bool PlantCtrl::update() {
   tIn_ = tC_in; rhIn_ = rh_in;
   tOut_ = tC_out; rhOut_ = rh_out;
 
-  // Tür-Status aktualisieren (unabhängig vom Modus)
+  // Tï¿½r-Status aktualisieren (unabhï¿½ngig vom Modus)
   if (doorPin_ >= 0) {
     bool closed = (digitalRead(doorPin_) == LOW);
     if (closed != lastDoorClosed_) {
@@ -231,9 +231,9 @@ bool PlantCtrl::update() {
     return true;
   }
 
-  // Trocknungsmodus: Einfache Regelung für 45-55% RH, LED 0%, min. 20% Lüfter
+  // Trocknungsmodus: Einfache Regelung fï¿½r 45-55% RH, LED 0%, min. 20% Lï¿½fter
   if (dryingMode_) {
-    // VPD berechnen (für Monitoring)
+    // VPD berechnen (fï¿½r Monitoring)
     vpdIn_ = computeVpd(tIn_, rhIn_);
     dpIn_  = computeDewPoint(tIn_, rhIn_);
     dpOut_ = computeDewPoint(tOut_, rhOut_);
@@ -246,17 +246,17 @@ bool PlantCtrl::update() {
     led_->setPercent(ledOut_);
     ledApplied_ = ledOut_;
 
-    // Lüfterregelung für Ziel 45-55% RH
+    // Lï¿½fterregelung fï¿½r Ziel 45-55% RH
     const float targetRhMin = lumina::drying::TARGET_RH_MIN;
     const float targetRhMax = lumina::drying::TARGET_RH_MAX;
     const float targetRhMid = (targetRhMin + targetRhMax) / 2.0f;
     const float fanMin = lumina::drying::FAN_MIN_PERCENT;
     const float fanMax = lumina::drying::FAN_MAX_PERCENT;
 
-    // Einfache Proportionalregelung: je höher RH über Ziel, desto mehr Lüfter
+    // Einfache Proportionalregelung: je hï¿½her RH ï¿½ber Ziel, desto mehr Lï¿½fter
     float fanCmd = fanMin;
     if (rhIn_ < targetRhMin) {
-      // Zu trocken: Minimallüfter
+      // Zu trocken: Minimallï¿½fter
       fanCmd = fanMin;
     } else if (rhIn_ > targetRhMax) {
       // Zu feucht: Maximal
@@ -272,8 +272,8 @@ bool PlantCtrl::update() {
     lastFanOut_ = fanOut_ = fanCmd;
     fan_->setPercent(fanOut_);
 
-    // Während Trocknung: Stepper/LED-Abstandsregelung DEAKTIVIERT
-    // Motor bleibt aus, egal ob Tür offen/zu
+    // Wï¿½hrend Trocknung: Stepper/LED-Abstandsregelung DEAKTIVIERT
+    // Motor bleibt aus, egal ob Tï¿½r offen/zu
     return true;
   }
 
@@ -349,12 +349,12 @@ bool PlantCtrl::update() {
         ledTarget = clamp01(cur().ledPercent);
       }
     } else {
-      // Ohne RTC: Modus bleibt unverändert -> statischer LED-Wert des Modus
+      // Ohne RTC: Modus bleibt unverï¿½ndert -> statischer LED-Wert des Modus
       ledTarget = clamp01(cur().ledPercent);
     }
   }
 
-  // 4b) Basiswerte für Regelung laden (nach evtl. Mode-Autowechsel)
+  // 4b) Basiswerte fï¿½r Regelung laden (nach evtl. Mode-Autowechsel)
   PhaseModeSettings& ps = cur();
   const float vpdTarget = midpoint(ps.vpdMin, ps.vpdMax);
   const float baseFan   = ps.fanMin;
@@ -369,7 +369,7 @@ bool PlantCtrl::update() {
     // BUGFIX: Beim Wechsel auf 0% (Sonnenuntergang) darf keine Totzone verhindern,
     //         dass 0% gesetzt wird. Sonst bleibt die LED z.B. bei 0.3% -> effektiv 1% stehen.
     const bool forceOff = (!isnan(ledApplied_) && ledTarget <= 0.0f && ledApplied_ > 0.0f);
-    // Nur schreiben, wenn sich der Wert deutlich geändert hat ODER wir 0% erzwingen müssen
+    // Nur schreiben, wenn sich der Wert deutlich geï¿½ndert hat ODER wir 0% erzwingen mï¿½ssen
     if (isnan(ledApplied_) || forceOff || fabsf(ledTarget - ledApplied_) >= 0.5f) {
       ledApplied_ = ledTarget;
       led_->setPercent(ledApplied_);
@@ -388,10 +388,10 @@ bool PlantCtrl::update() {
   if (fanMaxEff < ps.fanMin) fanMaxEff = ps.fanMin;
   if (fanMaxEff > 100.0f)    fanMaxEff = 100.0f;
 
-    // Priorität 1: Schimmelprävention (Humidity-Priority)
+    // Prioritï¿½t 1: Schimmelprï¿½vention (Humidity-Priority)
   const float cap   = rhCap_[si];
   const float hyst  = rhCapHyst_[si];
-  const float band  = fmaxf(0.0f, hyst * 0.5f); // symmetrische Hysterese ±band
+  const float band  = fmaxf(0.0f, hyst * 0.5f); // symmetrische Hysterese ï¿½band
   const float dpGapReq = dpGapMin_[si];
   const bool dpTooNear = ((float)(tIn_ - dpIn_) < dpGapReq);
 
@@ -410,7 +410,7 @@ bool PlantCtrl::update() {
     if (humidityPriorityActive_) {
       if (((float)rhIn_ <= (cap - band)) && !dpTooNear) {
         humidityPriorityActive_ = false;
-        // Cooldown starten (Taupunkt-Gefahr darf Cooldown übersteuern)
+        // Cooldown starten (Taupunkt-Gefahr darf Cooldown ï¿½bersteuern)
         hpCooldownUntilMs_ = millis() + hpCooldownMs_;
       }
     }
@@ -423,16 +423,19 @@ bool PlantCtrl::update() {
   // the box.  Previously this block was only applied if no humidity priority
   // override was active.  In practice, however, external humidity can spike
   // quickly (e.g. someone breathing on the sensor).  To ensure that humid air
-  // isn’t driven into the enclosure we now always evaluate this block before
+  // isnï¿½t driven into the enclosure we now always evaluate this block before
   // applying any other overrides.  If the condition is met we ramp the fan
   // toward zero using the configured rate limit and return immediately.  This
   // allows the box to retain its drier air even when indoor RH is high.
   // FIX: Heat-Emergency BEFORE humid-block - bei Hitze trotzdem kuehlen
   const bool heatEmergency = (tIn_ > (maxTemp_ + 0.5f));
-  if (!heatEmergency && blockOutsideHumid_ && (!isnan(dpIn_) && !isnan(dpOut_)) && (dpOut_ >= dpIn_ + dpHumidHyst_)) {
-    // Mindest-Luftwechsel beibehalten (15%) für CO2-Nachschub, auch wenn außen feuchter
-    // Kleine Box braucht kontinuierlichen Luftaustausch für Pflanzenstoffwechsel
-    float fanCmd = 15.0f; // war 0.0f - vollständige Blockade riskiert CO2-Mangel
+  // FIX: Moisture-Emergency - bei extremer Feuchte (z.B. >85%) Blockade ignorieren, um "Sumpf" bei Regen zu vermeiden
+  const bool moisturePanic = (rhIn_ >= rhHighThr_);
+
+  if (!heatEmergency && !moisturePanic && blockOutsideHumid_ && (!isnan(dpIn_) && !isnan(dpOut_)) && (dpOut_ >= dpIn_ + dpHumidHyst_)) {
+    // Mindest-Luftwechsel beibehalten (15%) fï¿½r CO2-Nachschub, auch wenn auï¿½en feuchter
+    // Kleine Box braucht kontinuierlichen Luftaustausch fï¿½r Pflanzenstoffwechsel
+    float fanCmd = 15.0f; // war 0.0f - vollstï¿½ndige Blockade riskiert CO2-Mangel
     fanCmd = limitRate(fanCmd, lastFanOut_, dt_s);
     lastFanOut_ = fanOut_ = fanCmd;
     fan_->setPercent(fanOut_);
@@ -451,8 +454,8 @@ bool PlantCtrl::update() {
   if (humidityPriorityActive_) {
     //
     // When humidity priority is active we previously forced the fan directly to
-    // its maximum (fanMaxEff).  This leads to large swings between 20 % and
-    // 70 % in flowering because the fan saturates at 70 % whenever the dewpoint
+    // its maximum (fanMaxEff).  This leads to large swings between 20ï¿½% and
+    // 70ï¿½% in flowering because the fan saturates at 70ï¿½% whenever the dewpoint
     // gap or RH thresholds are crossed and then drops back down as soon as the
     // thresholds clear.  To obtain smoother behaviour we scale the fan speed
     // based on how far the measured relative humidity and dewpoint gap exceed
@@ -464,7 +467,7 @@ bool PlantCtrl::update() {
     float overshootRH = (float)rhIn_ - cap;
     if (overshootRH < 0.0f) overshootRH = 0.0f;
 
-    // overshootDP: positive amount by which the dewpoint gap (Temp – Taupunkt)
+    // overshootDP: positive amount by which the dewpoint gap (Tempï¿½ï¿½ï¿½Taupunkt)
     // falls below the required minimum gap.  Values below zero are ignored.
     float overshootDP = dpGapReq - (float)(tIn_ - dpIn_);
     if (overshootDP < 0.0f) overshootDP = 0.0f;
@@ -473,8 +476,8 @@ bool PlantCtrl::update() {
     // commanded per percentage point of RH overshoot and per degree of dewpoint
     // gap deficit.  These values have been chosen empirically and can be
     // exposed via a setter if you wish to fine-tune them later.
-    const float wRH = 1.2f; // % fan increase per 1 %RH overshoot
-    const float wDP = 2.0f; // % fan increase per 1 °C dewpoint gap deficit
+    const float wRH = 1.2f; // % fan increase per 1ï¿½%RH overshoot
+    const float wDP = 2.0f; // % fan increase per 1ï¿½ï¿½C dewpoint gap deficit
 
     // Compute the additional fan demand.  Start from the minimum fan for this
     // phase and add scaled overshoot contributions.  Note that this may
@@ -482,7 +485,7 @@ bool PlantCtrl::update() {
     float targetFan = ps.fanMin + (wRH * overshootRH) + (wDP * overshootDP);
 
     // Determine the absolute maximum fan that may be commanded.  In NightSilent
-    // mode the configuration may allow a +20 % boost above fanMaxEff to rescue
+    // mode the configuration may allow a +20ï¿½% boost above fanMaxEff to rescue
     // the climate even if it means briefly being louder.  We also ensure
     // maxLimit never drops below fanMin to avoid pathological cases.
     float maxLimit = fanMaxEff;

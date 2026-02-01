@@ -263,6 +263,33 @@ void WebCtrl::setupRoutes_() {
     JsonDocument resp; bool ok=false; if (step_) { auto st=step_->status(); ok=true; resp["ok"]=true; resp["pos_mm"]=st.position_mm; resp["moving"]=st.isMoving; resp["homing"]=st.isHoming; resp["lastDone"]=st.lastOpDone; resp["uart_ok"]=st.uart_ok; }
     String out; serializeJson(resp, out); req->send(ok?200:500, "application/json", out);
   });
+
+  // WLAN Scan (asynchron gegen Watchdog-Crash)
+  http_.on("/api/wifi/scan", HTTP_GET, [](AsyncWebServerRequest* req){
+    int n = WiFi.scanComplete();
+    if (n == -2) {
+      // Scan nicht gestartet oder fehlgeschlagen -> neu anstoßen
+      WiFi.scanNetworks(true);
+      req->send(202, "application/json", "{\"status\":\"started\"}");
+    } else if (n == -1) {
+      // Scan läuft noch
+      req->send(202, "application/json", "{\"status\":\"running\"}");
+    } else {
+      // Ergebnis liegt vor
+      JsonDocument doc;
+      JsonArray arr = doc.to<JsonArray>();
+      for (int i = 0; i < n; ++i) {
+        JsonObject o = arr.add<JsonObject>();
+        o["ssid"] = WiFi.SSID(i);
+        o["rssi"] = WiFi.RSSI(i);
+        o["secure"] = (WiFi.encryptionType(i) != WIFI_AUTH_OPEN);
+      }
+      WiFi.scanDelete();
+      String out; serializeJson(doc, out);
+      req->send(200, "application/json", out);
+    }
+  });
+
   http_.on("/api/setup/done", HTTP_POST, [this](AsyncWebServerRequest* req){
     // Persistiere aktuellen ToF-Offset sicherheitshalber erneut
     if (tof_) {
@@ -352,14 +379,16 @@ void WebCtrl::setupRoutes_() {
              if (!ntf["apikey"].isNull())  { String k = String((const char*)ntf["apikey"]); if (k.length() && k != "***") n.apikey = k; }
                saveNotify(n);
              }
-             bool requestedReboot = doc["reboot"].as<bool>();
+             bool requestedReboot = doc["reboot"] | false;
+             bool connectNow = doc["connect_now"] | true;
+
              if (net_) net_->saveConfig(nc);
              bool connectedNow = false;
-             if (anyNetFieldTouched && net_) {
+             if (anyNetFieldTouched && net_ && connectNow) {
                // Sofortiger Verbindungsversuch ohne Reboot
                connectedNow = net_->reconnectSTA(true /*close AP on success*/);
              }
-             // Wenn erfolgreich direkt verbunden: Reboot unterdrÃ¼cken, sonst optional rebooten
+             // Wenn erfolgreich direkt verbunden: Reboot unterdrücken, sonst optional rebooten
              bool doReboot = (!connectedNow) && requestedReboot;
              req->send(200, "application/json", "{\"ok\":true}");
              if (doReboot) rebootAt_ = millis() + 800;
