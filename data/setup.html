@@ -185,29 +185,11 @@
       <div class="grid-2">
         <article>
           <header>
-            <h3><span class="step-number">2</span> <span>Klima Innen</span></h3>
-            <span class="badge" id="b_sht_in">Sensor Innen</span>
-          </header>
-          <div class="content">
-            <div class="instruction">Hauche den Sensor kurz an. Steigt die Feuchtigkeit?</div>
-            <p>Aktuelle Werte in der Box:</p>
-            <div style="font-size: 1.2rem; font-weight: bold; text-align: center;" id="shtIn">-</div>
-            <h4 id="shtInHdr" style="text-align:center; font-size:0.9rem;"></h4>
-            
-            <div class="checklist-box">
-              <strong>Checkliste:</strong>
-              <label><input type="checkbox" id="cb_sht" /> Werte sind plausibel</label>
-            </div>
-          </div>
-        </article>
-
-        <article>
-          <header>
-            <h3><span class="step-number">3</span> <span>Klima Außen</span></h3>
+            <h3><span class="step-number">2</span> <span>Klima Außen</span></h3>
             <span class="badge" id="b_sht_out">Sensor Außen</span>
           </header>
           <div class="content">
-            <div class="instruction">Prüfe die Werte der Umgebungsluft. Sind sie realistisch?</div>
+            <div class="instruction">Prüfe die Werte des Sensors (CH 1A). Sind sie realistisch?</div>
             <p>Werte der Umgebungsluft:</p>
             <div style="font-size: 1.2rem; font-weight: bold; text-align: center;" id="shtOut">-</div>
             <h4 id="shtOutHdr" style="text-align:center; font-size:0.9rem;"></h4>
@@ -215,6 +197,24 @@
             <div class="checklist-box">
               <strong>Checkliste:</strong>
               <label><input type="checkbox" id="cb_sht_out" /> Werte sind plausibel</label>
+            </div>
+          </div>
+        </article>
+
+        <article>
+          <header>
+            <h3><span class="step-number">3</span> <span>Klima Innen</span></h3>
+            <span class="badge" id="b_sht_in">Sensor Innen</span>
+          </header>
+          <div class="content">
+            <div class="instruction">Hauche den Sensor (CH 2A) kurz an. Steigt die Feuchtigkeit?</div>
+            <p>Aktuelle Werte in der Box:</p>
+            <div style="font-size: 1.2rem; font-weight: bold; text-align: center;" id="shtIn">-</div>
+            <h4 id="shtInHdr" style="text-align:center; font-size:0.9rem;"></h4>
+            
+            <div class="checklist-box">
+              <strong>Checkliste:</strong>
+              <label><input type="checkbox" id="cb_sht" /> Werte sind plausibel</label>
             </div>
           </div>
         </article>
@@ -228,7 +228,7 @@
             <!-- Removed Badge here as requested -->
           </header>
           <div class="content">
-            <div class="instruction">Teste beide Lüfter. Sie sollten hörbar anlaufen sowie ein fühlbarer Wind aus den Ablüftungskanälen kommen.</div>
+            <div class="instruction">Teste alle Lüfter. Lüfter 1 (FAN1) & 2 (FAN2) sollten hörbar anlaufen sowie ein fühlbarer Wind aus den Ablüftungskanälen kommen. Lüfter 3 (LOAD2) spürt man unter der Lampe.</div>
             
             <!-- Lüfter 1 -->
             <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -254,10 +254,24 @@
             </div>
             <div style="text-align: center;">Drehzahl: <strong id="fan2Rpm">0</strong> RPM</div>
 
+            <hr style="opacity: 0.1; margin: 0.5rem 0;">
+            
+            <!-- Lüfter 3 (LED) -->
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <strong>Lüfter 3 (LED)</strong>
+              <!-- No Tacho Badge for Fan 3 -->
+            </div>
+            <div class="btn-row">
+              <button id="fan3Off" type="button" class="primary">Aus</button>
+              <button id="fan3On" type="button" class="secondary">An (Test)</button>
+            </div>
+            <div style="text-align: center;"><small>(Kein Tacho-Signal)</small></div>
+
             <div class="checklist-box">
               <strong>Checkliste:</strong>
               <label><input type="checkbox" id="cb_fan" /> Lüfter 1 dreht sich</label>
               <label><input type="checkbox" id="cb_fan2" /> Lüfter 2 dreht sich</label>
+              <label><input type="checkbox" id="cb_fan3" /> Lüfter 3 dreht sich</label>
             </div>
           </div>
         </article>
@@ -269,7 +283,7 @@
           </header>
           <div class="content">
             <div class="instruction">
-              Vorsicht: Das Licht kann sehr hell sein! Nicht direkt hineinblicken.
+              Vorsicht: Das Licht (CH 2B) kann sehr hell sein! Nicht direkt hineinblicken.
             </div>
             <div class="btn-row">
               <button id="ledOff" type="button" class="primary">Aus</button>
@@ -327,7 +341,7 @@
           <span class="badge" id="b_tof">Sensor</span>
         </header>
         <div class="content">
-          <div class="instruction">Der Abstandssensor misst die Distanz zur Pflanze. Kalibriere ihn leer.</div>
+          <div class="instruction">Der Abstandssensor (CH 1B) misst die Distanz zur Pflanze. Kalibriere ihn leer.</div>
           <strong>Abstandssensor (ToF)</strong>
           <p style="font-size: 0.9rem; margin-top: 0.5rem;">
             Misst die Entfernung zur Pflanze. Lege das Kalibrier-Hilfsmittel (50mm) flach auf den Sensorboden.
@@ -345,27 +359,57 @@
         </div>
       </article>
 
-      <!-- SCHRITT 8: TÜR -->
+      <!-- SCHRITT 8: ZUSTANDSERKENNUNG -->
       <article>
         <header>
-          <h3><span class="step-number">8</span> <span>Tür-Erkennung</span></h3>
+          <h3><span class="step-number">8</span> <span>Zustandserkennung</span></h3>
         </header>
         <div class="content">
-          <div class="instruction">Öffne und schließe die Tür, um den Sensor zu testen.</div>
-          <strong>Tür-Kontakt (GPIO 5)</strong>
-          <div style="margin: 1rem 0; font-size: 1.1em;">Status: <strong id="doorState" style="color: var(--accent);">Unbekannt</strong></div>
+          <div class="instruction">Teste die Schalter an CON1 und CON2. Die Anzeige sollte reagieren, wenn Du die Tür öffnest oder den Schwimmer bewegst.</div>
+          
+          <div class="grid-2" style="gap: 1rem;">
+            <div>
+              <strong>Wasserpegel-Sensor (CON1)</strong>
+              <div style="margin: 0.5rem 0; font-size: 1.1em;">Status: <strong id="waterState" style="color: var(--accent);">Unbekannt</strong></div>
+            </div>
+            <div>
+              <strong>Tür-Kontakt (CON2)</strong>
+              <div style="margin: 0.5rem 0; font-size: 1.1em;">Status: <strong id="doorState" style="color: var(--accent);">Unbekannt</strong></div>
+            </div>
+          </div>
           
           <div class="checklist-box">
             <strong>Checkliste:</strong>
-            <label><input type="checkbox" id="cb_door" /> Türstatus wechselt korrekt</label>
+            <label><input type="checkbox" id="cb_water" /> Wasserpegel-Sensor funktioniert</label>
+            <label><input type="checkbox" id="cb_door" /> Tür-Erkennung funktioniert</label>
           </div>
         </div>
       </article>
 
-      <!-- SCHRITT 9: WLAN -->
+      <!-- SCHRITT 9: PUMPE -->
       <article>
         <header>
-          <h3><span class="step-number">9</span> <span>WLAN Verbindung</span></h3>
+          <h3><span class="step-number">9</span> <span>Pumpe</span></h3>
+        </header>
+        <div class="content">
+          <div class="instruction">
+             Teste die Pumpe an LOAD2 ob sie ein oder aus geht. Achte darauf dass die geeignete Spannung 5V oder 12V mit den Jumpern gesteckt ist. Achte auf das Hersetllerdatenblatt der Pumpe.
+          </div>
+          <div class="btn-row">
+            <button id="pumpOff" type="button" class="primary">Aus</button>
+            <button id="pumpOn" type="button" class="secondary">An (Test)</button>
+          </div>
+          <div class="checklist-box">
+            <strong>Checkliste:</strong>
+            <label><input type="checkbox" id="cb_pump" /> Pumpe läuft an</label>
+          </div>
+        </div>
+      </article>
+
+      <!-- SCHRITT 10: WLAN -->
+      <article>
+        <header>
+          <h3><span class="step-number">10</span> <span>WLAN Verbindung</span></h3>
           <span class="badge" id="b_wifi">WLAN</span>
         </header>
         <div class="content">
@@ -419,13 +463,10 @@
              Mit dem Klick auf "Fertigstellen" wird das System neu gestartet und der Regelbetrieb beginnt.
           </p>
           <div class="btn-row">
-            <button id="btnAbort" type="button" class="secondary">Abbruch (Testmodus bleiben)</button>
+            <button id="btnAbort" type="button" class="secondary" style="display:none;">Zurück</button>
             <button id="btnDone" type="button" class="success" disabled style="font-weight: 800;">
               Fertigstellen & Neustart
             </button>
-          </div>
-          <div style="text-align: center; margin-top: 1rem;">
-            <a href="/settings" style="color: var(--text-dim); text-decoration: underline;">Zurück zu den Einstellungen</a>
           </div>
         </div>
       </article>
@@ -555,6 +596,15 @@
             const v = st.tof_mm;
             $("tofLive").textContent = v >= 0 ? v : "Fehler";
           }
+          
+          // "Zurück" button logic:
+          // Only show if initial setup was ever done (install_done.mark exists).
+          const btnBack = $("btnAbort");
+          if (btnBack) {
+             const canGoBack = !!st.initial_setup_done;
+             btnBack.dataset.configured = canGoBack ? "true" : "false";
+             btnBack.style.display = canGoBack ? "block" : "none";
+          }
         } catch (e) {}
 
         // Global status (live values)
@@ -587,8 +637,15 @@
           $("fan2Rpm").textContent = fan2Rpm;
           updateFanBadge("b_fan2", fan2Rpm, fan2On);
 
+          // Fan 3
+          const fan3On = (live && !!live.fan3_on);
+          updateToggleBtns("fan3Off", "fan3On", fan3On);
+
           // LED
           updateToggleBtns("ledOff", "ledOn", !!live.light_on);
+
+          // Pump
+          updateToggleBtns("pumpOff", "pumpOn", !!live.pump_on);
 
           // RTC Prefill if empty
           if (!$("rtcDt").value && live && live.ntp_time) {
@@ -626,7 +683,7 @@
         } catch (e) { showToast("Fehler: " + e.message); }
       });
 
-      // 4. Fans & 5. LED
+      // 4. Fans & 5. LED & 9. Pump
       const simpleToggle = (id, api, on) => $(id).addEventListener("click", () => 
         fetch(api, { method: "POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({on}) })
       );
@@ -634,8 +691,12 @@
       simpleToggle("fanOn", "/api/fan", true);
       simpleToggle("fan2Off", "/api/fan2", false);
       simpleToggle("fan2On", "/api/fan2", true);
+      simpleToggle("fan3Off", "/api/fan3", false);
+      simpleToggle("fan3On", "/api/fan3", true);
       simpleToggle("ledOff", "/api/dac", false);
       simpleToggle("ledOn", "/api/dac", true);
+      simpleToggle("pumpOff", "/api/pump", false);
+      simpleToggle("pumpOn", "/api/pump", true);
 
       // 6. Stepper
       $("stepHome").addEventListener("click", async () => {
@@ -691,6 +752,31 @@
             const bad = !!s.diag;
             const uartOk = !!s.uart_ok;
             setBadge("b_step", !bad && uartOk, bad ? "Motor klemmt (DIAG)" : (uartOk ? "OK" : "Kabel prüfen"));
+
+            const btnH = $("stepHome");
+            if (!uartOk) {
+               // UART Error State
+               btnH.disabled = true;
+               btnH.classList.remove("primary", "success");
+               btnH.style.borderColor = "var(--err)";
+               btnH.style.color = "var(--err)";
+               btnH.textContent = "Fehler: Keine Verbindung zum Controller";
+               setStepMsg("TMC2209 nicht gefunden. Kabel/Strom prüfen!", "err");
+               // Disable jog buttons too
+               $("stepUp").disabled = true;
+               $("stepDown").disabled = true;
+               return; 
+            } else {
+               // UART OK - restore style if not currently homing/moving
+               if (btnH.textContent.startsWith("Fehler")) {
+                  btnH.style.borderColor = "";
+                  btnH.style.color = "";
+                  btnH.classList.add("primary");
+                  btnH.textContent = "Referenzfahrt starten (Kalibrierung)";
+                  btnH.disabled = false;
+                  setStepMsg("-", "");
+               }
+            }
 
             if (s.homing && !stepHomingActive) {
               stepHomingActive = true; stepHomed = false; stepDownEver = false;
@@ -758,8 +844,14 @@
       async function pollDoor() {
         try {
           const d = await fetchJSON("/api/door/status");
-          $("doorState").textContent = d.closed ? "Geschlossen" : "Offen";
-          $("doorState").style.color = d.closed ? "var(--ok)" : "var(--accent)";
+          
+          const ds = $("doorState");
+          ds.textContent = d.door_closed ? "Geschlossen" : "Offen";
+          ds.style.color = d.door_closed ? "var(--ok)" : "var(--accent)";
+
+          const ws = $("waterState");
+          ws.textContent = d.water_closed ? "Geschlossen (OK)" : "Offen (Alarm)";
+          ws.style.color = d.water_closed ? "var(--ok)" : "var(--accent)";
         } catch (_) {}
       }
 
@@ -867,7 +959,6 @@
           if (r.ok) {
             $("cb_wifi_done").checked = true;
             updateDoneEnabled();
-            showToast("WLAN Daten gespeichert!");
             btn.classList.add("success");
             btn.textContent = "Gespeichert ✓";
           } else {
@@ -885,9 +976,9 @@
       // Global Check
       function updateDoneEnabled() {
         const need = [
-          "cb_rtc", "cb_sht", "cb_sht_out", "cb_fan", "cb_fan2",
+          "cb_rtc", "cb_sht", "cb_sht_out", "cb_fan", "cb_fan2", "cb_fan3",
           "cb_led", "cb_step_home", "cb_step_down", "cb_step_up", 
-          "cb_tof", "cb_door", "cb_wifi_done"
+          "cb_tof", "cb_door", "cb_water", "cb_pump", "cb_wifi_done"
         ];
         const all = need.every((id) => $(id) && $(id).checked);
         $("btnDone").disabled = !all;
@@ -914,9 +1005,25 @@
           } else showToast("Fehler beim Abschließen");
         } catch (e) { showToast("Fehler: " + e.message); }
       });
+
       $("btnAbort").addEventListener("click", async () => {
-        fetch("/api/setup/abort", { method: "POST" });
-        showToast("Einrichtung pausiert.");
+        const btn = $("btnAbort");
+        const isConfigured = btn.dataset.configured === "true";
+        
+        if (isConfigured) {
+           // Behavior: Back to Settings (Abort re-setup)
+           try {
+             await fetch("/api/setup/done?reboot=false", { method: "POST" });
+             window.location.href = "/settings";
+           } catch(e) {
+             showToast("Fehler: " + e.message);
+           }
+        } else {
+           // Fallback / Old behavior (Just stay on page, pause setup)
+           // Should technically not be reachable if button is hidden
+           fetch("/api/setup/abort", { method: "POST" });
+           showToast("Einrichtung pausiert.");
+        }
       });
 
       connectWS();

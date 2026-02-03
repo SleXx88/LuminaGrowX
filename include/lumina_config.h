@@ -22,20 +22,25 @@ namespace lumina
     constexpr int I2C1_SCL = 9;
 
     // I2C-Bus 2
-    constexpr int I2C2_SDA = 20;
-    constexpr int I2C2_SCL = 14;
+    constexpr int I2C2_SDA = 21;
+    constexpr int I2C2_SCL = 47;
     constexpr uint32_t I2C2_FREQ = 400000; // 400 kHz
 
     // 4-Pin-Lüfter (PWM)
-    constexpr uint8_t FAN_PWM = 21;
+    constexpr uint8_t FAN_PWM_LED = 1;
+    constexpr uint8_t FAN_PWM = 2;
     constexpr uint8_t FAN2_PWM = 7;
     
     // Tacho-Pins (optional)
     constexpr int8_t FAN_TACHO = 15;
     constexpr int8_t FAN2_TACHO = 16;
 
-    // ToF (VL53L0X) – XSHUT (optional)
-    constexpr int TOF_XSHUT = 3;
+    // Weitere Hardware
+    constexpr int CO2_MQ_VAL = 4;        // Analog Input
+    constexpr int CO2_MQ_STAT = 14;      // Digital Input
+    constexpr int WATER_LEVEL_STATE = 40; // Digital Input
+    constexpr int PUMP_EN = 41;           // Digital Output
+    constexpr int LED_RGB = 48;           // Output
 
     // Stepper / TMC2209
     struct Stepper

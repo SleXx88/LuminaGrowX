@@ -26,6 +26,7 @@
 #include "../include/health.h"
 #include "../include/version.h"
 #include "../include/setup_flag.h"
+#include "led_ctrl.h"
 
 using namespace vpd_calc;
 using namespace plant_ctrl;
@@ -39,7 +40,6 @@ constexpr int I2C_SCL_1 = lumina::pins::I2C1_SCL;
 constexpr int I2C_SDA_2 = lumina::pins::I2C2_SDA;
 constexpr int I2C_SCL_2 = lumina::pins::I2C2_SCL;
 constexpr uint32_t I2C_FREQ_2 = lumina::pins::I2C2_FREQ;
-constexpr int PIN_XSHUT = lumina::pins::TOF_XSHUT;
 
 // Geräte
 SHT41Ctrl sht_in;
@@ -47,7 +47,9 @@ SHT41Ctrl sht_out;
 GP8211Ctrl dac;
 FanCtrl fan;
 FanCtrl fan2;
+FanCtrl fan3;
 ToFCtrl tof;
+LedCtrl statusLed(lumina::pins::LED_RGB);
 
 // Stepper aus zentraler Config
 static StepperPins makeStepPins() {
@@ -138,6 +140,17 @@ void setup()
   fan2.begin(cfg2);
   fan2.setPercent(0);
 
+  // Fan 3 (LED-Lüfter, kein Tacho)
+  FanCtrl::Config cfg3;
+  cfg3.pwmPin = lumina::pins::FAN_PWM_LED;
+  cfg3.ledcChannel = 2; // Channel 2
+  cfg3.pwmFreq = 25000;
+  cfg3.resolutionBits = 8;
+  cfg3.invert = false;
+  cfg3.tachoPin = -1; // Kein Tacho
+  fan3.begin(cfg3);
+  fan3.setPercent(0);
+
   // LED Initialisierung (GP8211)
   if (!dac.begin(Wire1)) {
     Serial.println("[GP8211] init FAIL (I2C addr 0x58)");
@@ -152,12 +165,8 @@ void setup()
 
   // ===== 2) Hardware-Sensoren =====
   // ToF aktivieren und starten
-  if (PIN_XSHUT >= 0) {
-    pinMode(PIN_XSHUT, OUTPUT);
-    digitalWrite(PIN_XSHUT, HIGH);
-    delay(3);
-  }
-  bool ok = tof.begin(Wire, 0x29, PIN_XSHUT);
+  // XSHUT nicht verwendet, direkt -1 übergeben
+  bool ok = tof.begin(Wire, 0x29, -1);
   Serial.println(ok ? F("[ToF] Init OK") : F("[ToF] Init FAILED"));
   health::set_tof(ok, ok ? String("") : F("ToF Init fehlgeschlagen"));
 
@@ -193,6 +202,17 @@ void setup()
   // Setup-Flag lesen
   bool setupDone = setup_flag::is_done();
   g_setupMode = !setupDone;
+
+  // Status LED logic
+  statusLed.begin();
+  statusLed.setBrightness(50); // Moderate brightness
+  if (g_setupMode) {
+      statusLed.setMode(LedCtrl::Mode::BREATHE);
+      statusLed.setColor(LedCtrl::Color::RED);
+      statusLed.setCycleTime(2000); // 2 seconds breathe cycle
+  } else {
+      statusLed.setColor(LedCtrl::Color::OFF);
+  }
 
   // SHT41
   // SHT41 bereits initialisiert (früher im Setup)
@@ -251,6 +271,12 @@ void setup()
   if (lumina::plant::DOOR_SWITCH_PIN >= 0) {
     pinMode(lumina::plant::DOOR_SWITCH_PIN, INPUT_PULLUP);
   }
+  
+  // Pumpe
+  if (lumina::pins::PUMP_EN >= 0) {
+    pinMode(lumina::pins::PUMP_EN, OUTPUT);
+    digitalWrite(lumina::pins::PUMP_EN, LOW);
+  }
 
   // Netzwerkteil starten (AP immer, STA wenn konfiguriert); mDNS: luminagrowx.local (verschoben ans Ende)
 
@@ -288,8 +314,8 @@ void setup()
     net.begin(forceAP, "luminagrowx", &rtc);
   }
   web.begin(&controller, &rtc, &net);
-  // Hardware-Referenzen für Setup/Tests an WebCtrl geben (inkl. SHT41, Fan2)
-  web.setHardware(&dac, &fan, &fan2, &step, &tof, &sht_in, &sht_out);
+  // Hardware-Referenzen für Setup/Tests an WebCtrl geben (inkl. SHT41, Fan2, Fan3)
+  web.setHardware(&dac, &fan, &fan2, &fan3, &step, &tof, &sht_in, &sht_out);
 
   // Drying-Status laden und in Controller setzen
   if (!g_setupMode) {
@@ -309,6 +335,9 @@ void loop()
 {
   // Keep stepper ticking every frame
   step.tick();
+  
+  // Update LED effects
+  statusLed.update();
 
   // Setup-Modus: nur Setup-Flow + Netzwerk/Web aktiv halten
   if (g_setupMode) {

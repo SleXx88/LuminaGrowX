@@ -128,8 +128,8 @@ void WebCtrl::begin(plant_ctrl::PlantCtrl* ctrl, RTC_Ctrl* rtc, NetCtrl* net) {
   http_.begin();
 }
 
-void WebCtrl::setHardware(GP8211Ctrl* dac, FanCtrl* fan, FanCtrl* fan2, StepperCtrl* stepper, ToFCtrl* tof, SHT41Ctrl* shtIn, SHT41Ctrl* shtOut) {
-  dac_ = dac; fan_ = fan; fan2_ = fan2; step_ = stepper; tof_ = tof; shtIn_ = shtIn; shtOut_ = shtOut;
+void WebCtrl::setHardware(GP8211Ctrl* dac, FanCtrl* fan, FanCtrl* fan2, FanCtrl* fan3, StepperCtrl* stepper, ToFCtrl* tof, SHT41Ctrl* shtIn, SHT41Ctrl* shtOut) {
+  dac_ = dac; fan_ = fan; fan2_ = fan2; fan3_ = fan3; step_ = stepper; tof_ = tof; shtIn_ = shtIn; shtOut_ = shtOut;
 }
 
 void WebCtrl::loop() {
@@ -248,6 +248,20 @@ void WebCtrl::setupRoutes_() {
              bool ok=false; bool on = doc["on"].as<bool>(); if (fan2_) { fan2_->setPercent(on?100.0f:0.0f); ok=true; }
              JsonDocument resp; resp["ok"]=ok; String out; serializeJson(resp, out); req->send(ok?200:500, "application/json", out);
            });
+  http_.on("/api/fan3", HTTP_POST, [](AsyncWebServerRequest*){}, NULL,
+           [this](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t, size_t){
+             JsonDocument doc; if (deserializeJson(doc, data, len)) { req->send(400, "application/json", "{\"error\":\"bad json\"}"); return; }
+             bool ok=false; bool on = doc["on"].as<bool>(); if (fan3_) { fan3_->setPercent(on?100.0f:0.0f); ok=true; }
+             JsonDocument resp; resp["ok"]=ok; String out; serializeJson(resp, out); req->send(ok?200:500, "application/json", out);
+           });
+  http_.on("/api/pump", HTTP_POST, [](AsyncWebServerRequest*){}, NULL,
+           [this](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t, size_t){
+             JsonDocument doc; if (deserializeJson(doc, data, len)) { req->send(400, "application/json", "{\"error\":\"bad json\"}"); return; }
+             bool ok=true; bool on = doc["on"].as<bool>();
+             int p = lumina::pins::PUMP_EN;
+             if (p >= 0) { digitalWrite(p, on ? HIGH : LOW); }
+             JsonDocument resp; resp["ok"]=ok; String out; serializeJson(resp, out); req->send(200, "application/json", out);
+           });
   http_.on("/api/stepper/jog", HTTP_POST, [](AsyncWebServerRequest*){}, NULL,
            [this](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t, size_t){
              JsonDocument doc; if (deserializeJson(doc, data, len)) { req->send(400, "application/json", "{\"error\":\"bad json\"}"); return; }
@@ -297,7 +311,19 @@ void WebCtrl::setupRoutes_() {
       File fw = LittleFS.open("/tof_offset.dat", FILE_WRITE);
       if (fw) { fw.printf("%d\n", (int)tof_->getOffsetMm()); fw.close(); }
     }
-    bool ok=setup_flag::set_done(true); if (ok) rebootAt_ = millis()+800; req->send(ok?202:500, "application/json", ok?"{\"ok\":true}":"{\"ok\":false}");
+    bool ok=setup_flag::set_done(true);
+    // Erstelle Marker-Datei für "Erstinbetriebnahme erledigt"
+    if (ok) {
+      File fm = LittleFS.open("/cfg/install_done.mark", FILE_WRITE);
+      if (fm) { fm.print("1"); fm.close(); }
+    }
+    bool doReboot = true;
+    if (req->hasParam("reboot")) {
+      String rb = req->getParam("reboot")->value();
+      if (rb == "false" || rb == "0") doReboot = false;
+    }
+    if (ok && doReboot) rebootAt_ = millis()+800;
+    req->send(ok?202:500, "application/json", ok?"{\"ok\":true}":"{\"ok\":false}");
   });
   http_.on("/api/setup/reset", HTTP_POST, [this](AsyncWebServerRequest* req){
     // Setup-Flag zurücksetzen und Neustart auslösen
@@ -310,22 +336,33 @@ void WebCtrl::setupRoutes_() {
     }
   });
   http_.on("/api/setup/abort", HTTP_POST, [this](AsyncWebServerRequest* req){ req->send(200, "application/json", "{\"ok\":true}"); });
-  // Türstatus
+  // Status der digitalen Eingänge (Tür & Wasser)
   http_.on("/api/door/status", HTTP_GET, [this](AsyncWebServerRequest* req){
-    JsonDocument resp; 
-    int pin = lumina::plant::DOOR_SWITCH_PIN; 
-    resp["present"] = (pin >= 0); 
-    resp["pin"] = pin; 
-    bool closed=false; 
-    int raw=-1; 
-    if (pin>=0){ 
-      pinMode(pin, INPUT); // External pull-up present
-      raw = digitalRead(pin); 
-      closed = (raw==LOW); 
-    } 
-    resp["closed"] = closed; 
-    resp["raw"]=raw; 
-    String out; serializeJson(resp, out); 
+    JsonDocument resp;
+    
+    // Tür (CON2)
+    int dPin = lumina::plant::DOOR_SWITCH_PIN;
+    bool dClosed = false;
+    if (dPin >= 0) {
+      pinMode(dPin, INPUT); // Externer Pullup
+      dClosed = (digitalRead(dPin) == LOW);
+    }
+    resp["door_closed"] = dClosed;
+    resp["door_present"] = (dPin >= 0);
+
+    // Wasser (CON1)
+    int wPin = lumina::pins::WATER_LEVEL_STATE;
+    bool wLow = false; // "Geschlossen" bedeutet Pegel OK oder Ausgelöst? User sagt "wenn geschlossen auf false/0".
+    // Laut GEMINI.md: "TRUE wenn Wasserstand zu niedrig" (Schwimmer oben/unten?)
+    // Wir geben einfach den Zustand "Geschlossen/Offen" weiter.
+    if (wPin >= 0) {
+      pinMode(wPin, INPUT); // Externer Pullup
+      wLow = (digitalRead(wPin) == LOW);
+    }
+    resp["water_closed"] = wLow;
+    resp["water_present"] = (wPin >= 0);
+
+    String out; serializeJson(resp, out);
     req->send(200, "application/json", out);
   });
 
@@ -616,6 +653,9 @@ String WebCtrl::makeSetupStatusJson_() {
   if (fan2_) {
     doc["fan2_rpm"] = fan2_->getRPM();
   }
+  if (fan3_) {
+    doc["fan3_rpm"] = fan3_->getRPM();
+  }
   if (step_) {
     auto st = step_->status();
     JsonObject s = doc["stepper"].to<JsonObject>();
@@ -625,6 +665,7 @@ String WebCtrl::makeSetupStatusJson_() {
     s["lastDone"] = st.lastOpDone;
     s["uart_ok"] = st.uart_ok;
   }
+  doc["initial_setup_done"] = LittleFS.exists("/cfg/install_done.mark");
   String out; serializeJson(doc, out); return out;
 }
 
@@ -735,6 +776,7 @@ String WebCtrl::makeStatusJson_() {
   int fanRpm = fan_ ? fan_->getRPM() : 0;
   int fan2Rpm = fan2_ ? fan2_->getRPM() : 0;
   float fan2Pct = fan2_ ? fan2_->getPercent() : 0.0f;
+  float fan3Pct = fan3_ ? fan3_->getPercent() : 0.0f;
   
   doc["light_on"] = ledPct > 0.5f;
   doc["light_pct"] = round1(ledPct);
@@ -744,7 +786,11 @@ String WebCtrl::makeStatusJson_() {
   doc["fan2_on"]  = fan2Pct > 0.5f;
   doc["fan2_pct"] = round1(fan2Pct);
   doc["fan2_rpm"] = fan2Rpm;
-  doc["pump_on"]  = false; // kein Pumpen-State integriert
+  doc["fan3_on"]  = fan3Pct > 0.5f;
+  doc["fan3_pct"] = round1(fan3Pct);
+  
+  int pPin = lumina::pins::PUMP_EN;
+  doc["pump_on"]  = (pPin >= 0) && (digitalRead(pPin) == HIGH);
 
   // Tür-Status
   bool doorOpen = ctrl_ ? ctrl_->isDoorOpen() : false;

@@ -32,7 +32,7 @@ public:
              net_ctrl::NetCtrl* net);
 
   // Optionale Hardware-Referenzen für Setup/Tests (LED-DAC, Lüfter, Stepper, ToF)
-  void setHardware(GP8211Ctrl* dac, FanCtrl* fan, FanCtrl* fan2, StepperCtrl* stepper, ToFCtrl* tof, SHT41Ctrl* shtIn = nullptr, SHT41Ctrl* shtOut = nullptr);
+  void setHardware(GP8211Ctrl* dac, FanCtrl* fan, FanCtrl* fan2, FanCtrl* fan3, StepperCtrl* stepper, ToFCtrl* tof, SHT41Ctrl* shtIn = nullptr, SHT41Ctrl* shtOut = nullptr);
 
   void loop(); // broadcast status, reboot scheduling, probes
 
@@ -93,6 +93,7 @@ private:
   GP8211Ctrl* dac_ = nullptr;
   FanCtrl* fan_ = nullptr;
   FanCtrl* fan2_ = nullptr;
+  FanCtrl* fan3_ = nullptr;
   StepperCtrl* step_ = nullptr;
   ToFCtrl* tof_ = nullptr;
   SHT41Ctrl* shtIn_ = nullptr;
