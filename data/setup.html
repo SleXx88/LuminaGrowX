@@ -298,10 +298,35 @@
         </article>
       </div>
 
-      <!-- SCHRITT 6: STEPPER -->
+      <!-- SCHRITT 6: ABSTAND (ToF) -->
       <article>
         <header>
-          <h3><span class="step-number">6</span> <span>Höhenverstellung (LED-Plattform)</span></h3>
+          <h3><span class="step-number">6</span> <span>Abstand (ToF)</span></h3>
+          <span class="badge" id="b_tof">Sensor</span>
+        </header>
+        <div class="content">
+          <div class="instruction">Der Abstandssensor (CH 1B) misst die Distanz zur Pflanze. Kalibriere ihn leer.</div>
+          <strong>Abstandssensor (ToF)</strong>
+          <p style="font-size: 0.9rem; margin-top: 0.5rem;">
+            Misst die Entfernung zur Pflanze. Lege das Kalibrier-Hilfsmittel (50mm) flach auf den Sensorboden.
+          </p>
+          <div class="btn-row">
+            <button id="tofCal" type="button" class="primary">Kalibrieren (50mm)</button>
+          </div>
+          <small id="tofMsg">–</small>
+          <div style="margin-top: 0.5rem;">Aktuell gemessen: <strong id="tofLive">-</strong> mm</div>
+          
+          <div class="checklist-box">
+            <strong>Checkliste:</strong>
+            <label><input type="checkbox" id="cb_tof" /> Kalibrierung OK</label>
+          </div>
+        </div>
+      </article>
+
+      <!-- SCHRITT 7: STEPPER -->
+      <article>
+        <header>
+          <h3><span class="step-number">7</span> <span>Höhenverstellung (LED-Plattform)</span></h3>
           <span class="badge" id="b_step">Motor</span>
         </header>
         <div class="content">
@@ -335,31 +360,6 @@
             <label><input type="checkbox" id="cb_step_home" /> Lampe ist oben angekommen?</label>
             <label><input type="checkbox" id="cb_step_down" /> Abwärts-Taste funktioniert?</label>
             <label><input type="checkbox" id="cb_step_up" /> Aufwärts-Taste funktioniert?</label>
-          </div>
-        </div>
-      </article>
-
-      <!-- SCHRITT 7: ABSTAND (ToF) -->
-      <article>
-        <header>
-          <h3><span class="step-number">7</span> <span>Abstand (ToF)</span></h3>
-          <span class="badge" id="b_tof">Sensor</span>
-        </header>
-        <div class="content">
-          <div class="instruction">Der Abstandssensor (CH 1B) misst die Distanz zur Pflanze. Kalibriere ihn leer.</div>
-          <strong>Abstandssensor (ToF)</strong>
-          <p style="font-size: 0.9rem; margin-top: 0.5rem;">
-            Misst die Entfernung zur Pflanze. Lege das Kalibrier-Hilfsmittel (50mm) flach auf den Sensorboden.
-          </p>
-          <div class="btn-row">
-            <button id="tofCal" type="button" class="primary">Kalibrieren (50mm)</button>
-          </div>
-          <small id="tofMsg">–</small>
-          <div style="margin-top: 0.5rem;">Aktuell gemessen: <strong id="tofLive">-</strong> mm</div>
-          
-          <div class="checklist-box">
-            <strong>Checkliste:</strong>
-            <label><input type="checkbox" id="cb_tof" /> Kalibrierung OK</label>
           </div>
         </div>
       </article>
