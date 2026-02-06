@@ -50,7 +50,7 @@ static bool writeTextFile(const char* path, const String& data) {
   return true;
 }
 
-WebCtrl::WebCtrl() {}
+WebCtrl::WebCtrl() : targetDacPct_(0.0f), currentDacPct_(0.0f), lastDacFadeMs_(0) {}
 
 bool WebCtrl::loadAppCfg(AppCfg& out) {
   String s; if (!readTextFile(APP_CFG_PATH, s)) return false;
@@ -144,6 +144,10 @@ void WebCtrl::begin(plant_ctrl::PlantCtrl* ctrl, RTC_Ctrl* rtc, NetCtrl* net) {
 void WebCtrl::setHardware(GP8211Ctrl* dac, FanCtrl* fan, FanCtrl* fan2, FanCtrl* fan3, StepperCtrl* stepper, ToFCtrl* tof, SHT41Ctrl* shtIn, SHT41Ctrl* shtOut) {
   dac_ = dac; fan_ = fan; fan2_ = fan2; fan3_ = fan3; step_ = stepper; tof_ = tof; shtIn_ = shtIn; shtOut_ = shtOut;
   
+  if (dac_) {
+    currentDacPct_ = targetDacPct_ = dac_->getPercent();
+  }
+
   if (step_) {
       // Apply loaded config
       step_->setMaxTravelMm(stepper_cfg_.max_travel_mm);
@@ -154,6 +158,23 @@ void WebCtrl::loop() {
   uint32_t now = millis();
   
   checkStepperCalibration_();
+
+  // Manual LED Fading logic (only if grow not started)
+  if (dac_ && !grow_.started) {
+    if (now - lastDacFadeMs_ >= 25) { // 40 Hz update
+      float diff = targetDacPct_ - currentDacPct_;
+      if (fabsf(diff) > 0.1f) {
+        float step = 2.5f; // 2.5% per 25ms = 100% per 1.0s
+        if (diff > 0) currentDacPct_ += fminf(diff, step);
+        else currentDacPct_ -= fminf(-diff, step);
+        dac_->setPercent(currentDacPct_);
+      } else if (currentDacPct_ != targetDacPct_) {
+        currentDacPct_ = targetDacPct_;
+        dac_->setPercent(currentDacPct_);
+      }
+      lastDacFadeMs_ = now;
+    }
+  }
 
   if (now >= nextProbeAt_) {
     if (net_) net_->probeInternet();
@@ -254,7 +275,17 @@ void WebCtrl::setupRoutes_() {
   http_.on("/api/dac", HTTP_POST, [](AsyncWebServerRequest*){}, NULL,
            [this](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t, size_t){
              JsonDocument doc; if (deserializeJson(doc, data, len)) { req->send(400, "application/json", "{\"error\":\"bad json\"}"); return; }
-             bool ok=false; bool on = doc["on"].as<bool>(); if (dac_) { dac_->setPercent(on?100.0f:0.0f); ok=true; }
+             bool ok=false; bool on = doc["on"].as<bool>();
+             if (dac_) {
+               if (grow_.started) {
+                 dac_->setPercent(on ? 100.0f : 0.0f);
+               } else {
+                 targetDacPct_ = on ? 100.0f : 0.0f;
+                 // Initialize current if it's the first time
+                 if (lastDacFadeMs_ == 0) currentDacPct_ = dac_->getPercent();
+               }
+               ok = true;
+             }
              JsonDocument resp; resp["ok"]=ok; String out; serializeJson(resp, out); req->send(ok?200:500, "application/json", out);
            });
   http_.on("/api/fan", HTTP_POST, [](AsyncWebServerRequest*){}, NULL,
@@ -793,7 +824,13 @@ String WebCtrl::makeStatusJson_() {
   doc["dew_c"] = round1(dewC);
 
   // Actuators
-  float ledPct = ctrl_ ? ctrl_->currentLedPercentEffective() : 0.0f;
+  float ledPct = 0.0f;
+  if (grow_.started && ctrl_) {
+    ledPct = ctrl_->currentLedPercentEffective();
+  } else if (dac_) {
+    ledPct = dac_->getPercent();
+  }
+  
   float fanPct = fan_ ? fan_->getPercent() : 0.0f;
   int fanRpm = fan_ ? fan_->getRPM() : 0;
   int fan2Rpm = fan2_ ? fan2_->getRPM() : 0;

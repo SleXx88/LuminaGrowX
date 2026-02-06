@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="de" data-theme="dark">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -9,35 +9,28 @@
       :root {
         --accent: #ef4444;
         --accent-2: #dc2626;
-        --glass: rgba(20, 20, 22, 0.6);
-        --glass-strong: rgba(20, 20, 22, 0.85);
+        --bg-main: #080809;
+        --glass: rgba(255, 255, 255, 0.03);
+        --glass-strong: rgba(255, 255, 255, 0.05);
         --muted: rgba(255, 255, 255, 0.06);
-        --border: rgba(255, 255, 255, 0.18);
+        --border: rgba(255, 255, 255, 0.1);
         --text: #e5e7eb;
-        --text-dim: #cbd5e1;
+        --text-dim: #9ca3af;
         --ok: #22c55e;
         --warn: #f59e0b;
         --err: #ef4444;
         --radius: 12px;
-        --pico-background-color: transparent;
-        --pico-card-background-color: transparent;
+        --pico-background-color: var(--bg-main);
+        --pico-card-background-color: var(--glass);
       }
-      html, body { height: 100%; }
+      html, body { 
+        height: 100%; 
+        background-color: var(--bg-main);
+      }
       body {
         position: relative;
         color: var(--text);
-        background: #0b0b0c; /* Fallback */
       }
-      /*
-      body::before {
-        content: "";
-        position: fixed;
-        inset: 0;
-        background: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7)),
-          url("/bg.jpg") center/cover no-repeat;
-        z-index: -1;
-      }
-      */
       /* Typography & Layout */
       h1, h2, h3, h4 { color: #fff; margin-bottom: 0.5rem; }
       small { color: var(--text-dim); }
@@ -98,14 +91,32 @@
       .text-err { color: var(--err) !important; }
 
       button, .button {
-        background: rgba(255,255,255,0.05); border: 1px solid var(--border);
-        color: var(--text); border-radius: 6px; font-weight: 600; cursor: pointer;
+        background: var(--accent); border: 1px solid var(--accent);
+        color: #fff; border-radius: 6px; font-weight: 600; cursor: pointer;
         padding: 0.6rem 1rem; transition: all 0.2s;
       }
-      button:hover { background: rgba(255,255,255,0.15); border-color: #fff; }
-      button.primary { background: var(--accent); border-color: var(--accent); color: white; }
-      button.primary:hover { background: var(--accent-2); }
+      button:hover { background: var(--accent-2); border-color: var(--accent-2); color: #fff; }
+      
+      button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+      button.primary:hover { background: var(--accent-2); border-color: var(--accent-2); }
+      
+      button.secondary { 
+        background: rgba(239, 68, 68, 0.1); 
+        border-color: var(--accent); 
+        color: var(--accent); 
+      }
+      button.secondary:hover { 
+        background: var(--accent); 
+        color: #fff; 
+      }
+
       button.success { background: var(--ok); border-color: var(--ok); color: white; }
+      button.success:hover { background: #16a34a; border-color: #16a34a; }
+      
+      button:disabled, button[disabled] {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
       
       input[type="checkbox"] { width: 1.2rem; height: 1.2rem; accent-color: var(--ok); margin-right: 0.5rem; }
       label { cursor: pointer; display: flex; align-items: center; }
@@ -809,6 +820,32 @@
             if (s.homing && !stepHomingActive) {
               stepHomingActive = true; stepHomed = false; stepDownEver = false;
             }
+
+            if (stepHomingActive) {
+               const btnH = $("stepHome");
+               btnH.disabled = true;
+               btnH.classList.add("success"); btnH.classList.remove("primary");
+               
+               // Calibration stages:
+               // 1. Up to top (pos approaches 0 from unknown)
+               // 2. Down to bottom (pos increases)
+               // 3. Up to top (pos approaches 0)
+               if (s.pos_mm > 0.5) {
+                  // If we are significantly away from 0 and moving, we are likely in stage 2 or 3
+                  // We can't know stage 2 vs 3 easily without tracking direction, 
+                  // but we can at least show movement.
+                  if (s.moving) {
+                      // Note: pos_mm is 0 at the top.
+                      // Stage 2 (down): pos increases. Stage 3 (up): pos decreases to 0.
+                      // Since we don't have the direction here, we use a general "Kalibrierung läuft..."
+                      // unless we want to keep track of prev pos.
+                      btnH.textContent = "Kalibrierung läuft...";
+                  }
+               } else {
+                  btnH.textContent = "Fährt nach oben...";
+               }
+            }
+
             if (stepHomingActive && !s.homing && s.lastDone) {
               stepHomingActive = false; stepHomed = true;
               // Reset Home Button

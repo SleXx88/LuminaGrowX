@@ -147,6 +147,11 @@ private:
   bool firstUpdateCheckDone_ = false;
   static void updateCheckTaskTrampoline_(void* arg);
   void updateCheckTaskRun_();
+
+  // Manual LED Fading (for Setup/Manual tests)
+  float targetDacPct_ = 0.0f;
+  float currentDacPct_ = 0.0f;
+  uint32_t lastDacFadeMs_ = 0;
 };
 
 } // namespace web_ctrl

@@ -33,9 +33,11 @@ public:
   bool setPercent(float percent) {
     if (!isfinite(percent)) percent = 0;
     if (percent <= 0.0f) {
+      lastPercent_ = 0.0f;
       return setRaw(0); // 0V
     }
     if (percent > 100.0f) percent = 100.0f;
+    lastPercent_ = percent;
     // Erzwinge Mindestwert 1% => Vmin
     float p = percent;
     if (p < 1.0f) p = 1.0f;
@@ -45,6 +47,8 @@ public:
     const uint16_t code = static_cast<uint16_t>(lroundf((volts / 10.0f) * 32767.0f));
     return setRaw(code);
   }
+
+  float getPercent() const { return lastPercent_; }
 
   // Effektiver Prozentwert (Anzeige):
   //  - 0% bleibt 0%
@@ -96,6 +100,7 @@ public:
 private:
   TwoWire* _wire;
   float    minVoltAt1Pct_ = 1.0f; // Default: 1.0V bei 1%
+  float    lastPercent_ = 0.0f;
 
   static float clampVmin_(float v) {
     if (!isfinite(v)) return 1.0f;
