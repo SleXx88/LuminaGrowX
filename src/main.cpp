@@ -161,7 +161,7 @@ void setup()
   }
   // LED/DAC-Minimalspannung anpassen (Anzeige: 1% entspricht dieser Spannung)
   dac.setMinVoltAt1Percent(lumina::ledcfg::MIN_V_AT_1PCT);
-  dac.setPercent(10);
+  // dac.setPercent(10);
 
   // ===== 2) Hardware-Sensoren =====
   // ToF aktivieren und starten

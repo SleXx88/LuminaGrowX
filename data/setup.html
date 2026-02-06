@@ -28,6 +28,7 @@
         color: var(--text);
         background: #0b0b0c; /* Fallback */
       }
+      /*
       body::before {
         content: "";
         position: fixed;
@@ -36,6 +37,7 @@
           url("/bg.jpg") center/cover no-repeat;
         z-index: -1;
       }
+      */
       /* Typography & Layout */
       h1, h2, h3, h4 { color: #fff; margin-bottom: 0.5rem; }
       small { color: var(--text-dim); }
@@ -172,7 +174,7 @@
             <input id="rtcDt" type="datetime-local" aria-label="Datum und Zeit" />
             <button id="rtcSet" type="button" class="primary">Zeit speichern</button>
           </div>
-          <small id="rtcState" style="text-align:right;">Status: -</small>
+          <div id="rtcState" style="text-align: center; font-weight: bold; margin: 0.5rem 0;">Status: -</div>
           
           <div class="checklist-box">
             <strong>Checkliste:</strong>
@@ -189,12 +191,10 @@
             <span class="badge" id="b_sht_out">Sensor Außen</span>
           </header>
           <div class="content">
-            <div class="instruction">Prüfe die Werte des Sensors (CH 1A). Sind sie realistisch?</div>
-            <p>Werte der Umgebungsluft:</p>
-            <div style="font-size: 1.2rem; font-weight: bold; text-align: center;" id="shtOut">-</div>
-            <h4 id="shtOutHdr" style="text-align:center; font-size:0.9rem;"></h4>
+            <div class="instruction">Hauche den Sensor (Klemme CH 1A) kurz an. Steigt die Feuchtigkeit oder ändert sich die Temperatur?</div>
+            <div style="text-align: center; font-weight: bold; margin: 0.5rem 0;" id="shtOut">-</div>
             
-            <div class="checklist-box">
+            <div class="checklist-box" style="margin-top: 0;">
               <strong>Checkliste:</strong>
               <label><input type="checkbox" id="cb_sht_out" /> Werte sind plausibel</label>
             </div>
@@ -207,12 +207,10 @@
             <span class="badge" id="b_sht_in">Sensor Innen</span>
           </header>
           <div class="content">
-            <div class="instruction">Hauche den Sensor (CH 2A) kurz an. Steigt die Feuchtigkeit?</div>
-            <p>Aktuelle Werte in der Box:</p>
-            <div style="font-size: 1.2rem; font-weight: bold; text-align: center;" id="shtIn">-</div>
-            <h4 id="shtInHdr" style="text-align:center; font-size:0.9rem;"></h4>
+            <div class="instruction">Hauche den Sensor (Klemme CH 2A) kurz an. Steigt die Feuchtigkeit oder ändert sich die Temperatur?</div>
+            <div style="text-align: center; font-weight: bold; margin: 0.5rem 0;" id="shtIn">-</div>
             
-            <div class="checklist-box">
+            <div class="checklist-box" style="margin-top: 0;">
               <strong>Checkliste:</strong>
               <label><input type="checkbox" id="cb_sht" /> Werte sind plausibel</label>
             </div>
@@ -228,7 +226,7 @@
             <!-- Removed Badge here as requested -->
           </header>
           <div class="content">
-            <div class="instruction">Teste alle Lüfter. Lüfter 1 (FAN1) & 2 (FAN2) sollten hörbar anlaufen sowie ein fühlbarer Wind aus den Ablüftungskanälen kommen. Lüfter 3 (LOAD2) spürt man unter der Lampe.</div>
+            <div class="instruction">Teste alle Lüfter. Lüfter 1 (Klemme FAN1) & 2 (Klemme FAN2) sollten hörbar anlaufen sowie ein fühlbarer Wind aus den Ablüftungskanälen kommen. Lüfter 3 (Klemme LOAD2) spürt man unter der Lampe.</div>
             
             <!-- Lüfter 1 -->
             <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -283,7 +281,7 @@
           </header>
           <div class="content">
             <div class="instruction">
-              Vorsicht: Das Licht (CH 2B) kann sehr hell sein! Nicht direkt hineinblicken.
+              Du kannst die LED an Klemme CH 2B testen, indem Du sie probeweise an- und ausschaltest. Vorsicht: Das Licht ist sehr hell!
             </div>
             <div class="btn-row">
               <button id="ledOff" type="button" class="primary">Aus</button>
@@ -292,7 +290,7 @@
             
             <div class="checklist-box">
               <strong>Checkliste:</strong>
-              <label><input type="checkbox" id="cb_led" /> Licht lässt sich schalten</label>
+              <label><input type="checkbox" id="cb_led" /> LED lässt sich ein- und ausschalten</label>
             </div>
           </div>
         </article>
@@ -305,20 +303,33 @@
           <span class="badge" id="b_tof">Sensor</span>
         </header>
         <div class="content">
-          <div class="instruction">Der Abstandssensor (CH 1B) misst die Distanz zur Pflanze. Kalibriere ihn leer.</div>
-          <strong>Abstandssensor (ToF)</strong>
-          <p style="font-size: 0.9rem; margin-top: 0.5rem;">
-            Misst die Entfernung zur Pflanze. Lege das Kalibrier-Hilfsmittel (50mm) flach auf den Sensorboden.
-          </p>
-          <div class="btn-row">
-            <button id="tofCal" type="button" class="primary">Kalibrieren (50mm)</button>
+          <div class="instruction">
+            Der Abstandssensor (Klemme CH 1B) misst die Distanz zur Pflanze. Bitte kalibriere den Sensor wie folgt:
           </div>
-          <small id="tofMsg">–</small>
-          <div style="margin-top: 0.5rem;">Aktuell gemessen: <strong id="tofLive">-</strong> mm</div>
           
+          <label>
+            <input type="checkbox" id="cb_tof_1" /> 
+            1. Kalibrierwerkzeug (50mm) auf den Sensor setzen.
+          </label>
+          
+          <div style="text-align: center; margin: 0.6rem 0; white-space: nowrap;">
+            Abstand&nbsp;live:&nbsp;<strong id="tofLive">-</strong>&nbsp;mm
+          </div>
+          
+          <button id="tofCal" type="button" class="primary" style="width: 100%;" disabled>2. Kalibrieren starten</button>
+          <div style="text-align: center; margin-top: -0.25rem;"><small id="tofMsg">–</small></div>
+
+          <label style="margin-top: 0.5rem;">
+            <input type="checkbox" id="cb_tof_2" disabled /> 
+            3. Kalibrierwerkzeug vom Sensor entfernen.
+          </label>
+
           <div class="checklist-box">
             <strong>Checkliste:</strong>
-            <label><input type="checkbox" id="cb_tof" /> Kalibrierung OK</label>
+            <label>
+              <input type="checkbox" id="cb_tof" disabled /> 
+              Kalibrierung OK?
+            </label>
           </div>
         </div>
       </article>
@@ -331,8 +342,8 @@
         </header>
         <div class="content">
           <div class="instruction">
-            Damit die Automatik funktioniert, muss die Lampe wissen, wo "Oben" ist.
-            <br><strong>Schritt A:</strong> Starte die Kalibrierung. Die Lampe fährt nach ganz oben an den Anschlag.
+            Hier wird die LED-Plattform kalibriert. Sobald Du "Referenzfahrt starten" drückst, fährt die Plattform zuerst zum oberen Anschlag, dann zum unteren Anschlag und schließlich wieder nach oben in die Nullposition. So ermittelt das System automatisch den gesamten Fahrweg.
+            <br><strong>Hinweis:</strong> Sollte die Fahrt fälschlicherweise nach unten starten, ist wahrscheinlich die Polung des Motors an der Klemme "STEPPER (B2 B1 A1 A2)" vertauscht.
           </div>
           
           <button id="stepHome" type="button" class="primary" style="width: 100%; padding: 1rem;">
@@ -348,7 +359,7 @@
           <hr style="opacity: 0.1;">
 
           <div class="instruction">
-            <strong>Schritt B:</strong> Wenn die Lampe oben gestoppt hat, teste vorsichtig die Bewegung.
+            Sobald die Referenzfahrt abgeschlossen ist, kannst Du die Plattform in 1-cm-Schritten testweise ab und auf bewegen.
           </div>
           <div class="btn-row">
             <button id="stepDown" type="button" class="primary" disabled>▼ 1 cm Abwärts</button>
@@ -357,7 +368,7 @@
 
           <div class="checklist-box">
             <strong>Checkliste:</strong>
-            <label><input type="checkbox" id="cb_step_home" /> Lampe ist oben angekommen?</label>
+            <label><input type="checkbox" id="cb_step_home" /> Plattformkalibrierung OK?</label>
             <label><input type="checkbox" id="cb_step_down" /> Abwärts-Taste funktioniert?</label>
             <label><input type="checkbox" id="cb_step_up" /> Aufwärts-Taste funktioniert?</label>
           </div>
@@ -370,15 +381,15 @@
           <h3><span class="step-number">8</span> <span>Zustandserkennung</span></h3>
         </header>
         <div class="content">
-          <div class="instruction">Teste die Schalter an CON1 und CON2. Die Anzeige sollte reagieren, wenn Du die Tür öffnest oder den Schwimmer bewegst.</div>
+          <div class="instruction">Teste die Schalter an Klemme CON1 und Klemme CON2. Die Anzeige sollte reagieren, wenn Du die Tür öffnest oder den Schwimmer bewegst.</div>
           
           <div class="grid-2" style="gap: 1rem;">
             <div>
-              <strong>Wasserpegel-Sensor (CON1)</strong>
+              <strong>Wasserpegel-Sensor (Klemme CON1)</strong>
               <div style="margin: 0.5rem 0; font-size: 1.1em;">Status: <strong id="waterState" style="color: var(--accent);">Unbekannt</strong></div>
             </div>
             <div>
-              <strong>Tür-Kontakt (CON2)</strong>
+              <strong>Tür-Kontakt (Klemme CON2)</strong>
               <div style="margin: 0.5rem 0; font-size: 1.1em;">Status: <strong id="doorState" style="color: var(--accent);">Unbekannt</strong></div>
             </div>
           </div>
@@ -398,7 +409,7 @@
         </header>
         <div class="content">
           <div class="instruction">
-             Teste die Pumpe an LOAD2 ob sie ein oder aus geht. Achte darauf dass die geeignete Spannung 5V oder 12V mit den Jumpern gesteckt ist. Achte auf das Hersetllerdatenblatt der Pumpe.
+             Teste die Pumpe an Klemme LOAD2 ob sie ein oder aus geht. Achte darauf dass die geeignete Spannung 5V oder 12V mit den Jumpern gesteckt ist. Achte auf das Hersetllerdatenblatt der Pumpe.
           </div>
           <div class="btn-row">
             <button id="pumpOff" type="button" class="primary">Aus</button>
@@ -593,10 +604,13 @@
       }
 
       async function refreshStatus() {
+        let rtcOk = false;
         // Setup specific status
         try {
           const st = await fetchJSON("/api/setup/status");
-          $("rtcState").textContent = (st.rtc_ok ? "Uhrzeit läuft" : "Fehler: RTC fehlt");
+          rtcOk = !!st.rtc_ok;
+          if (!rtcOk) $("rtcState").textContent = "Fehler: RTC fehlt";
+          
           if (typeof st.tof_mm !== "undefined") {
             const v = st.tof_mm;
             $("tofLive").textContent = v >= 0 ? v : "Fehler";
@@ -620,8 +634,14 @@
           const tIn = live && live.temp_c, hIn = live && live.humi_rh;
           const tOut = live && live.temp_out_c, hOut = live && live.humi_out_rh;
           
-          $("shtIn").textContent = (Number.isFinite(tIn) ? tIn.toFixed(1) + "°C " : "") + (Number.isFinite(hIn) ? hIn.toFixed(0) + "%" : "-");
-          $("shtOut").textContent = (Number.isFinite(tOut) ? tOut.toFixed(1) + "°C " : "") + (Number.isFinite(hOut) ? hOut.toFixed(0) + "%" : "-");
+          if ($("shtIn")) {
+            $("shtIn").innerHTML = `<div>${Number.isFinite(tIn) ? tIn.toFixed(1) + "°C" : "-"}</div>` + 
+                                   `<div style="font-size:0.9em; opacity:0.8; font-weight:normal;">${Number.isFinite(hIn) ? hIn.toFixed(0) + "% rH" : "-"}</div>`;
+          }
+          if ($("shtOut")) {
+            $("shtOut").innerHTML = `<div>${Number.isFinite(tOut) ? tOut.toFixed(1) + "°C" : "-"}</div>` + 
+                                    `<div style="font-size:0.9em; opacity:0.8; font-weight:normal;">${Number.isFinite(hOut) ? hOut.toFixed(0) + "% rH" : "-"}</div>`;
+          }
 
           // Fans
           // Fan 1
@@ -653,12 +673,15 @@
           updateToggleBtns("pumpOff", "pumpOn", !!live.pump_on);
 
           // RTC Prefill if empty
-          if (!$("rtcDt").value && live && live.ntp_time) {
-             const m = live.ntp_time.match(/(\d{1,2})[\.\-](\d{1,2})[\.\-](\d{2,4})\s+(\d{1,2})[\:\-](\d{1,2})[\:\-](\d{1,2})/);
-             if (m) {
-               let y = Number(m[3]); if(y<100) y+=2000;
-               const iso = y+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[1]).padStart(2,'0')+'T'+String(m[4]).padStart(2,'0')+':'+String(m[5]).padStart(2,'0');
-               $("rtcDt").value = iso;
+          if (live && live.ntp_time) {
+             if (rtcOk) $("rtcState").textContent = live.ntp_time;
+             if (!$("rtcDt").value) {
+                const m = live.ntp_time.match(/(\d{1,2})[\.\-](\d{1,2})[\.\-](\d{2,4})\s+(\d{1,2})[\:\-](\d{1,2})[\:\-](\d{1,2})/);
+                if (m) {
+                  let y = Number(m[3]); if(y<100) y+=2000;
+                  const iso = y+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[1]).padStart(2,'0')+'T'+String(m[4]).padStart(2,'0')+':'+String(m[5]).padStart(2,'0');
+                  $("rtcDt").value = iso;
+                }
              }
           }
         } catch (e) {}
@@ -844,17 +867,24 @@
       }
 
       // 7. ToF & Door
+      $("cb_tof_1").addEventListener("change", (e) => {
+        $("tofCal").disabled = !e.target.checked;
+      });
+
       $("tofCal").addEventListener("click", async () => {
         try {
           const r = await fetchJSON("/api/tof/calibrate", { method: "POST", body: "{}" });
           if (r.ok) {
              $("tofMsg").textContent = "OK (Erkannt: " + r.measured + "mm)";
-             $("cb_tof").checked = true;
-             updateDoneEnabled();
+             $("cb_tof_2").disabled = false;
           } else {
              $("tofMsg").textContent = "Fehler (Sensor verdeckt?)";
           }
         } catch (e) { $("tofMsg").textContent = "Fehler"; }
+      });
+
+      $("cb_tof_2").addEventListener("change", (e) => {
+        $("cb_tof").disabled = !e.target.checked;
       });
 
       async function pollDoor() {
@@ -994,7 +1024,7 @@
         const need = [
           "cb_rtc", "cb_sht", "cb_sht_out", "cb_fan", "cb_fan2", "cb_fan3",
           "cb_led", "cb_step_home", "cb_step_down", "cb_step_up", 
-          "cb_tof", "cb_door", "cb_water", "cb_pump", "cb_wifi_done"
+          "cb_tof_1", "cb_tof_2", "cb_tof", "cb_door", "cb_water", "cb_pump", "cb_wifi_done"
         ];
         const all = need.every((id) => $(id) && $(id).checked);
         $("btnDone").disabled = !all;
