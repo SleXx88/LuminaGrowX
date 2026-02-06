@@ -110,7 +110,18 @@ public:
 
 private:
   enum class Mode { IDLE, CONTINUOUS, GOTO, HOMING };
-  enum class HomeState { IDLE, PRE_BACKOFF, FAST, BACKOFF, DONE };
+  enum class HomeState { 
+    IDLE, 
+    PRE_BACKOFF, 
+    FAST_UP, 
+    BACKOFF_TOP, 
+    ZERO_TOP,
+    FAST_DOWN,
+    BACKOFF_BOTTOM,
+    CALC_SPAN,
+    RETURN_TO_ZERO,
+    DONE 
+  };
 
   inline long  mmToSteps(float mm) const;
   inline float stepsToMm(long st) const;
@@ -130,6 +141,17 @@ private:
   void homeMoveRelativeMM_(float mmLogical, float maxHz);
   void recomputeSoftLimits_();
   void debugPrintLimits() const;
+
+public:
+  // Returns true if a new max_travel_mm was calculated. Clears the flag on read.
+  bool checkNewCalibration() {
+      if (newCalibrationAvailable_) {
+          newCalibrationAvailable_ = false;
+          return true;
+      }
+      return false;
+  }
+  float getMaxTravelMm() const { return l_.max_travel_mm; }
 
 private:
   StepperPins       p_;
@@ -161,6 +183,7 @@ private:
   volatile bool      lastOpDone_   = false;
   volatile bool      homingFinished_ = false;
   bool      homingBackoffActive_ = false;
+  bool      newCalibrationAvailable_ = false;
 
   uint32_t  lastDebugPosMs_ = 0;
   uint16_t  debugMoveLogIntervalMs_ = 100;

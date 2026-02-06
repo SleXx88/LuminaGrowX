@@ -46,7 +46,7 @@ Die Konfiguration stammt aus `include/lumina_config.h`.
 *   **DIR Pin (11):** Bekanntes Problem mit Hardware-Verbindung ("Motor dreht nur in eine Richtung"). Workaround in Software aktiv.
 
 ### CO2 Sensor (MQ-2 Gas-Sensor)
-*   `CO2_MQ_VAL` wird über einen Spannungsteiler gemessen -> CO2 Analog Ausgang - 1,8k - CO2_MQ_VAL (Analog Input) - 3,3k - GND 
+*   `CO2_MQ_VAL` wird über einen Spannungsteiler gemessen -> CO2 Analog Ausgang
 
 ### Lüfter (PWM)
 *   Frequenz: 25 kHz

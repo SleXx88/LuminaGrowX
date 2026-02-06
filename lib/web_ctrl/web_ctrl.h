@@ -22,6 +22,7 @@ struct AppCfg { String seed = "Northern Lights"; };
 struct GrowState { bool started=false; uint32_t start_epoch=0; uint16_t total_days=90; };
 struct DryingState { bool active=false; uint32_t start_epoch=0; };
 struct NotifyCfg { bool enabled=false; String phone; String apikey; };
+struct StepperCfg { float max_travel_mm = 440.0f; };
 
 class WebCtrl {
 public:
@@ -45,6 +46,8 @@ public:
   bool saveDrying(const DryingState& d);
   bool loadNotify(NotifyCfg& out);
   bool saveNotify(const NotifyCfg& n);
+  bool loadStepperCfg(StepperCfg& out);
+  bool saveStepperCfg(const StepperCfg& c);
 
 private:
   // HTTP handlers
@@ -86,6 +89,8 @@ private:
   // WhatsApp
   bool whatsappSend_(const String& phone, const String& apikey, const String& message);
 
+  void checkStepperCalibration_();
+
 private:
   plant_ctrl::PlantCtrl* ctrl_ = nullptr;
   RTC_Ctrl* rtc_ = nullptr;
@@ -106,6 +111,7 @@ private:
   GrowState grow_;
   DryingState drying_;
   NotifyCfg notify_;
+  StepperCfg stepper_cfg_;
 
   uint32_t nextPushAt_ = 0;
   uint32_t nextProbeAt_ = 0;

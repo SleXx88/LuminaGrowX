@@ -1,4 +1,4 @@
-﻿#include "web_ctrl.h"
+#include "web_ctrl.h"
 #include "rtc_ctrl.h"
 #include "plant_ctrl.h"
 #include "net_ctrl.h"
@@ -24,6 +24,7 @@ static const char* APP_CFG_PATH   = "/cfg/app.json";
 static const char* GROW_CFG_PATH  = "/cfg/grow.json";
 static const char* DRYING_CFG_PATH= "/cfg/drying.json";
 static const char* NOTIFY_CFG_PATH= "/cfg/notify.json";
+static const char* STEPPER_CFG_PATH= "/cfg/stepper.json";
 static const char* UPDATE_CFG_PATH= "/cfg/update.json";
 // Version kommt aus include/version.h (FW_VERSION)
 // GitHub Releases (latest) defaults â€“ fest im Code hinterlegt
@@ -96,6 +97,16 @@ bool WebCtrl::saveNotify(const NotifyCfg& n) {
   JsonDocument doc; doc["enabled"] = n.enabled; doc["phone"] = n.phone; doc["apikey"] = n.apikey; String out; serializeJson(doc, out);
   bool ok = writeTextFile(NOTIFY_CFG_PATH, out); if (ok) notify_ = n; return ok;
 }
+bool WebCtrl::loadStepperCfg(StepperCfg& out) {
+    String s; if (!readTextFile(STEPPER_CFG_PATH, s)) return false;
+    JsonDocument doc; if (deserializeJson(doc, s)) return false;
+    out.max_travel_mm = doc["max_travel_mm"].as<float>();
+    stepper_cfg_ = out; return true;
+}
+bool WebCtrl::saveStepperCfg(const StepperCfg& c) {
+    JsonDocument doc; doc["max_travel_mm"] = c.max_travel_mm; String out; serializeJson(doc, out);
+    bool ok = writeTextFile(STEPPER_CFG_PATH, out); if (ok) stepper_cfg_ = c; return ok;
+}
 
 static uint64_t uptime_s() { return millis() / 1000ULL; }
 
@@ -108,6 +119,8 @@ void WebCtrl::begin(plant_ctrl::PlantCtrl* ctrl, RTC_Ctrl* rtc, NetCtrl* net) {
   drying_ = tmpD;
   NotifyCfg tmpN; loadNotify(tmpN);
   notify_ = tmpN;
+  StepperCfg tmpS; loadStepperCfg(tmpS);
+  stepper_cfg_ = tmpS;
 
   // Initialen Grow/Drying-Status an PlantCtrl weiterleiten
   if (ctrl_) {
@@ -130,10 +143,18 @@ void WebCtrl::begin(plant_ctrl::PlantCtrl* ctrl, RTC_Ctrl* rtc, NetCtrl* net) {
 
 void WebCtrl::setHardware(GP8211Ctrl* dac, FanCtrl* fan, FanCtrl* fan2, FanCtrl* fan3, StepperCtrl* stepper, ToFCtrl* tof, SHT41Ctrl* shtIn, SHT41Ctrl* shtOut) {
   dac_ = dac; fan_ = fan; fan2_ = fan2; fan3_ = fan3; step_ = stepper; tof_ = tof; shtIn_ = shtIn; shtOut_ = shtOut;
+  
+  if (step_) {
+      // Apply loaded config
+      step_->setMaxTravelMm(stepper_cfg_.max_travel_mm);
+  }
 }
 
 void WebCtrl::loop() {
   uint32_t now = millis();
+  
+  checkStepperCalibration_();
+
   if (now >= nextProbeAt_) {
     if (net_) net_->probeInternet();
     nextProbeAt_ = now + 60000;
@@ -274,7 +295,7 @@ void WebCtrl::setupRoutes_() {
     JsonDocument resp; resp["ok"]=ok; String out; serializeJson(resp, out); req->send(ok?200:500, "application/json", out);
   });
   http_.on("/api/stepper/status", HTTP_GET, [this](AsyncWebServerRequest* req){
-    JsonDocument resp; bool ok=false; if (step_) { auto st=step_->status(); ok=true; resp["ok"]=true; resp["pos_mm"]=st.position_mm; resp["moving"]=st.isMoving; resp["homing"]=st.isHoming; resp["lastDone"]=st.lastOpDone; resp["uart_ok"]=st.uart_ok; }
+    JsonDocument resp; bool ok=false; if (step_) { auto st=step_->status(); ok=true; resp["ok"]=true; resp["pos_mm"]=st.position_mm; resp["moving"]=st.isMoving; resp["homing"]=st.isHoming; resp["lastDone"]=st.lastOpDone; resp["uart_ok"]=st.uart_ok; resp["max_travel_mm"] = stepper_cfg_.max_travel_mm; }
     String out; serializeJson(resp, out); req->send(ok?200:500, "application/json", out);
   });
 
@@ -664,6 +685,7 @@ String WebCtrl::makeSetupStatusJson_() {
     s["homing"] = st.isHoming;
     s["lastDone"] = st.lastOpDone;
     s["uart_ok"] = st.uart_ok;
+    s["max_travel_mm"] = stepper_cfg_.max_travel_mm;
   }
   doc["initial_setup_done"] = LittleFS.exists("/cfg/install_done.mark");
   String out; serializeJson(doc, out); return out;
@@ -1445,4 +1467,12 @@ bool WebCtrl::fileExists_(const char* path) {
   bool mounted = LittleFS.begin(false, "/littlefs", 10, "littlefs");
   if (!mounted) { Serial.println(F("[FS] not mounted in fileExists_")); return false; }
   return LittleFS.exists(path);
+}
+
+void WebCtrl::checkStepperCalibration_() {
+    if (step_ && step_->checkNewCalibration()) {
+        stepper_cfg_.max_travel_mm = step_->getMaxTravelMm();
+        saveStepperCfg(stepper_cfg_);
+        Serial.printf("[WEB] Saved new stepper calibration: %.2f mm\n", stepper_cfg_.max_travel_mm);
+    }
 }

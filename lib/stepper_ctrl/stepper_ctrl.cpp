@@ -219,6 +219,7 @@ bool StepperCtrl::startHoming()
   }
 
   homingBackoffActive_ = false;
+  newCalibrationAvailable_ = false; // Reset flag
   hState_ = HomeState::PRE_BACKOFF;
   mode_ = Mode::HOMING;
   lastOpDone_ = false;
@@ -243,6 +244,7 @@ void StepperCtrl::resetHoming()
   sgAvg_ = 0.0f;
   diagTriggered_ = false;
   homingBackoffActive_ = false;
+  newCalibrationAvailable_ = false;
   if (debug_) Serial.println("[HOME] Reset");
 
   if (mutex_) xSemaphoreGive(mutex_);
@@ -250,19 +252,19 @@ void StepperCtrl::resetHoming()
 
 std::pair<float, bool> StepperCtrl::goTop(uint8_t speedLevel)
 {
-  return goToEnd(+1, speedLevel);
+  return goToEnd(-1, speedLevel);
 }
 std::pair<float, bool> StepperCtrl::goBottom(uint8_t speedLevel)
 {
-  return goToEnd(-1, speedLevel);
+  return goToEnd(+1, speedLevel);
 }
 std::pair<float, bool> StepperCtrl::moveUp(float mm, uint8_t speedLevel)
 {
-  return moveBy(+1, mm, speedLevel);
+  return moveBy(-1, mm, speedLevel);
 }
 std::pair<float, bool> StepperCtrl::moveDown(float mm, uint8_t speedLevel)
 {
-  return moveBy(-1, mm, speedLevel);
+  return moveBy(+1, mm, speedLevel);
 }
 
 /* ---------------- Bewegungen ---------------- */
@@ -271,10 +273,11 @@ std::pair<float, bool> StepperCtrl::goToEnd(int logicalDir, uint8_t speedLevel)
 {
   if (mutex_) xSemaphoreTake(mutex_, portMAX_DELAY);
 
+  // logicalDir: -1 = TOP (softMin), +1 = BOTTOM (softMax)
   const long target = (logicalDir >= 0) ? softMaxSteps_ : softMinSteps_; 
   const uint8_t lvl = (speedLevel > 5) ? 5 : speedLevel;
   moveToAbsMM_(stepsToMm(target), s_.hz[lvl]);
-  if (debug_) Serial.printf("[CMD] goToEnd(%s) lvl=%u\n", (logicalDir >= 0) ? "TOP" : "BOTTOM", lvl);
+  if (debug_) Serial.printf("[CMD] goToEnd(%s) lvl=%u\n", (logicalDir >= 0) ? "BOTTOM" : "TOP", lvl);
   
   std::pair<float, bool> ret = {getPositionMm(), (mode_ == Mode::IDLE)};
   
@@ -287,9 +290,11 @@ std::pair<float, bool> StepperCtrl::moveBy(int logicalDir, float mm, uint8_t spe
   if (mutex_) xSemaphoreTake(mutex_, portMAX_DELAY);
 
   const uint8_t lvl = (speedLevel > 5) ? 5 : speedLevel;
-  const float mmLogical = (logicalDir >= 0) ? -fabsf(mm) : +fabsf(mm);
+  // logicalDir: -1=Up (negative mm), +1=Down (positive mm)
+  const float mmLogical = (logicalDir >= 0) ? +fabsf(mm) : -fabsf(mm);
+  
   moveRelativeLogicalMM_(mmLogical, s_.hz[lvl]);
-  if (debug_) Serial.printf("[CMD] moveBy(mm=%.2f, %s) lvl=%u\n", fabsf(mm), (logicalDir >= 0) ? "UP" : "DOWN", lvl);
+  if (debug_) Serial.printf("[CMD] moveBy(mm=%.2f, %s) lvl=%u\n", fabsf(mm), (logicalDir >= 0) ? "DOWN" : "UP", lvl);
   
   std::pair<float, bool> ret = {getPositionMm(), (mode_ == Mode::IDLE)};
   
@@ -316,7 +321,8 @@ void StepperCtrl::jogUp(uint8_t speedLevel)
   if (mutex_) xSemaphoreTake(mutex_, portMAX_DELAY);
   
   const uint8_t lvl = (speedLevel > 5) ? 5 : speedLevel;
-  startContinuousLogical_(s_.hz[lvl], +1);
+  // Up is logical -1
+  startContinuousLogical_(s_.hz[lvl], -1);
   if (debug_) Serial.printf("[CMD] jogUp lvl=%u\n", lvl);
 
   if (mutex_) xSemaphoreGive(mutex_);
@@ -326,7 +332,8 @@ void StepperCtrl::jogDown(uint8_t speedLevel)
   if (mutex_) xSemaphoreTake(mutex_, portMAX_DELAY);
 
   const uint8_t lvl = (speedLevel > 5) ? 5 : speedLevel;
-  startContinuousLogical_(s_.hz[lvl], -1);
+  // Down is logical +1
+  startContinuousLogical_(s_.hz[lvl], +1);
   if (debug_) Serial.printf("[CMD] jogDown lvl=%u\n", lvl);
 
   if (mutex_) xSemaphoreGive(mutex_);
@@ -478,15 +485,17 @@ void StepperCtrl::beginHomePhase_(HomeState next, float speedHz, int logicalDir)
   sgAvg_ = 0.0f;
   sgLastPoll_ = 0;
 
-  if (next == HomeState::FAST)
+  if (next == HomeState::FAST_UP || next == HomeState::FAST_DOWN)
   {
     homingStartSteps_ = stepper_.getCurrentPosition();
     
     // Target calculation: Allow over-travel to ensure we hit the limit switch
-    // even if the logical position thinks we are already there.
     float target_mm;
+    // Note: homingDirLogical is -1 (TOP/UP).
+    // If logicalDir < 0 (UP): Target -1.5*max
+    // If logicalDir > 0 (DOWN): Target +1.5*max
     if (logicalDir >= 0) target_mm = l_.max_travel_mm * 1.5f; 
-    else target_mm = -l_.max_travel_mm * 0.5f;
+    else target_mm = -l_.max_travel_mm * 1.5f; // Was 0.5, increased to 1.5 for safety if offset
 
     float v = fabsf(speedHz);
     stepper_.setMaxSpeed(v);
@@ -497,7 +506,7 @@ void StepperCtrl::beginHomePhase_(HomeState next, float speedHz, int logicalDir)
     long tgt = mmToSteps(target_mm) * (-axisSign);
     
     stepper_.moveTo(tgt);
-    Serial.printf("[HOMING] Start Fast Move (Target: %.1f mm)\n", target_mm);
+    Serial.printf("[HOMING] Start Fast Move (State: %d, Target: %.1f mm)\n", (int)next, target_mm);
   }
 
   diagTriggered_ = false;
@@ -513,109 +522,196 @@ void StepperCtrl::updateHoming_()
   uint32_t now = millis();
   bool sgWindowOver = (now - homePhaseMs_) > h_.sg_ignore_ms;
 
+  // 0. Pre-Backoff Completion
   if (hState_ == HomeState::PRE_BACKOFF)
   {
     if (!stepper_.isRunning())
     {
-      beginHomePhase_(HomeState::FAST, h_.speed_fast_hz, homingDirLogical_);
-      if (debug_) Serial.println("[HOME] Pre-backoff done -> FAST");
+      // Move Fast Up (towards Top, Logical -1)
+      beginHomePhase_(HomeState::FAST_UP, h_.speed_fast_hz, homingDirLogical_); // -1
+      if (debug_) Serial.println("[HOME] Pre-backoff done -> FAST_UP");
     }
     return;
   }
 
-  if (now - sgLastPoll_ >= h_.sg_poll_ms)
-  {
-    sgLastPoll_ = now;
-    uint32_t sg_val = 0;
-    
-    // Only process if read succeeds
-    if (stepper_.readRegister(TMCTiny::SG_RESULT, sg_val)) {
-        uint16_t sg_raw = (uint16_t)sg_val;
-
-        if ((now - sgCalibMs_) <= h_.sg_baseline_ms)
-        {
-          sgSamples_++;
-          sgBaseline_ = (sgBaseline_ * (sgSamples_ - 1) + (float)sg_raw) / (float)sgSamples_;
-          if (sgSamples_ < 3) sgAvg_ = sgBaseline_;
-        }
-        else
-        {
-          sgAvg_ = ema_update(sgAvg_, (float)sg_raw, 0.25f);
-        }
-    } else {
-        // Read failed
-        if (debug_) Serial.print("!"); // visual marker for UART error
-    }
-  }
-
+  // Monitor StallGuard during FAST moves
   bool stallDetected = false;
-
-  // 1. Check Hardware DIAG Pin
-  if (diagTriggered_) {
-      stallDetected = true;
-      diagTriggered_ = false; // Ack
-      Serial.println("[HOMING] Hardware Stop (DIAG Pin)");
-  }
-
-  // 2. Check Software Polling (Backup)
-  if (!stallDetected && sgWindowOver && (sgSamples_ > 5))
+  if (hState_ == HomeState::FAST_UP || hState_ == HomeState::FAST_DOWN)
   {
-    float dropThreshold = fmaxf(sgBaseline_ * (1.0f - h_.sg_drop_pct), (float)h_.sg_abs_thr);
-    if (sgAvg_ <= dropThreshold) {
-        stallDetected = true;
-        Serial.printf("[HOMING] Soft Stop (SG: %.1f < %.1f)\n", sgAvg_, dropThreshold);
-    }
-  }
-  if (stallDetected)
-  {
-    long delta = labs((long)(stepper_.getCurrentPosition() - homingStartSteps_));
-    if (delta < mmToSteps(h_.min_stall_mm)) {
-        stallDetected = false;
-        // Serial.println("[HOMING] Ignored noise/bump"); 
-    }
+      if (now - sgLastPoll_ >= h_.sg_poll_ms)
+      {
+        sgLastPoll_ = now;
+        uint32_t sg_val = 0;
+        if (stepper_.readRegister(TMCTiny::SG_RESULT, sg_val)) {
+            uint16_t sg_raw = (uint16_t)sg_val;
+            if ((now - sgCalibMs_) <= h_.sg_baseline_ms)
+            {
+              sgSamples_++;
+              sgBaseline_ = (sgBaseline_ * (sgSamples_ - 1) + (float)sg_raw) / (float)sgSamples_;
+              if (sgSamples_ < 3) sgAvg_ = sgBaseline_;
+            }
+            else
+            {
+              sgAvg_ = ema_update(sgAvg_, (float)sg_raw, 0.25f);
+            }
+        }
+      }
+
+      // 1. Check Hardware DIAG Pin
+      if (diagTriggered_) {
+          stallDetected = true;
+          diagTriggered_ = false; // Ack
+          Serial.println("[HOMING] Hardware Stop (DIAG Pin)");
+      }
+
+      // 2. Check Software Polling
+      if (!stallDetected && sgWindowOver && (sgSamples_ > 5))
+      {
+        float dropThreshold = fmaxf(sgBaseline_ * (1.0f - h_.sg_drop_pct), (float)h_.sg_abs_thr);
+        if (sgAvg_ <= dropThreshold) {
+            stallDetected = true;
+            Serial.printf("[HOMING] Soft Stop (SG: %.1f < %.1f)\n", sgAvg_, dropThreshold);
+        }
+      }
+
+      // 3. Min distance check
+      if (stallDetected)
+      {
+        long delta = labs((long)(stepper_.getCurrentPosition() - homingStartSteps_));
+        if (delta < mmToSteps(h_.min_stall_mm)) {
+            stallDetected = false;
+        }
+      }
   }
 
-  if (hState_ == HomeState::FAST && stallDetected)
+  // 1. Handle Stall in FAST_UP (Top detected)
+  if (hState_ == HomeState::FAST_UP && stallDetected)
   {
     long cur = stepper_.getCurrentPosition();
     stepper_.forceStopAndNewPosition(cur);
-    stepper_.setCurrentPosition(mmToSteps(l_.home_offset_mm));
+    // Set temporary 0 + offset (we are at Top)
+    // Actually, we are at the physical limit.
+    // We backoff now.
+    
+    // Move Down (Logical +1)
+    const float backoff_mm = h_.backoff_mm;
+    const int backoffDir = (homingDirLogical_ == -1) ? +1 : -1; // -1 is Up, so Backoff is +1 (Down)
 
-    const float backoff_target_mm = l_.home_offset_mm - homingDirLogical_ * h_.backoff_mm;
     float v = fabsf(h_.speed_slow_hz);
     stepper_.setMaxSpeed(v);
     stepper_.setAcceleration(v * 2.0f);
     
-    // Use consistent coordinate transform
-    const int axisSign = (AXIS_UP_DIR_ >= 0) ? +1 : -1;
-    long tgt = mmToSteps(backoff_target_mm) * (-axisSign);
-    
-    stepper_.enable(true); // Restart move
-    lastMotorActivityMs_ = millis();
-    
-    stepper_.moveTo(tgt);
+    // Relative move logic
+    // We can't use moveRelativeLogicalMM_ because it respects soft limits which might be wrong.
+    // Use raw move:
+    // Dir +1 (Down) -> Motor +1 (if AxisUp -1).
+    // Let's use homeMoveRelativeMM_ which clamps but we are at limit so clamp should be fine if limits are wide enough?
+    // But we haven't set limits yet.
+    // Use raw stepper move.
+    long steps = mmToSteps(backoff_mm);
+    // If backoffDir is +1 (Down), and Down is +Steps (since 0 is Top).
+    // Yes.
+    stepper_.enable(true);
+    stepper_.move(steps); // +steps = Down
 
-    hState_ = HomeState::BACKOFF;
+    hState_ = HomeState::BACKOFF_TOP;
     homingBackoffActive_ = true;
-    Serial.printf("[HOMING] Backing off to %.2f mm\n", backoff_target_mm);
+    Serial.printf("[HOMING] Top found. Backing off %.2f mm\n", backoff_mm);
     return;
   }
 
-  if (hState_ == HomeState::BACKOFF)
+  // 2. Handle BACKOFF_TOP completion
+  if (hState_ == HomeState::BACKOFF_TOP)
   {
     if (!stepper_.isRunning())
     {
-      stepper_.forceStopAndNewPosition(0);
-      recomputeSoftLimits_();
-
-      hState_ = HomeState::DONE;
-      mode_ = Mode::IDLE;
-      lastOpDone_ = true;
-      homingFinished_ = true;
-      homingBackoffActive_ = false;
-
-      Serial.println("[HOMING] Done. Zero set at top.");
+      stepper_.forceStopAndNewPosition(0); // Set Zero at Top (after backoff)
+      // Note: We are now at 0. Top Limit is actually -3mm (if backoff was 3mm).
+      // But standard is 0 = Top Switch position (after backoff).
+      
+      // Now start Phase 2: Find Bottom
+      hState_ = HomeState::ZERO_TOP;
+      // Fallthrough to next if immediately
     }
+  }
+  
+  if (hState_ == HomeState::ZERO_TOP)
+  {
+      // Move Fast Down (Logical +1)
+      beginHomePhase_(HomeState::FAST_DOWN, h_.speed_fast_hz, +1);
+      if (debug_) Serial.println("[HOMING] Zero set. Searching Bottom...");
+      return;
+  }
+
+  // 3. Handle Stall in FAST_DOWN (Bottom detected)
+  if (hState_ == HomeState::FAST_DOWN && stallDetected)
+  {
+    long cur = stepper_.getCurrentPosition();
+    stepper_.forceStopAndNewPosition(cur);
+    
+    // We are at Bottom.
+    // Backoff Up (Logical -1).
+    const float backoff_mm = h_.backoff_mm;
+    // Up is Negative steps.
+    long steps = -mmToSteps(backoff_mm);
+
+    float v = fabsf(h_.speed_slow_hz);
+    stepper_.setMaxSpeed(v);
+    stepper_.setAcceleration(v * 2.0f);
+    
+    stepper_.enable(true);
+    stepper_.move(steps); 
+
+    hState_ = HomeState::BACKOFF_BOTTOM;
+    Serial.printf("[HOMING] Bottom found. Backing off %.2f mm\n", backoff_mm);
+    return;
+  }
+
+  // 4. Handle BACKOFF_BOTTOM completion
+  if (hState_ == HomeState::BACKOFF_BOTTOM)
+  {
+      if (!stepper_.isRunning())
+      {
+          hState_ = HomeState::CALC_SPAN;
+      }
+  }
+
+  // 5. Calculate Span
+  if (hState_ == HomeState::CALC_SPAN)
+  {
+      long pos = stepper_.getCurrentPosition();
+      // We are at Bottom Backoff.
+      // Position is Steps from Top Zero.
+      // Measured Travel = Steps -> mm.
+      // Since we defined 0 as Top, Bottom is positive.
+      float measured_mm = stepsToMm(pos);
+      
+      Serial.printf("[HOMING] Calibration Done. Steps=%ld, Measured=%.2f mm\n", pos, measured_mm);
+      
+      // Update Limit
+      // DEADLOCK FIX: Do not call setMaxTravelMm(measured_mm) because it takes the mutex, 
+      // and we already hold it in updateHoming_ (called by tick).
+      l_.max_travel_mm = measured_mm;
+      recomputeSoftLimits_();
+      newCalibrationAvailable_ = true;
+
+      // Return to Zero
+      moveToAbsMM_(0.0f, h_.speed_fast_hz);
+      hState_ = HomeState::RETURN_TO_ZERO;
+  }
+
+  // 6. Handle RETURN_TO_ZERO completion
+  if (hState_ == HomeState::RETURN_TO_ZERO)
+  {
+      if (!stepper_.isRunning())
+      {
+          hState_ = HomeState::DONE;
+          mode_ = Mode::IDLE;
+          lastOpDone_ = true;
+          homingFinished_ = true;
+          homingBackoffActive_ = false;
+          Serial.println("[HOMING] Sequence Complete. At Top Zero.");
+      }
   }
 }
 

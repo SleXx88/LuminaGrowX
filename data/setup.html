@@ -313,7 +313,12 @@
           <button id="stepHome" type="button" class="primary" style="width: 100%; padding: 1rem;">
             Referenzfahrt starten (Kalibrierung)
           </button>
-          <small id="stepMsg" style="text-align: center; display: block; min-height: 1.2em;">–</small>
+          <div style="text-align: center; margin-top: 0.5rem;">
+            <small id="stepMsg" style="display: block; min-height: 1.2em;">–</small>
+            <div id="calibResult" style="font-size: 0.85rem; margin-top: 0.2rem; display: none;">
+              Physischer Fahrweg: <strong id="valMaxTravel">-</strong> mm
+            </div>
+          </div>
 
           <hr style="opacity: 0.1;">
 
@@ -789,6 +794,11 @@
               btnH.textContent = "Referenzfahrt wiederholen";
               btnH.disabled = false;
               setStepMsg("Kalibrierung OK", "ok");
+              
+              if (s.max_travel_mm) {
+                  $("valMaxTravel").textContent = s.max_travel_mm.toFixed(1);
+                  $("calibResult").style.display = "block";
+              }
             }
 
             // Jog Logic
@@ -822,6 +832,12 @@
                   delete btnDown.dataset.moving;
                   setStepMsg("OK", "ok");
                }
+            }
+            
+            // Always show max travel if it's already calibrated (e.g. on page refresh)
+            if (s.max_travel_mm && !stepHomingActive) {
+                $("valMaxTravel").textContent = s.max_travel_mm.toFixed(1);
+                $("calibResult").style.display = "block";
             }
           }
         } catch (_) {}
