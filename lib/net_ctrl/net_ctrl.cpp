@@ -1,63 +1,40 @@
 #include "net_ctrl.h"
-#include <ArduinoJson.h>
+#include <Preferences.h>
 #include "rtc_ctrl.h"
 
 using namespace net_ctrl;
 
-static const char* NET_CFG_PATH = "/cfg/network.json";
-
-static bool readTextFile(const char* path, String& out) {
-  File f = LittleFS.open(path, FILE_READ);
-  if (!f) return false;
-  out = f.readString();
-  f.close();
-  return true;
-}
-
-static bool writeTextFile(const char* path, const String& data) {
-  // ensure directory exists
-  LittleFS.mkdir("/cfg");
-  File f = LittleFS.open(path, FILE_WRITE);
-  if (!f) return false;
-  f.print(data);
-  f.close();
-  return true;
-}
+// NVS Namespace für Netzwerkdaten
+const char* kNetNamespace = "network";
 
 bool NetCtrl::loadConfig(NetworkConfig& out) {
-  String s;
-  if (!readTextFile(NET_CFG_PATH, s)) return false;
-  JsonDocument doc;
-  if (deserializeJson(doc, s)) return false;
-  out.ssid = String((const char*)doc["ssid"]);
-  out.pass = String((const char*)doc["pass"]);
-  out.useStatic = doc["use_static"].as<bool>();
-  if (!doc["static"].isNull()) {
-    JsonObject st = doc["static"].as<JsonObject>();
-    out.ip   = String((const char*)st["ip"]);
-    out.mask = String((const char*)st["mask"]);
-    out.gw   = String((const char*)st["gw"]);
-    out.dns  = String((const char*)st["dns"]);
-  }
+  Preferences prefs;
+  if (!prefs.begin(kNetNamespace, true)) return false;
+  out.ssid = prefs.getString("ssid", "");
+  out.pass = prefs.getString("pass", "");
+  out.useStatic = prefs.getBool("use_static", false);
+  out.ip = prefs.getString("ip", "");
+  out.mask = prefs.getString("mask", "255.255.255.0");
+  out.gw = prefs.getString("gw", "");
+  out.dns = prefs.getString("dns", "1.1.1.1");
+  prefs.end();
   cfg_ = out;
   return true;
 }
 
 bool NetCtrl::saveConfig(const NetworkConfig& c) {
-  JsonDocument doc;
-  doc["ssid"] = c.ssid;
-  doc["pass"] = c.pass;
-  doc["use_static"] = c.useStatic;
-  JsonObject st = doc["static"].to<JsonObject>();
-  st["ip"]   = c.ip;
-  st["mask"] = c.mask;
-  st["gw"]   = c.gw;
-  st["dns"]  = c.dns;
-  String out;
-  serializeJson(doc, out);
-  bool ok = writeTextFile(NET_CFG_PATH, out);
-  if (ok) cfg_ = c;
-  return ok;
+  Preferences prefs;
+  if (!prefs.begin(kNetNamespace, false)) return false;
+  prefs.putString("ssid", c.ssid);
+  prefs.putString("pass", c.pass);
+  prefs.putBool("use_static", c.useStatic);
+  prefs.putString("ip", c.ip);
+  prefs.putString("mask", c.mask);
+  prefs.putString("gw", c.gw);
+  prefs.putString("dns", c.dns);
+  prefs.end();
+  cfg_ = c;
+  return true;
 }
 
 void NetCtrl::tzInit() {

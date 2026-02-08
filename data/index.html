@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="de">
   <head>
     <meta charset="utf-8" />
@@ -119,16 +119,15 @@
     </style>
   </head>
   <body>
-    <header class="hero container">
-      <nav>
-        <ul>
-          <li>
-            <h1 class="brand"><span class="brand-word">LISA</span><span class="brand-pro">PRO</span></h1>
-            <p class="subtitle">Automatisierte Growbox</p>
-          </li>
-        </ul>
-        <ul class="nav-status">
-          <li class="nav-status-row">
+    <main class="container" style="margin-top: 1rem; flex: 1; display: flex; flex-direction: column; gap: 1rem;">
+      <header class="hero" style="display: flex; flex-direction: column; align-items: center; text-align: center; padding: 1.5rem 1rem; position: relative;">
+        <div class="brand-area">
+          <h1 class="brand" style="margin: 0;"><span class="brand-word">LISA</span><span class="brand-pro">PRO</span></h1>
+          <p class="subtitle" style="margin: 0;">Automatisierte Growbox</p>
+        </div>
+        
+        <ul class="nav-status" style="display: flex; flex-direction: row; flex-wrap: wrap; gap: 0.5rem; justify-content: center; align-items: center; list-style: none; padding: 0; margin: 1rem 0 0; width: 100%;">
+          <li class="nav-status-row" style="margin: 0;">
             <span class="badge" title="Internetverbindung"><span id="liveIcon" class="icon"></span></span>
             <span class="badge" title="Benachrichtigungen"><span id="waIcon" class="icon"></span></span>
             <span class="fw-stack" title="Firmware">
@@ -136,16 +135,14 @@
               <a id="fwTopUpd" class="badge-accent fw-new" href="/update" style="display:none"></a>
             </span>
           </li>
-          <li class="nav-status-row">
+          <li class="nav-status-row" style="margin: 0;">
             <span class="badge" title="Datum/Uhrzeit"><span id="ntpTop" class="mono">--</span></span>
           </li>
         </ul>
-      </nav>
-      <div id="healthBanner" class="health-banner ok"></div>
-    </header>
+        <div id="healthBanner" class="health-banner ok" style="width: 100%; margin-top: 1rem;"></div>
+      </header>
 
-    <main class="container">
-      <div class="grid" style="margin-top: 1rem">
+      <div class="grid" style="margin-top: 0">
         <article>
           <header><h2>Grow</h2></header>
           <div class="content" style="padding: 1rem; display: grid; gap: 0.8rem">
@@ -301,27 +298,28 @@
               </div>
             </div>
           </div>
-        </article>
+        </div>
 
-      </div>
-      <div style="display: flex; gap: 0.5rem; padding: 1rem 0; margin-top: auto;">
-        <a href="/settings" class="button" role="button">Einstellungen</a>
-        <a href="/update" class="button" role="button">Update</a>
-      </div>
+        <div style="display: flex; gap: 0.5rem; padding: 1rem 0; margin-top: auto;">
+          <a href="/settings" class="button" role="button">Einstellungen</a>
+          <a href="/info" class="button" role="button">Info</a>
+          <a href="/update" class="button" role="button">Update</a>
+        </div>
+
+        <footer class="site" style="padding: 0.9rem 1.1rem; margin-top: auto; margin-bottom: 1rem; background: var(--glass); border: 1px solid var(--border); border-radius: var(--radius); backdrop-filter: blur(3px);">
+          <small style="display:block">&copy; 2025 Martin Teske – Alle Rechte vorbehalten.</small>
+          <small style="display:block">
+            <strong>LuminaGrowX</strong> ist eine Open-Source-Software von 
+            <a href="https://martinteske-blog.de" target="_blank">MartinTeske-Blog.de</a>, 
+            entwickelt für die <strong>LisaPro Growbox</strong>.
+            <br>
+            Die LisaPro Growbox ist exklusiv erhältlich bei 
+            <a href="https://mutualgarden.de" target="_blank">MutualGarden.de</a>.
+          </small>
+          <small style="display:block"><span id="apInfo" class="mono"></span></small>
+        </footer>
+      </div> <!-- Ende von Grid Area wrapper? Nein, hier muss main container zu -->
     </main>
-
-    <footer class="site container">
-      <small style="display:block">&copy; 2025 Martin Teske – Alle Rechte vorbehalten.</small>
-      <small style="display:block">
-        <strong>LuminaGrowX</strong> ist eine Open-Source-Software von 
-        <a href="https://martinteske-blog.de" target="_blank">MartinTeske-Blog.de</a>, 
-        entwickelt für die <strong>LisaPro Growbox</strong>.
-        <br>
-        Die LisaPro Growbox ist exklusiv erhältlich bei 
-        <a href="https://mutualgarden.de" target="_blank">MutualGarden.de</a>.
-      </small>
-      <small style="display:block"><span id="apInfo" class="mono"></span></small>
-    </footer>
 
     <dialog id="dlgNet" class="modal">
       <article>

@@ -6,6 +6,7 @@
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <Update.h>
+#include <Preferences.h>
 #include "../../include/version.h"
 #include "../../include/lumina_config.h"
 #include "../../include/setup_flag.h"
@@ -20,92 +21,101 @@
 using namespace web_ctrl;
 using net_ctrl::NetCtrl;
 
-static const char* APP_CFG_PATH   = "/cfg/app.json";
-static const char* GROW_CFG_PATH  = "/cfg/grow.json";
-static const char* DRYING_CFG_PATH= "/cfg/drying.json";
-static const char* NOTIFY_CFG_PATH= "/cfg/notify.json";
-static const char* STEPPER_CFG_PATH= "/cfg/stepper.json";
-static const char* UPDATE_CFG_PATH= "/cfg/update.json";
-// Version kommt aus include/version.h (FW_VERSION)
+// NVS Namespaces
+static const char* NVS_APP = "app";
+static const char* NVS_GROW = "grow";
+static const char* NVS_DRY = "drying";
+static const char* NVS_NOTIFY = "notify";
+static const char* NVS_STEPPER = "stepper";
+static const char* NVS_UPDATE = "update_cfg";
+
 // GitHub Releases (latest) defaults â€“ fest im Code hinterlegt
 static const char* GH_OWNER = "SleXx88";
 static const char* GH_REPO  = "LuminaGrowX";
 static const char* GH_ASSET = "LuminaGrowX-package.tar";
-static const char* UPDATE_MANIFEST_URL = ""; // leer -> aus /cfg/update.json lesen
-
-static bool readTextFile(const char* path, String& out) {
-  if (!LittleFS.exists(path)) return false;
-  File f = LittleFS.open(path, FILE_READ);
-  if (!f) return false;
-  out = f.readString();
-  f.close();
-  return true;
-}
-static bool writeTextFile(const char* path, const String& data) {
-  LittleFS.mkdir("/cfg");
-  File f = LittleFS.open(path, FILE_WRITE);
-  if (!f) return false;
-  f.print(data);
-  f.close();
-  return true;
-}
+static const char* UPDATE_MANIFEST_URL = ""; // leer -> aus NVS lesen
 
 WebCtrl::WebCtrl() : targetDacPct_(0.0f), currentDacPct_(0.0f), lastDacFadeMs_(0) {}
 
 bool WebCtrl::loadAppCfg(AppCfg& out) {
-  String s; if (!readTextFile(APP_CFG_PATH, s)) return false;
-  JsonDocument doc; if (deserializeJson(doc, s)) return false;
-  out.seed = String((const char*)doc["seed"]);
+  Preferences prefs;
+  if (!prefs.begin(NVS_APP, true)) return false;
+  out.seed = prefs.getString("seed", "Northern Lights");
+  prefs.end();
   app_ = out; return true;
 }
 bool WebCtrl::saveAppCfg(const AppCfg& c) {
-  JsonDocument doc; doc["seed"] = c.seed; String out; serializeJson(doc, out);
-  bool ok = writeTextFile(APP_CFG_PATH, out); if (ok) app_ = c; return ok;
+  Preferences prefs;
+  if (!prefs.begin(NVS_APP, false)) return false;
+  prefs.putString("seed", c.seed);
+  prefs.end();
+  app_ = c; return true;
 }
 bool WebCtrl::loadGrow(GrowState& out) {
-  String s; if (!readTextFile(GROW_CFG_PATH, s)) return false;
-  JsonDocument doc; if (deserializeJson(doc, s)) return false;
-  out.started = doc["started"].as<bool>();
-  out.start_epoch = doc["start_epoch"].as<uint32_t>();
-  out.total_days = doc["total_days"].as<uint16_t>();
+  Preferences prefs;
+  if (!prefs.begin(NVS_GROW, true)) return false;
+  out.started = prefs.getBool("started", false);
+  out.start_epoch = prefs.getUInt("start_epoch", 0);
+  out.total_days = (uint16_t)prefs.getUInt("total_days", 90);
+  prefs.end();
   grow_ = out; return true;
 }
 bool WebCtrl::saveGrow(const GrowState& g) {
-  JsonDocument doc; doc["started"] = g.started; doc["start_epoch"] = g.start_epoch; doc["total_days"] = g.total_days; String out; serializeJson(doc, out);
-  bool ok = writeTextFile(GROW_CFG_PATH, out); if (ok) grow_ = g; return ok;
+  Preferences prefs;
+  if (!prefs.begin(NVS_GROW, false)) return false;
+  prefs.putBool("started", g.started);
+  prefs.putUInt("start_epoch", g.start_epoch);
+  prefs.putUInt("total_days", (uint32_t)g.total_days);
+  prefs.end();
+  grow_ = g; return true;
 }
 bool WebCtrl::loadDrying(DryingState& out) {
-  String s; if (!readTextFile(DRYING_CFG_PATH, s)) return false;
-  JsonDocument doc; if (deserializeJson(doc, s)) return false;
-  out.active = doc["active"].as<bool>();
-  out.start_epoch = doc["start_epoch"].as<uint32_t>();
+  Preferences prefs;
+  if (!prefs.begin(NVS_DRY, true)) return false;
+  out.active = prefs.getBool("active", false);
+  out.start_epoch = prefs.getUInt("start_epoch", 0);
+  prefs.end();
   drying_ = out; return true;
 }
 bool WebCtrl::saveDrying(const DryingState& d) {
-  JsonDocument doc; doc["active"] = d.active; doc["start_epoch"] = d.start_epoch; String out; serializeJson(doc, out);
-  bool ok = writeTextFile(DRYING_CFG_PATH, out); if (ok) drying_ = d; return ok;
+  Preferences prefs;
+  if (!prefs.begin(NVS_DRY, false)) return false;
+  prefs.putBool("active", d.active);
+  prefs.putUInt("start_epoch", d.start_epoch);
+  prefs.end();
+  drying_ = d; return true;
 }
 bool WebCtrl::loadNotify(NotifyCfg& out) {
-  String s; if (!readTextFile(NOTIFY_CFG_PATH, s)) return false;
-  JsonDocument doc; if (deserializeJson(doc, s)) return false;
-  out.enabled = doc["enabled"].as<bool>();
-  out.phone = String((const char*)doc["phone"]);
-  out.apikey = String((const char*)doc["apikey"]);
+  Preferences prefs;
+  if (!prefs.begin(NVS_NOTIFY, true)) return false;
+  out.enabled = prefs.getBool("enabled", false);
+  out.phone = prefs.getString("phone", "");
+  out.apikey = prefs.getString("apikey", "");
+  prefs.end();
   notify_ = out; return true;
 }
 bool WebCtrl::saveNotify(const NotifyCfg& n) {
-  JsonDocument doc; doc["enabled"] = n.enabled; doc["phone"] = n.phone; doc["apikey"] = n.apikey; String out; serializeJson(doc, out);
-  bool ok = writeTextFile(NOTIFY_CFG_PATH, out); if (ok) notify_ = n; return ok;
+  Preferences prefs;
+  if (!prefs.begin(NVS_NOTIFY, false)) return false;
+  prefs.putBool("enabled", n.enabled);
+  prefs.putString("phone", n.phone);
+  prefs.putString("apikey", n.apikey);
+  prefs.end();
+  notify_ = n; return true;
 }
 bool WebCtrl::loadStepperCfg(StepperCfg& out) {
-    String s; if (!readTextFile(STEPPER_CFG_PATH, s)) return false;
-    JsonDocument doc; if (deserializeJson(doc, s)) return false;
-    out.max_travel_mm = doc["max_travel_mm"].as<float>();
+    Preferences prefs;
+    if (!prefs.begin(NVS_STEPPER, true)) return false;
+    out.max_travel_mm = prefs.getFloat("max_travel_mm", 440.0f);
+    prefs.end();
     stepper_cfg_ = out; return true;
 }
 bool WebCtrl::saveStepperCfg(const StepperCfg& c) {
-    JsonDocument doc; doc["max_travel_mm"] = c.max_travel_mm; String out; serializeJson(doc, out);
-    bool ok = writeTextFile(STEPPER_CFG_PATH, out); if (ok) stepper_cfg_ = c; return ok;
+    Preferences prefs;
+    if (!prefs.begin(NVS_STEPPER, false)) return false;
+    prefs.putFloat("max_travel_mm", c.max_travel_mm);
+    prefs.end();
+    stepper_cfg_ = c; return true;
 }
 
 static uint64_t uptime_s() { return millis() / 1000ULL; }
@@ -768,6 +778,7 @@ static String fmtDateTime_local(time_t t) {
 String WebCtrl::makeStatusJson_() {
   JsonDocument doc;
   doc["ip"] = net_ && net_->isConnected() ? net_->staIP().toString() : String("0.0.0.0");
+  doc["ssid"] = net_ ? net_->cfg().ssid : String("");
   doc["use_static"] = net_ ? net_->cfg().useStatic : false;
   doc["wifi_connected"] = net_ ? net_->isConnected() : false;
   doc["internet_ok"] = net_ ? net_->internetOK() : false;
@@ -854,6 +865,17 @@ String WebCtrl::makeStatusJson_() {
   // Tür-Status
   bool doorOpen = ctrl_ ? ctrl_->isDoorOpen() : false;
   doc["door_open"] = doorOpen;
+
+  if (step_) {
+    auto st = step_->status();
+    JsonObject s = doc["stepper"].to<JsonObject>();
+    s["pos_mm"] = st.position_mm;
+    s["moving"] = st.isMoving;
+    s["homing"] = st.isHoming;
+    s["lastDone"] = st.lastOpDone;
+    s["uart_ok"] = st.uart_ok;
+    s["max_travel_mm"] = stepper_cfg_.max_travel_mm;
+  }
 
   JsonObject healthObj = doc["health"].to<JsonObject>();
   const auto& hs = health::state();
@@ -1031,6 +1053,9 @@ void WebCtrl::registerUpdateRoutes_() {
   // Settings page
   http_.on("/settings", HTTP_GET, [this](AsyncWebServerRequest* req){
     sendFile_(req, "/settings.html", "text/html; charset=utf-8");
+  });
+  http_.on("/info", HTTP_GET, [this](AsyncWebServerRequest* req){
+    sendFile_(req, "/info.html", "text/html; charset=utf-8");
   });
 
   // Check manifest or GitHub latest
@@ -1409,22 +1434,25 @@ bool WebCtrl::applyPackageFromFile_(const char* tarPath, bool& fwUpdated, int& f
 }
 
 bool WebCtrl::loadUpdateCfg_(String& manifestUrl, String& ghOwner, String& ghRepo, String& ghAsset) {
-  manifestUrl = ""; ghOwner = ""; ghRepo = ""; ghAsset = "";
-  if (!LittleFS.exists(UPDATE_CFG_PATH)) return false;
-  File f = LittleFS.open(UPDATE_CFG_PATH, FILE_READ); if (!f) return false;
-  String s = f.readString(); f.close();
-  JsonDocument doc; if (deserializeJson(doc, s)) return false;
-  if (!doc["manifest_url"].isNull()) manifestUrl = String((const char*)doc["manifest_url"]);
-  if (!doc["gh_owner"].isNull()) ghOwner = String((const char*)doc["gh_owner"]);
-  if (!doc["gh_repo"].isNull())  ghRepo  = String((const char*)doc["gh_repo"]);
-  if (!doc["gh_asset"].isNull()) ghAsset = String((const char*)doc["gh_asset"]);
+  Preferences prefs;
+  if (!prefs.begin(NVS_UPDATE, true)) return false;
+  manifestUrl = prefs.getString("man_url", "");
+  ghOwner = prefs.getString("gh_owner", "");
+  ghRepo = prefs.getString("gh_repo", "");
+  ghAsset = prefs.getString("gh_asset", "");
+  prefs.end();
   return (manifestUrl.length() + ghOwner.length() + ghRepo.length() + ghAsset.length()) > 0;
 }
 
 bool WebCtrl::saveUpdateCfg_(const String& manifestUrl, const String& ghOwner, const String& ghRepo, const String& ghAsset) {
-  LittleFS.mkdir("/cfg");
-  JsonDocument doc; doc["manifest_url"] = manifestUrl; doc["gh_owner"] = ghOwner; doc["gh_repo"] = ghRepo; doc["gh_asset"] = ghAsset; String out; serializeJson(doc, out);
-  File f = LittleFS.open(UPDATE_CFG_PATH, FILE_WRITE); if (!f) return false; f.print(out); f.close(); return true;
+  Preferences prefs;
+  if (!prefs.begin(NVS_UPDATE, false)) return false;
+  prefs.putString("man_url", manifestUrl);
+  prefs.putString("gh_owner", ghOwner);
+  prefs.putString("gh_repo", ghRepo);
+  prefs.putString("gh_asset", ghAsset);
+  prefs.end();
+  return true;
 }
 
 String WebCtrl::manifestUrl_() {
