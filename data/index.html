@@ -214,7 +214,8 @@
                   <div id="modesGrid" style="display:grid; gap:1rem;"></div>
                 </div>
 
-                <div style="display: flex; justify-content: flex-end;">
+                <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
+                  <button id="btnResetPhases" class="outline secondary">Werkseinstellungen</button>
                   <button id="btnSavePhases" class="primary">Speichern</button>
                 </div>
               </div>
@@ -903,6 +904,18 @@
           if (res.ok) showToast("Einstellungen gespeichert!");
           else throw new Error(res.error || "Unbekannter Fehler");
         } catch(e) { showToast("Fehler beim Speichern: " + e.message); }
+      });
+
+      $("btnResetPhases").addEventListener("click", async () => {
+        if (!confirm("Möchtest du wirklich alle Phasen-Einstellungen auf Werkseinstellungen zurücksetzen?")) return;
+        try {
+          const resp = await fetch("/api/settings/phases/reset", { method: "POST" });
+          const res = await resp.json();
+          if (res.ok) {
+            showToast("Werkseinstellungen wiederhergestellt!");
+            await loadPhases(); // Reload data from server
+          } else throw new Error(res.error || "Reset fehlgeschlagen");
+        } catch(e) { showToast("Fehler: " + e.message); }
       });
 
       (async function () { await loadInfo(); await loadPhases(); startWS(); try { const s = await fetchJSON("/api/status"); updateStatus(s); } catch (_) {} })();

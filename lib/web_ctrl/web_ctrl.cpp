@@ -307,7 +307,7 @@ void WebCtrl::loop() {
     nextProbeAt_ = now + 60000;
   }
 
-  // System-Zeit aus RTC setzen wenn NTP nicht verfügbar
+  // System-Zeit aus RTC setzen wenn NTP nicht verfÃ¼gbar
   static bool systemTimeSetFromRTC = false;
   if (!systemTimeSetFromRTC && rtc_) {
     time_t tnow = time(nullptr);
@@ -321,7 +321,7 @@ void WebCtrl::loop() {
     }
   }
 
-  // Periodische RTC-Synchronisierung: einmal nach erstem Internet (SNTP) und danach täglich gegen 03:05 Lokalzeit
+  // Periodische RTC-Synchronisierung: einmal nach erstem Internet (SNTP) und danach tÃ¤glich gegen 03:05 Lokalzeit
   if (net_ && net_->internetOK() && rtc_) {
     time_t tnow = time(nullptr);
     // Nur synchronisieren, wenn Systemzeit valide (SNTP) ist
@@ -332,7 +332,7 @@ void WebCtrl::loop() {
       if (!rtcSyncedOnce_) {
         if (syncRTCFromSystem_()) { rtcSyncedOnce_ = true; lastRtcSyncYMD_ = ymd; }
       } else {
-        // Tägliche Synchronisierung: zwischen 03:05:00 und 03:10:59, maximal einmal pro Tag
+        // TÃ¤gliche Synchronisierung: zwischen 03:05:00 und 03:10:59, maximal einmal pro Tag
         if (ymd != lastRtcSyncYMD_ && tmL.tm_hour == 3 && tmL.tm_min >= 5 && tmL.tm_min <= 10) {
           if (syncRTCFromSystem_()) { lastRtcSyncYMD_ = ymd; }
         }
@@ -499,6 +499,32 @@ void WebCtrl::setupRoutes_() {
     String out; serializeJson(doc, out); req->send(200, "application/json", out);
   });
   
+  http_.on("/api/settings/phases/reset", HTTP_POST, [this](AsyncWebServerRequest* req){
+    if (!ctrl_) { req->send(500, "application/json", "{\"error\":\"no ctrl\"}"); return; }
+    Serial.println(F("[WEB] POST /api/settings/phases/reset: restoring factory defaults..."));
+    
+    // Reset Schedules
+    ctrl_->setSchedule(vpd_calc::GrowthStage::Seedling, lumina::schedule::SEEDLING);
+    ctrl_->setSchedule(vpd_calc::GrowthStage::Vegetative, lumina::schedule::VEGETATIVE);
+    ctrl_->setSchedule(vpd_calc::GrowthStage::Flowering, lumina::schedule::FLOWERING);
+    
+    // Reset Mode Settings
+    const vpd_calc::GrowthStage stages[] = {
+      vpd_calc::GrowthStage::Seedling, 
+      vpd_calc::GrowthStage::Vegetative, 
+      vpd_calc::GrowthStage::Flowering
+    };
+    for (int i=0; i<3; ++i) {
+      for (int m=0; m<3; ++m) {
+        auto& d = lumina::defaults::PHASE_MODE[i][m];
+        ctrl_->setStageModeSettings(stages[i], (plant_ctrl::DayMode)m, 
+                                    d.ledPercent, d.fanMin, d.fanMax, d.vpdMin, d.vpdMax);
+      }
+    }
+    savePhases(ctrl_);
+    req->send(200, "application/json", "{\"ok\":true}");
+  });
+  
   http_.on("/api/settings/phases", HTTP_POST, [](AsyncWebServerRequest*){}, NULL,
            [this](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t, size_t){
              if (!ctrl_) { req->send(500, "application/json", "{\"error\":\"no ctrl\"}"); return; }
@@ -565,11 +591,11 @@ void WebCtrl::setupRoutes_() {
   http_.on("/api/wifi/scan", HTTP_GET, [](AsyncWebServerRequest* req){
     int n = WiFi.scanComplete();
     if (n == -2) {
-      // Scan nicht gestartet oder fehlgeschlagen -> neu anstoßen
+      // Scan nicht gestartet oder fehlgeschlagen -> neu anstoÃŸen
       WiFi.scanNetworks(true);
       req->send(202, "application/json", "{\"status\":\"started\"}");
     } else if (n == -1) {
-      // Scan läuft noch
+      // Scan lÃ¤uft noch
       req->send(202, "application/json", "{\"status\":\"running\"}");
     } else {
       // Ergebnis liegt vor
@@ -595,7 +621,7 @@ void WebCtrl::setupRoutes_() {
       if (fw) { fw.printf("%d\n", (int)tof_->getOffsetMm()); fw.close(); }
     }
     bool ok=setup_flag::set_done(true);
-    // Erstelle Marker-Datei für "Erstinbetriebnahme erledigt"
+    // Erstelle Marker-Datei fÃ¼r "Erstinbetriebnahme erledigt"
     if (ok) {
       File fm = LittleFS.open("/cfg/install_done.mark", FILE_WRITE);
       if (fm) { fm.print("1"); fm.close(); }
@@ -609,7 +635,7 @@ void WebCtrl::setupRoutes_() {
     req->send(ok?202:500, "application/json", ok?"{\"ok\":true}":"{\"ok\":false}");
   });
   http_.on("/api/setup/reset", HTTP_POST, [this](AsyncWebServerRequest* req){
-    // Setup-Flag zurücksetzen und Neustart auslösen
+    // Setup-Flag zurÃ¼cksetzen und Neustart auslÃ¶sen
     bool ok = setup_flag::set_done(false);
     if (ok) {
       rebootAt_ = millis() + 800;
@@ -619,11 +645,11 @@ void WebCtrl::setupRoutes_() {
     }
   });
   http_.on("/api/setup/abort", HTTP_POST, [this](AsyncWebServerRequest* req){ req->send(200, "application/json", "{\"ok\":true}"); });
-  // Status der digitalen Eingänge (Tür & Wasser)
+  // Status der digitalen EingÃ¤nge (TÃ¼r & Wasser)
   http_.on("/api/door/status", HTTP_GET, [this](AsyncWebServerRequest* req){
     JsonDocument resp;
     
-    // Tür (CON2)
+    // TÃ¼r (CON2)
     int dPin = lumina::plant::DOOR_SWITCH_PIN;
     bool dClosed = false;
     if (dPin >= 0) {
@@ -635,7 +661,7 @@ void WebCtrl::setupRoutes_() {
 
     // Wasser (CON1)
     int wPin = lumina::pins::WATER_LEVEL_STATE;
-    bool wLow = false; // "Geschlossen" bedeutet Pegel OK oder Ausgelöst? User sagt "wenn geschlossen auf false/0".
+    bool wLow = false; // "Geschlossen" bedeutet Pegel OK oder AusgelÃ¶st? User sagt "wenn geschlossen auf false/0".
     // Laut GEMINI.md: "TRUE wenn Wasserstand zu niedrig" (Schwimmer oben/unten?)
     // Wir geben einfach den Zustand "Geschlossen/Offen" weiter.
     if (wPin >= 0) {
@@ -708,7 +734,7 @@ void WebCtrl::setupRoutes_() {
                // Sofortiger Verbindungsversuch ohne Reboot
                connectedNow = net_->reconnectSTA(true /*close AP on success*/);
              }
-             // Wenn erfolgreich direkt verbunden: Reboot unterdrücken, sonst optional rebooten
+             // Wenn erfolgreich direkt verbunden: Reboot unterdrÃ¼cken, sonst optional rebooten
              bool doReboot = (!connectedNow) && requestedReboot;
              req->send(200, "application/json", "{\"ok\":true}");
              if (doReboot) rebootAt_ = millis() + 800;
@@ -784,7 +810,7 @@ void WebCtrl::setupRoutes_() {
                return;
              }
              if (!notify_.enabled) {
-               Serial.println("[WA] Notifications disabled (switch off) â€” aborting send");
+               Serial.println("[WA] Notifications disabled (switch off) â€“ aborting send");
                req->send(403, "application/json", "{\"error\":\"notifications disabled\"}");
                return;
              }
@@ -835,7 +861,7 @@ void WebCtrl::setupRoutes_() {
              String action = String((const char*)doc["action"]);
              time_t now = time(nullptr);
              if (action == "start") {
-               // Prüfen ob Trocknung aktiv ist
+               // PrÃ¼fen ob Trocknung aktiv ist
                if (drying_.active) {
                  req->send(400, "application/json", "{\"error\":\"Drying mode active\"}");
                  return;
@@ -868,14 +894,14 @@ void WebCtrl::setupRoutes_() {
              String action = String((const char*)doc["action"]);
              time_t now = time(nullptr);
              if (action == "start") {
-               // Prüfen ob Grow aktiv ist
+               // PrÃ¼fen ob Grow aktiv ist
                if (grow_.started) {
                  req->send(400, "application/json", "{\"error\":\"Grow mode active\"}");
                  return;
                }
                drying_.active = true; drying_.start_epoch = (uint32_t)now;
                saveDrying(drying_);
-               // PlantCtrl über Trocknungsmodus informieren
+               // PlantCtrl Ã¼ber Trocknungsmodus informieren
                if (ctrl_) ctrl_->setDryingMode(true);
                req->send(200, "application/json", "{\"ok\":true}");
                if (ws_.count() > 0) ws_.textAll(makeStatusJson_());
@@ -1089,7 +1115,7 @@ String WebCtrl::makeStatusJson_() {
   int pPin = lumina::pins::PUMP_EN;
   doc["pump_on"]  = (pPin >= 0) && (digitalRead(pPin) == HIGH);
 
-  // Tür-Status
+  // TÃ¼r-Status
   bool doorOpen = ctrl_ ? ctrl_->isDoorOpen() : false;
   doc["door_open"] = doorOpen;
 
@@ -1137,7 +1163,7 @@ String WebCtrl::makeStatusJson_() {
   }
   g["day"] = day;
   const char* phase = "";
-  if (day > 0) { if (day <= 14) phase = "Keimung/Seedling"; else if (day <= 35) phase = "Vegetationsphase"; else phase = "BlÃ¼tephase"; }
+  if (day > 0) { if (day <= 14) phase = "Keimung/Seedling"; else if (day <= 35) phase = "Vegetationsphase"; else phase = "Blütephase"; }
   g["phase"] = phase;
 
   // Drying block
@@ -1337,7 +1363,7 @@ void WebCtrl::registerUpdateRoutes_() {
       bool fwUpd=false; int filesUpd=0; String err;
       bool saved = handlePackageUploadEnd_(fwUpd, filesUpd, err);
       if (!saved) { JsonDocument resp; resp["ok"]=false; resp["error"]=err; String out; serializeJson(resp,out); req->send(500,"application/json",out); return; }
-      // Wenn wir direkt aus der Upload-Phase kommen, erlaube den Übergang ins Anwenden
+      // Wenn wir direkt aus der Upload-Phase kommen, erlaube den Ãœbergang ins Anwenden
       if (updateJobRunning_ && updatePhase_ != "uploading") { req->send(409, "application/json", "{\"error\":\"update running\"}"); return; }
       // Upload ist abgeschlossen, beende Upload-Phase und starte Apply-Job
       updateJobRunning_ = false;
@@ -1401,7 +1427,7 @@ void WebCtrl::registerUpdateRoutes_() {
 void WebCtrl::startRemoteUpdateJob_() {
   if (updateJobRunning_) return;
   updateJobRunning_ = true; updatePhase_ = "checking"; updateMsg_ = "GitHub latest"; updateOk_ = false; updateFwUpdated_ = false; updateFilesUpdated_ = 0; updateErr_ = "";
-  // Während des Updates Regelung pausieren
+  // WÃ¤hrend des Updates Regelung pausieren
   health::state().control_paused = true;
   // Spawn on Core 0 with moderate stack
   xTaskCreatePinnedToCore(&WebCtrl::updateTaskTrampoline_, "upd_remote", 12288, this, 1, nullptr, 0);
@@ -1533,7 +1559,7 @@ bool WebCtrl::downloadToFile_(const String& url, const char* path) {
       http.end();
       if (!loc.length()) { updateErr_ = "redirect without location"; return false; }
       current = loc;
-      continue; // nächsten Hop versuchen
+      continue; // nÃ¤chsten Hop versuchen
     }
     if (code != 200) { updateErr_ = String("http code ")+String(code); http.end(); return false; }
 
@@ -1609,7 +1635,7 @@ bool WebCtrl::handlePackageUploadEnd_(bool& fwUpdated, int& filesUpdated, String
   // Nur Upload finalisieren; das Anwenden erfolgt asynchron in startApplyUploadedJob_()
   fwUpdated=false; filesUpdated=0; err="";
   if (!LittleFS.exists(pkgTempPath_.c_str())) { err="temp not found"; return false; }
-  // Paket ist vollständig hochgeladen und liegt unter pkgTempPath_; Anwendung startet asynchron
+  // Paket ist vollstÃ¤ndig hochgeladen und liegt unter pkgTempPath_; Anwendung startet asynchron
   return true;
 }
 
@@ -1627,7 +1653,7 @@ bool WebCtrl::applyPackageFromFile_(const char* tarPath, bool& fwUpdated, int& f
     char nameC[101]; memcpy(nameC, hdr+0, 100); nameC[100]='\0'; String name=String(nameC);
     uint32_t size=0; if (!parseOctal_((const char*)(hdr+124), 12, size)) size=0; char typeflag=(char)hdr[156]; if (typeflag=='\0') typeflag='0';
     uint32_t toRead=size; uint32_t pad=(BLK-(size%BLK))%BLK;
-    // Zähle Gesamtmenge der anzuwendenden Daten hoch, wenn reguläre Datei
+    // ZÃ¤hle Gesamtmenge der anzuwendenden Daten hoch, wenn regulÃ¤re Datei
     if (typeflag=='0') {
       if (name=="firmware.bin" || name.startsWith("www/")) {
         if (updateApplyTotal_ >= 0) updateApplyTotal_ += (int32_t)size;
@@ -1768,3 +1794,4 @@ void WebCtrl::checkStepperCalibration_() {
         Serial.printf("[WEB] Saved new stepper calibration: %.2f mm\n", stepper_cfg_.max_travel_mm);
     }
 }
+
