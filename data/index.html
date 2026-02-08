@@ -789,6 +789,7 @@
       }
       initIcons();
       let phasesData = [];
+      let currentPhaseIdx = 0;
       const phaseSel = $("phaseSel");
       const toggleProfi = $("toggleProfi");
       const profiBlock = $("profiBlock");
@@ -815,14 +816,15 @@
       }
 
       function renderPhase(idx) {
-        if (!phasesData[idx]) return;
+        idx = parseInt(idx);
+        if (isNaN(idx) || !phasesData[idx]) return;
         const p = phasesData[idx];
         const s = p.schedule;
-        $("phOn").value = s.on;
-        $("phOff").value = s.off;
+        $("phOn").value = s.on || "06:00";
+        $("phOff").value = s.off || "00:00";
         $("phSilent").checked = !!s.use_silent;
-        $("phRise").value = s.sunrise_min;
-        $("phSet").value = s.sunset_min;
+        $("phRise").value = s.sunrise_min || 0;
+        $("phSet").value = s.sunset_min || 0;
 
         const modesDiv = $("modesGrid");
         modesDiv.innerHTML = 
@@ -838,9 +840,40 @@
             inp.value = p.settings[m][f];
           }
         });
+        currentPhaseIdx = idx;
       }
 
-      phaseSel.addEventListener("change", () => renderPhase(phaseSel.value));
+      function collectCurrentPhaseData(idx) {
+        if (idx === undefined) idx = currentPhaseIdx;
+        const p = phasesData[idx];
+        if (!p) return;
+        
+        // Save global schedule fields to current phase slot
+        p.schedule.on = $("phOn").value;
+        p.schedule.off = $("phOff").value;
+        p.schedule.use_silent = $("phSilent").checked;
+        p.schedule.sunrise_min = parseInt($("phRise").value) || 0;
+        p.schedule.sunset_min = parseInt($("phSet").value) || 0;
+
+        // Save mode-specific fields from the grid
+        const modesDiv = $("modesGrid");
+        const inputs = modesDiv.querySelectorAll("input");
+        inputs.forEach(inp => {
+          const m = inp.dataset.mode;
+          const f = inp.dataset.field;
+          let val = parseFloat(inp.value);
+          if (isNaN(val)) return;
+          if (f === "led" || f.startsWith("fan")) val = Math.round(val);
+          p.settings[m][f] = val;
+        });
+      }
+
+      phaseSel.addEventListener("change", () => {
+        // 1. Save what's currently on screen to the OLD index
+        collectCurrentPhaseData(currentPhaseIdx);
+        // 2. Load and render the NEW index
+        renderPhase(parseInt(phaseSel.value));
+      });
 
       async function loadPhases() {
         try {
@@ -849,38 +882,26 @@
           const j = await r.json();
           if (j.phases) {
             phasesData = j.phases;
-            renderPhase(phaseSel.value);
+            // Set currentPhaseIdx to whatever the selector says and render it
+            const startIdx = parseInt(phaseSel.value);
+            currentPhaseIdx = startIdx;
+            renderPhase(startIdx);
           }
-        } catch(e) { console.error(e); }
+        } catch(e) { console.error("loadPhases Error:", e); }
       }
 
       $("btnSavePhases").addEventListener("click", async () => {
-        const idx = phaseSel.value;
-        const p = phasesData[idx];
-        if (!p) return;
-        p.schedule.on = $("phOn").value;
-        p.schedule.off = $("phOff").value;
-        p.schedule.use_silent = $("phSilent").checked;
-        p.schedule.sunrise_min = parseInt($("phRise").value);
-        p.schedule.sunset_min = parseInt($("phSet").value);
-
-        const modesDiv = $("modesGrid");
-        const inputs = modesDiv.querySelectorAll("input");
-        inputs.forEach(inp => {
-          const m = inp.dataset.mode;
-          const f = inp.dataset.field;
-          let val = parseFloat(inp.value);
-          if (f === "led" || f.startsWith("fan")) val = Math.round(val);
-          p.settings[m][f] = val;
-        });
-
+        // Ensure current UI state is captured in phasesData array
+        collectCurrentPhaseData(currentPhaseIdx);
         try {
-          await fetch("/api/settings/phases", {
+          const resp = await fetch("/api/settings/phases", {
             method: "POST",
             headers: {"Content-Type":"application/json"},
             body: JSON.stringify({phases: phasesData})
           });
-          showToast("Einstellungen gespeichert!");
+          const res = await resp.json();
+          if (res.ok) showToast("Einstellungen gespeichert!");
+          else throw new Error(res.error || "Unbekannter Fehler");
         } catch(e) { showToast("Fehler beim Speichern: " + e.message); }
       });
 

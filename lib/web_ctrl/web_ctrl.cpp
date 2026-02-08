@@ -178,8 +178,15 @@ bool WebCtrl::loadPhases(plant_ctrl::PlantCtrl* ctrl) {
         ctrl->setStageModeSettings(stage, plant_ctrl::DayMode::NightSilent, 
           blob.modes[2].ledPercent, blob.modes[2].fanMin, blob.modes[2].fanMax, blob.modes[2].vpdMin, blob.modes[2].vpdMax);
         any = true;
-        Serial.printf("[WEB] loadPhases: loaded %s (st=%d), On=%02d:%02d, Off=%02d:%02d\n", 
-          key, (int)stage, blob.schedule.on.hour, blob.schedule.on.minute, blob.schedule.off.hour, blob.schedule.off.minute);
+        Serial.printf("[WEB] loadPhases: loaded %s (st=%d), On=%02d:%02d, Off=%02d:%02d, Silent=%s, Rise=%d, Set=%d\n", 
+          key, (int)stage, blob.schedule.on.hour, blob.schedule.on.minute, blob.schedule.off.hour, blob.schedule.off.minute,
+          blob.schedule.use_night_silent ? "YES" : "NO", blob.schedule.sunrise_minutes, blob.schedule.sunset_minutes);
+        
+        const char* mnames[] = {"day", "night", "night_silent"};
+        for (int m=0; m<3; ++m) {
+          Serial.printf("[WEB] loadPhases:   Mode %s: LED=%.1f%%, Fan=%.1f-%.1f%%, VPD=%.2f-%.2f\n", 
+            mnames[m], blob.modes[m].ledPercent, blob.modes[m].fanMin, blob.modes[m].fanMax, blob.modes[m].vpdMin, blob.modes[m].vpdMax);
+        }
       } else {
         Serial.printf("[WEB] loadPhases: size mismatch %s (exp %u, got %u)\n", key, (unsigned)sizeof(blob), (unsigned)read);
       }
@@ -468,7 +475,7 @@ void WebCtrl::setupRoutes_() {
       JsonObject p = arr.add<JsonObject>();
       p["id"] = i;
       p["name"] = names[i];
-      auto sch = ctrl_->getSchedule((vpd_calc::GrowthStage)i);
+      auto sch = ctrl_->getSchedule((vpd_calc::GrowthStage)(i + 1));
       JsonObject s = p["schedule"].to<JsonObject>();
       char buf[8];
       snprintf(buf, sizeof(buf), "%02d:%02d", sch.on.hour, sch.on.minute); s["on"] = buf;
@@ -480,7 +487,7 @@ void WebCtrl::setupRoutes_() {
       JsonObject modes = p["settings"].to<JsonObject>();
       const char* mnames[] = {"day", "night", "night_silent"};
       for (int m=0; m<3; ++m) {
-        auto sett = ctrl_->getStageModeSettings((vpd_calc::GrowthStage)i, (plant_ctrl::DayMode)m);
+        auto sett = ctrl_->getStageModeSettings((vpd_calc::GrowthStage)(i + 1), (plant_ctrl::DayMode)m);
         JsonObject mo = modes[mnames[m]].to<JsonObject>();
         mo["led"] = sett.ledPercent;
         mo["fan_min"] = sett.fanMin;
@@ -521,7 +528,9 @@ void WebCtrl::setupRoutes_() {
                  if (!s["sunset_min"].isNull()) sch.sunset_minutes = s["sunset_min"];
                  if (!s["use_silent"].isNull()) sch.use_night_silent = s["use_silent"];
                  ctrl_->setSchedule(stage, sch);
-                 Serial.printf("[WEB] Update Phase %d Schedule: On=%02d:%02d, Off=%02d:%02d\n", id, sch.on.hour, sch.on.minute, sch.off.hour, sch.off.minute);
+                 Serial.printf("[WEB] Update Phase %d Schedule: On=%02d:%02d, Off=%02d:%02d, Silent=%s, Rise=%d, Set=%d\n", 
+                               id, sch.on.hour, sch.on.minute, sch.off.hour, sch.off.minute, 
+                               sch.use_night_silent ? "YES" : "NO", sch.sunrise_minutes, sch.sunset_minutes);
                }
                
                // Settings
@@ -532,12 +541,18 @@ void WebCtrl::setupRoutes_() {
                    if (!modes[mnames[m]].isNull()) {
                      JsonObject mo = modes[mnames[m]];
                      auto sett = ctrl_->getStageModeSettings(stage, (plant_ctrl::DayMode)m);
-                     if (!mo["led"].isNull()) sett.ledPercent = mo["led"];
-                     if (!mo["fan_min"].isNull()) sett.fanMin = mo["fan_min"];
-                     if (!mo["fan_max"].isNull()) sett.fanMax = mo["fan_max"];
-                     if (!mo["vpd_min"].isNull()) sett.vpdMin = mo["vpd_min"];
-                     if (!mo["vpd_max"].isNull()) sett.vpdMax = mo["vpd_max"];
-                     ctrl_->setStageModeSettings(stage, (plant_ctrl::DayMode)m, sett.ledPercent, sett.fanMin, sett.fanMax, sett.vpdMin, sett.vpdMax);
+                     bool changed = false;
+                     if (!mo["led"].isNull()) { sett.ledPercent = mo["led"]; changed = true; }
+                     if (!mo["fan_min"].isNull()) { sett.fanMin = mo["fan_min"]; changed = true; }
+                     if (!mo["fan_max"].isNull()) { sett.fanMax = mo["fan_max"]; changed = true; }
+                     if (!mo["vpd_min"].isNull()) { sett.vpdMin = mo["vpd_min"]; changed = true; }
+                     if (!mo["vpd_max"].isNull()) { sett.vpdMax = mo["vpd_max"]; changed = true; }
+                     
+                     if (changed) {
+                       ctrl_->setStageModeSettings(stage, (plant_ctrl::DayMode)m, sett.ledPercent, sett.fanMin, sett.fanMax, sett.vpdMin, sett.vpdMax);
+                       Serial.printf("[WEB] Update Phase %d Mode %s: LED=%d%%, Fan=%d-%d%%, VPD=%.2f-%.2f\n", 
+                                     id, mnames[m], (int)sett.ledPercent, (int)sett.fanMin, (int)sett.fanMax, sett.vpdMin, sett.vpdMax);
+                     }
                    }
                  }
                }
