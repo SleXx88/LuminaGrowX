@@ -19,6 +19,10 @@ PlantCtrl::PlantCtrl() {
       settings_[si][mi] = lumina::defaults::PHASE_MODE[si][mi];
     }
   }
+  // Zeitpl?ne aus defaults kopieren
+  schedules_[0] = lumina::schedule::SEEDLING;
+  schedules_[1] = lumina::schedule::VEGETATIVE;
+  schedules_[2] = lumina::schedule::FLOWERING;
 }
 
 void PlantCtrl::begin(SHT41Ctrl& sensorIndoor,
@@ -71,6 +75,20 @@ void PlantCtrl::setStageModeSettings(vpd_calc::GrowthStage st, DayMode md,
   if (fanMax < fanMin) fanMax = fanMin;
   if (vpdMin < 0) vpdMin = 0; if (vpdMax < vpdMin) vpdMax = vpdMin;
   settings_[si][mi] = { ledPercent, fanMin, fanMax, vpdMin, vpdMax };
+}
+
+PhaseModeSettings PlantCtrl::getStageModeSettings(vpd_calc::GrowthStage st, DayMode md) const {
+  return settings_[idxStage(st)][idxMode(md)];
+}
+
+void PlantCtrl::setSchedule(vpd_calc::GrowthStage st, const LightSchedule& sch) {
+  int idx = idxStage(st);
+  schedules_[idx] = sch;
+  Serial.printf("[CTRL] setSchedule[%d]: On=%02d:%02d Off=%02d:%02d\n", idx, sch.on.hour, sch.on.minute, sch.off.hour, sch.off.minute);
+}
+
+LightSchedule PlantCtrl::getSchedule(vpd_calc::GrowthStage st) const {
+  return schedules_[idxStage(st)];
 }
 
 void PlantCtrl::setKpFan(float kp)                 { kpFan_ = kp; }
@@ -297,14 +315,7 @@ bool PlantCtrl::update() {
   float ledTarget = 0.0f;
   {
     bool haveRtc = (rtc_ != nullptr);
-    const lumina::LightSchedule* sch = nullptr;
-    using vpd_calc::GrowthStage;
-    switch (stage_) {
-      case GrowthStage::Seedling:   sch = &lumina::schedule::SEEDLING; break;
-      case GrowthStage::Vegetative: sch = &lumina::schedule::VEGETATIVE; break;
-      case GrowthStage::Flowering:  sch = &lumina::schedule::FLOWERING; break;
-      default: sch = &lumina::schedule::VEGETATIVE; break;
-    }
+    const LightSchedule* sch = &schedules_[idxStage(stage_)];
     if (haveRtc && sch) {
       uint16_t y; uint8_t mo, d, hh, mi, ss;
       if (rtc_->readComponents(y, mo, d, hh, mi, ss)) {
@@ -316,7 +327,7 @@ bool PlantCtrl::update() {
         if (onSec <= offSec) dayActive = (nowSec >= onSec) && (nowSec < offSec);
         else                 dayActive = (nowSec >= onSec) || (nowSec < offSec);
 
-        DayMode desired = dayActive ? DayMode::Day : DayMode::Night;
+        DayMode desired = dayActive ? DayMode::Day : (sch->use_night_silent ? DayMode::NightSilent : DayMode::Night);
         if (desired != mode_) {
           setMode(desired);
         }
@@ -631,14 +642,7 @@ bool PlantCtrl::allowDownAdjustNow_(uint32_t now) {
     uint16_t y; uint8_t mo, d, hh, mi, ss;
     if (rtc_->readComponents(y, mo, d, hh, mi, ss)) {
       // Zeitplan je nach Phase
-      const lumina::LightSchedule* sch = nullptr;
-      using vpd_calc::GrowthStage;
-      switch (stage_) {
-        case GrowthStage::Seedling:   sch = &lumina::schedule::SEEDLING; break;
-        case GrowthStage::Vegetative: sch = &lumina::schedule::VEGETATIVE; break;
-        case GrowthStage::Flowering:  sch = &lumina::schedule::FLOWERING; break;
-        default: sch = &lumina::schedule::VEGETATIVE; break;
-      }
+      const LightSchedule* sch = &schedules_[idxStage(stage_)];
       if (sch) {
         unsigned long long token = makeTokenYMDHM(y, mo, d, hh, mi);
         if (hh == sch->on.hour  && mi == sch->on.minute  && token != lastSunriseToken_) { lastSunriseToken_ = token; Serial.println(F("[SCHEDULE] Sunrise adjust")); return true; }

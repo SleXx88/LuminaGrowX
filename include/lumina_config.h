@@ -89,25 +89,14 @@ namespace lumina
   }
 
   // --- Licht-Zeitpläne (optional) ---
-  struct TimeHM
-  {
-    uint8_t hour;
-    uint8_t minute;
-  };
-  struct LightSchedule
-  {
-    TimeHM on;                // Start (Licht an)
-    TimeHM off;               // Ende  (Licht aus)
-    uint16_t sunrise_minutes; // Ramp-up Dauer
-    uint16_t sunset_minutes;  // Ramp-down Dauer
-  };
+  using LightSchedule = plant_ctrl::LightSchedule;
 
   namespace schedule
   {
     // Hinweis: Beispiel – identisch für alle Phasen
-    constexpr LightSchedule SEEDLING{{6, 0}, {2, 0}, 20, 20};
-    constexpr LightSchedule VEGETATIVE{{6, 0}, {0, 0}, 20, 20};
-    constexpr LightSchedule FLOWERING{{6, 0}, {18, 0}, 20, 20};
+    constexpr LightSchedule SEEDLING{{6, 0}, {0, 0}, 20, 20, false};
+    constexpr LightSchedule VEGETATIVE{{6, 0}, {22, 0}, 20, 20, false};
+    constexpr LightSchedule FLOWERING{{6, 0}, {18, 0}, 20, 20, false};
   }
 
   // --- Default-Parameter je Phase & Modus ---

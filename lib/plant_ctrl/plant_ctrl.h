@@ -26,6 +26,19 @@ namespace plant_ctrl {
 // Tagesmodi
 enum class DayMode : uint8_t { Day=0, Night=1, NightSilent=2 };
 
+struct TimeHM {
+  uint8_t hour;
+  uint8_t minute;
+};
+
+struct LightSchedule {
+  TimeHM on;                // Start (Licht an)
+  TimeHM off;               // Ende  (Licht aus)
+  uint16_t sunrise_minutes; // Ramp-up Dauer
+  uint16_t sunset_minutes;  // Ramp-down Dauer
+  bool use_night_silent;    // Nutze NightSilent-Modus statt Night
+};
+
 // Konfiguration pro Phase & Modus
 struct PhaseModeSettings {
   float ledPercent;   // fester LED-Prozentwert (0..100)
@@ -51,12 +64,18 @@ public:
 
   // Phase/Modus
   void setStage(vpd_calc::GrowthStage stage);
+  vpd_calc::GrowthStage getStage() const { return stage_; }
   void setMode(DayMode mode);
 
   // Überschreiben pro Phase/Modus
   void setStageModeSettings(vpd_calc::GrowthStage st, DayMode md,
                             float ledPercent, float fanMin, float fanMax,
                             float vpdMin, float vpdMax);
+  PhaseModeSettings getStageModeSettings(vpd_calc::GrowthStage st, DayMode md) const;
+
+  // Zeitpläne
+  void setSchedule(vpd_calc::GrowthStage st, const LightSchedule& sch);
+  LightSchedule getSchedule(vpd_calc::GrowthStage st) const;
 
   // Regelungsparameter
   void setKpFan(float kp);
@@ -167,6 +186,8 @@ private:
 
   // Standardtabelle [3][3]
   PhaseModeSettings settings_[3][3];
+  // Zeitpläne je Phase [3]
+  LightSchedule schedules_[3];
 
   // Regelungsparameter
   float kpFan_              = 18.0f;

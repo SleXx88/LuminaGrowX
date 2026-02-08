@@ -48,6 +48,8 @@ public:
   bool saveNotify(const NotifyCfg& n);
   bool loadStepperCfg(StepperCfg& out);
   bool saveStepperCfg(const StepperCfg& c);
+  bool loadPhases(plant_ctrl::PlantCtrl* ctrl);
+  bool savePhases(plant_ctrl::PlantCtrl* ctrl);
 
 private:
   // HTTP handlers
@@ -121,6 +123,7 @@ private:
   bool rtcSyncedOnce_ = false;
   bool syncRTCFromSystem_();
   bool syncSystemFromRTC_();
+  void syncControllerStage_();
 
   // Temporary file for package upload/download
   String pkgTempPath_ = "/.update_pkg.tar";

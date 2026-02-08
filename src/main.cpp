@@ -1,4 +1,4 @@
-﻿// LuminaGrowX main – uses centralized lumina_config
+// LuminaGrowX main – uses centralized lumina_config
 
 #include <Arduino.h>
 
@@ -236,13 +236,15 @@ void setup()
   // ToF: Offset laden; optional automatisch kalibrieren (je nach Flag)
   {
     bool haveOffset = false;
-    File f = LittleFS.open("/tof_offset.dat", FILE_READ);
-    if (f) {
-      String s = f.readString();
-      f.close();
-      int val = 0; int n = 0;
-      if (s.length() > 0) n = sscanf(s.c_str(), "%d", &val);
-      if (n == 1) { tof.setOffsetMm((int16_t)val); haveOffset = true; }
+    if (LittleFS.exists("/tof_offset.dat")) {
+      File f = LittleFS.open("/tof_offset.dat", FILE_READ);
+      if (f) {
+        String s = f.readString();
+        f.close();
+        int val = 0; int n = 0;
+        if (s.length() > 0) n = sscanf(s.c_str(), "%d", &val);
+        if (n == 1) { tof.setOffsetMm((int16_t)val); haveOffset = true; }
+      }
     }
     if (!g_setupMode && lumina::startup::DO_TOF_CALIBRATE_ON_BOOT && !haveOffset) {
       // Automatische Ein-Punkt-Offset-Kalibrierung
@@ -281,23 +283,9 @@ void setup()
   // Netzwerkteil starten (AP immer, STA wenn konfiguriert); mDNS: luminagrowx.local (verschoben ans Ende)
 
   // ===== 5) Weitere Aktoren + Controller =====
-  // Zentrale Env-Defaults anwenden (aus lumina_config.h)
-  {
-    const GrowthStage stages[3] = { GrowthStage::Seedling, GrowthStage::Vegetative, GrowthStage::Flowering };
-    const DayMode modes[3] = { DayMode::Day, DayMode::Night, DayMode::NightSilent };
-    for (int i = 0; i < 3; ++i) {
-      for (int j = 0; j < 3; ++j) {
-        const auto& s = lumina::defaults::PHASE_MODE[i][j];
-        controller.setStageModeSettings(stages[i], modes[j], s.ledPercent, s.fanMin, s.fanMax, s.vpdMin, s.vpdMax);
-      }
-    }
-  }
-
   // Controller verbinden und konfigurieren (inkl. Stepper/ToF/RTC/Tuer)
   if (!g_setupMode) {
     controller.begin(sht_in, sht_out, dac, fan, step, tof, &rtc, lumina::plant::DOOR_SWITCH_PIN);
-    controller.setStage(vpd_calc::GrowthStage::Flowering);
-    controller.setMode(DayMode::Day);
     controller.applyLuminaConfig();
   }
 

@@ -28,6 +28,7 @@ static const char* NVS_DRY = "drying";
 static const char* NVS_NOTIFY = "notify";
 static const char* NVS_STEPPER = "stepper";
 static const char* NVS_UPDATE = "update_cfg";
+static const char* NVS_PHASES = "cfg_phases";
 
 // GitHub Releases (latest) defaults â€“ fest im Code hinterlegt
 static const char* GH_OWNER = "SleXx88";
@@ -40,7 +41,8 @@ WebCtrl::WebCtrl() : targetDacPct_(0.0f), currentDacPct_(0.0f), lastDacFadeMs_(0
 bool WebCtrl::loadAppCfg(AppCfg& out) {
   Preferences prefs;
   if (!prefs.begin(NVS_APP, true)) return false;
-  out.seed = prefs.getString("seed", "Northern Lights");
+  if (prefs.isKey("seed")) out.seed = prefs.getString("seed");
+  else out.seed = "Northern Lights";
   prefs.end();
   app_ = out; return true;
 }
@@ -89,8 +91,10 @@ bool WebCtrl::loadNotify(NotifyCfg& out) {
   Preferences prefs;
   if (!prefs.begin(NVS_NOTIFY, true)) return false;
   out.enabled = prefs.getBool("enabled", false);
-  out.phone = prefs.getString("phone", "");
-  out.apikey = prefs.getString("apikey", "");
+  if (prefs.isKey("phone")) out.phone = prefs.getString("phone");
+  else out.phone = "";
+  if (prefs.isKey("apikey")) out.apikey = prefs.getString("apikey");
+  else out.apikey = "";
   prefs.end();
   notify_ = out; return true;
 }
@@ -103,7 +107,32 @@ bool WebCtrl::saveNotify(const NotifyCfg& n) {
   prefs.end();
   notify_ = n; return true;
 }
+
+void WebCtrl::syncControllerStage_() {
+  if (!ctrl_ || !grow_.started || !grow_.start_epoch) return;
+  time_t now = time(nullptr);
+  if (now < 1700000000) return; // Time not synced yet
+  
+  uint32_t day = 0;
+  if (now >= grow_.start_epoch) {
+    day = (uint32_t)((now - grow_.start_epoch)/86400UL) + 1;
+    if (day > grow_.total_days) day = grow_.total_days;
+  }
+  
+  vpd_calc::GrowthStage stage;
+  if (day <= 14) stage = vpd_calc::GrowthStage::Seedling;
+  else if (day <= 35) stage = vpd_calc::GrowthStage::Vegetative;
+  else stage = vpd_calc::GrowthStage::Flowering;
+  
+  if (ctrl_->getStage() != stage) {
+    ctrl_->setStage(stage);
+    Serial.printf("[WEB] Growth phase synced to day %u: %s\n", (unsigned)day, 
+      (stage==vpd_calc::GrowthStage::Seedling)?"Seedling":((stage==vpd_calc::GrowthStage::Vegetative)?"Veg":"Flower"));
+  }
+}
+
 bool WebCtrl::loadStepperCfg(StepperCfg& out) {
+
     Preferences prefs;
     if (!prefs.begin(NVS_STEPPER, true)) return false;
     out.max_travel_mm = prefs.getFloat("max_travel_mm", 440.0f);
@@ -118,10 +147,85 @@ bool WebCtrl::saveStepperCfg(const StepperCfg& c) {
     stepper_cfg_ = c; return true;
 }
 
+#pragma pack(push, 1)
+struct PhaseBlob {
+  plant_ctrl::LightSchedule schedule;
+  plant_ctrl::PhaseModeSettings modes[3];
+};
+#pragma pack(pop)
+
+bool WebCtrl::loadPhases(plant_ctrl::PlantCtrl* ctrl) {
+  if (!ctrl) return false;
+  Preferences prefs;
+  if (!prefs.begin(NVS_PHASES, true)) {
+    Serial.println(F("[WEB] loadPhases: Preferences.begin(PHASES, true) FAILED"));
+    return false;
+  }
+  
+  bool any = false;
+  for (int i=0; i<3; ++i) {
+    char key[8]; snprintf(key, sizeof(key), "p%d", i);
+    if (prefs.isKey(key)) {
+      PhaseBlob blob;
+      size_t read = prefs.getBytes(key, &blob, sizeof(blob));
+      if (read == sizeof(blob)) {
+        auto stage = (vpd_calc::GrowthStage)(i + 1); // 0->1(Seedling), 1->2(Veg), 2->3(Flow)
+        ctrl->setSchedule(stage, blob.schedule);
+        ctrl->setStageModeSettings(stage, plant_ctrl::DayMode::Day, 
+          blob.modes[0].ledPercent, blob.modes[0].fanMin, blob.modes[0].fanMax, blob.modes[0].vpdMin, blob.modes[0].vpdMax);
+        ctrl->setStageModeSettings(stage, plant_ctrl::DayMode::Night, 
+          blob.modes[1].ledPercent, blob.modes[1].fanMin, blob.modes[1].fanMax, blob.modes[1].vpdMin, blob.modes[1].vpdMax);
+        ctrl->setStageModeSettings(stage, plant_ctrl::DayMode::NightSilent, 
+          blob.modes[2].ledPercent, blob.modes[2].fanMin, blob.modes[2].fanMax, blob.modes[2].vpdMin, blob.modes[2].vpdMax);
+        any = true;
+        Serial.printf("[WEB] loadPhases: loaded %s (st=%d), On=%02d:%02d, Off=%02d:%02d\n", 
+          key, (int)stage, blob.schedule.on.hour, blob.schedule.on.minute, blob.schedule.off.hour, blob.schedule.off.minute);
+      } else {
+        Serial.printf("[WEB] loadPhases: size mismatch %s (exp %u, got %u)\n", key, (unsigned)sizeof(blob), (unsigned)read);
+      }
+    }
+  }
+  prefs.end();
+  if (!any) Serial.println(F("[WEB] loadPhases: no saved settings found in NVS"));
+  return any;
+}
+
+bool WebCtrl::savePhases(plant_ctrl::PlantCtrl* ctrl) {
+  if (!ctrl) return false;
+  Preferences prefs;
+  if (!prefs.begin(NVS_PHASES, false)) {
+    Serial.println(F("[WEB] savePhases: Preferences.begin(PHASES, false) FAILED"));
+    return false;
+  }
+
+  for (int i=0; i<3; ++i) {
+    auto stage = (vpd_calc::GrowthStage)(i + 1);
+    PhaseBlob blob;
+    blob.schedule = ctrl->getSchedule(stage);
+    blob.modes[0] = ctrl->getStageModeSettings(stage, plant_ctrl::DayMode::Day);
+    blob.modes[1] = ctrl->getStageModeSettings(stage, plant_ctrl::DayMode::Night);
+    blob.modes[2] = ctrl->getStageModeSettings(stage, plant_ctrl::DayMode::NightSilent);
+    
+    char key[8]; snprintf(key, sizeof(key), "p%d", i);
+    size_t written = prefs.putBytes(key, &blob, sizeof(blob));
+    Serial.printf("[WEB] savePhases: saved %s (st=%d), On=%02d:%02d, Off=%02d:%02d, size %u\n", 
+      key, (int)stage, blob.schedule.on.hour, blob.schedule.on.minute, blob.schedule.off.hour, blob.schedule.off.minute, (unsigned)written);
+  }
+  prefs.end();
+  return true;
+}
+
 static uint64_t uptime_s() { return millis() / 1000ULL; }
 
 void WebCtrl::begin(plant_ctrl::PlantCtrl* ctrl, RTC_Ctrl* rtc, NetCtrl* net) {
   ctrl_ = ctrl; rtc_ = rtc; net_ = net;
+
+  // Ensure all NVS namespaces exist by opening in RW mode once
+  {
+    const char* ns[] = {NVS_APP, NVS_GROW, NVS_DRY, NVS_NOTIFY, NVS_STEPPER, NVS_UPDATE, NVS_PHASES};
+    Preferences p; for (auto s : ns) { p.begin(s, false); p.end(); }
+  }
+
   AppCfg tmpA; loadAppCfg(tmpA);
   GrowState tmpG; loadGrow(tmpG);
   grow_ = tmpG;
@@ -131,6 +235,11 @@ void WebCtrl::begin(plant_ctrl::PlantCtrl* ctrl, RTC_Ctrl* rtc, NetCtrl* net) {
   notify_ = tmpN;
   StepperCfg tmpS; loadStepperCfg(tmpS);
   stepper_cfg_ = tmpS;
+  
+  if (ctrl_) {
+    loadPhases(ctrl_);
+    syncControllerStage_();
+  }
 
   // Initialen Grow/Drying-Status an PlantCtrl weiterleiten
   if (ctrl_) {
@@ -200,6 +309,7 @@ void WebCtrl::loop() {
       if (syncSystemFromRTC_()) {
         systemTimeSetFromRTC = true;
         Serial.println(F("[WEB] Systemzeit aus RTC initialisiert"));
+        syncControllerStage_();
       }
     }
   }
@@ -226,6 +336,14 @@ void WebCtrl::loop() {
     if (ws_.count() > 0) ws_.textAll(makeStatusJson_());
     nextPushAt_ = now + 2000;
   }
+
+  // Sync stage from epoch periodically
+  static uint32_t lastStageSync = 0;
+  if (now - lastStageSync >= 60000) {
+    lastStageSync = now;
+    syncControllerStage_();
+  }
+
   if (rebootAt_ && now >= rebootAt_) {
     delay(100);
     ESP.restart();
@@ -339,6 +457,94 @@ void WebCtrl::setupRoutes_() {
     JsonDocument resp; bool ok=false; if (step_) { auto st=step_->status(); ok=true; resp["ok"]=true; resp["pos_mm"]=st.position_mm; resp["moving"]=st.isMoving; resp["homing"]=st.isHoming; resp["lastDone"]=st.lastOpDone; resp["uart_ok"]=st.uart_ok; resp["max_travel_mm"] = stepper_cfg_.max_travel_mm; }
     String out; serializeJson(resp, out); req->send(ok?200:500, "application/json", out);
   });
+
+  // Phases API
+  http_.on("/api/settings/phases", HTTP_GET, [this](AsyncWebServerRequest* req){
+    if (!ctrl_) { req->send(500, "application/json", "{\"error\":\"no ctrl\"}"); return; }
+    JsonDocument doc;
+    JsonArray arr = doc["phases"].to<JsonArray>();
+    const char* names[] = {"Seedling", "Vegetative", "Flowering"};
+    for (int i=0; i<3; ++i) {
+      JsonObject p = arr.add<JsonObject>();
+      p["id"] = i;
+      p["name"] = names[i];
+      auto sch = ctrl_->getSchedule((vpd_calc::GrowthStage)i);
+      JsonObject s = p["schedule"].to<JsonObject>();
+      char buf[8];
+      snprintf(buf, sizeof(buf), "%02d:%02d", sch.on.hour, sch.on.minute); s["on"] = buf;
+      snprintf(buf, sizeof(buf), "%02d:%02d", sch.off.hour, sch.off.minute); s["off"] = buf;
+      s["sunrise_min"] = sch.sunrise_minutes;
+      s["sunset_min"] = sch.sunset_minutes;
+      s["use_silent"] = sch.use_night_silent;
+      
+      JsonObject modes = p["settings"].to<JsonObject>();
+      const char* mnames[] = {"day", "night", "night_silent"};
+      for (int m=0; m<3; ++m) {
+        auto sett = ctrl_->getStageModeSettings((vpd_calc::GrowthStage)i, (plant_ctrl::DayMode)m);
+        JsonObject mo = modes[mnames[m]].to<JsonObject>();
+        mo["led"] = sett.ledPercent;
+        mo["fan_min"] = sett.fanMin;
+        mo["fan_max"] = sett.fanMax;
+        mo["vpd_min"] = sett.vpdMin;
+        mo["vpd_max"] = sett.vpdMax;
+      }
+    }
+    String out; serializeJson(doc, out); req->send(200, "application/json", out);
+  });
+  
+  http_.on("/api/settings/phases", HTTP_POST, [](AsyncWebServerRequest*){}, NULL,
+           [this](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t, size_t){
+             if (!ctrl_) { req->send(500, "application/json", "{\"error\":\"no ctrl\"}"); return; }
+             JsonDocument doc; DeserializationError err = deserializeJson(doc, data, len);
+             if (err) { req->send(400, "application/json", "{\"error\":\"bad json\"}"); return; }
+             
+             JsonArray phases = doc["phases"];
+             if (phases.isNull()) { req->send(400, "application/json", "{\"error\":\"missing phases array\"}"); return; }
+             
+             Serial.println(F("[WEB] POST /api/settings/phases: processing..."));
+             for (JsonObject p : phases) {
+               int id = p["id"] | -1;
+               if (id < 0 || id > 2) continue;
+               auto stage = (vpd_calc::GrowthStage)(id + 1); // Fix: 0->1, 1->2, 2->3
+               
+               // Schedule
+               if (!p["schedule"].isNull()) {
+                 JsonObject s = p["schedule"];
+                 auto sch = ctrl_->getSchedule(stage);
+                 if (s["on"].is<const char*>()) { 
+                   int h, m; if (sscanf(s["on"].as<const char*>(), "%d:%d", &h, &m)==2) { sch.on.hour=h; sch.on.minute=m; }
+                 }
+                 if (s["off"].is<const char*>()) {
+                   int h, m; if (sscanf(s["off"].as<const char*>(), "%d:%d", &h, &m)==2) { sch.off.hour=h; sch.off.minute=m; }
+                 }
+                 if (!s["sunrise_min"].isNull()) sch.sunrise_minutes = s["sunrise_min"];
+                 if (!s["sunset_min"].isNull()) sch.sunset_minutes = s["sunset_min"];
+                 if (!s["use_silent"].isNull()) sch.use_night_silent = s["use_silent"];
+                 ctrl_->setSchedule(stage, sch);
+                 Serial.printf("[WEB] Update Phase %d Schedule: On=%02d:%02d, Off=%02d:%02d\n", id, sch.on.hour, sch.on.minute, sch.off.hour, sch.off.minute);
+               }
+               
+               // Settings
+               if (!p["settings"].isNull()) {
+                 JsonObject modes = p["settings"];
+                 const char* mnames[] = {"day", "night", "night_silent"};
+                 for (int m=0; m<3; ++m) {
+                   if (!modes[mnames[m]].isNull()) {
+                     JsonObject mo = modes[mnames[m]];
+                     auto sett = ctrl_->getStageModeSettings(stage, (plant_ctrl::DayMode)m);
+                     if (!mo["led"].isNull()) sett.ledPercent = mo["led"];
+                     if (!mo["fan_min"].isNull()) sett.fanMin = mo["fan_min"];
+                     if (!mo["fan_max"].isNull()) sett.fanMax = mo["fan_max"];
+                     if (!mo["vpd_min"].isNull()) sett.vpdMin = mo["vpd_min"];
+                     if (!mo["vpd_max"].isNull()) sett.vpdMax = mo["vpd_max"];
+                     ctrl_->setStageModeSettings(stage, (plant_ctrl::DayMode)m, sett.ledPercent, sett.fanMin, sett.fanMax, sett.vpdMin, sett.vpdMax);
+                   }
+                 }
+               }
+             }
+             savePhases(ctrl_);
+             req->send(200, "application/json", "{\"ok\":true}");
+           });
 
   // WLAN Scan (asynchron gegen Watchdog-Crash)
   http_.on("/api/wifi/scan", HTTP_GET, [](AsyncWebServerRequest* req){
@@ -619,10 +825,16 @@ void WebCtrl::setupRoutes_() {
                  req->send(400, "application/json", "{\"error\":\"Drying mode active\"}");
                  return;
                }
-               grow_.started = true; grow_.start_epoch = (uint32_t)now;
+               grow_.started = true; 
+               if (!doc["start_epoch"].isNull()) grow_.start_epoch = doc["start_epoch"].as<uint32_t>();
+               else grow_.start_epoch = (uint32_t)now;
+               
                if (!doc["total_days"].isNull()) grow_.total_days = (uint16_t)doc["total_days"].as<uint16_t>();
                saveGrow(grow_);
-               if (ctrl_) ctrl_->setGrowActive(true);
+               if (ctrl_) {
+                 ctrl_->setGrowActive(true);
+                 syncControllerStage_();
+               }
                req->send(200, "application/json", "{\"ok\":true}");
                if (ws_.count() > 0) ws_.textAll(makeStatusJson_());
              } else if (action == "stop") {
@@ -1436,10 +1648,10 @@ bool WebCtrl::applyPackageFromFile_(const char* tarPath, bool& fwUpdated, int& f
 bool WebCtrl::loadUpdateCfg_(String& manifestUrl, String& ghOwner, String& ghRepo, String& ghAsset) {
   Preferences prefs;
   if (!prefs.begin(NVS_UPDATE, true)) return false;
-  manifestUrl = prefs.getString("man_url", "");
-  ghOwner = prefs.getString("gh_owner", "");
-  ghRepo = prefs.getString("gh_repo", "");
-  ghAsset = prefs.getString("gh_asset", "");
+  manifestUrl = prefs.isKey("man_url") ? prefs.getString("man_url") : "";
+  ghOwner = prefs.isKey("gh_owner") ? prefs.getString("gh_owner") : "";
+  ghRepo = prefs.isKey("gh_repo") ? prefs.getString("gh_repo") : "";
+  ghAsset = prefs.isKey("gh_asset") ? prefs.getString("gh_asset") : "";
   prefs.end();
   return (manifestUrl.length() + ghOwner.length() + ghRepo.length() + ghAsset.length()) > 0;
 }
