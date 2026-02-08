@@ -101,6 +101,47 @@ static void printPos(StepperCtrl& s, const char* tag) {
   Serial.printf("[POS] %s: %.2f mm\n", tag, s.getPositionMm());
 }
 
+// Versucht einen blockierten I2C-Bus zu befreien, indem SCL manuell getaktet wird.
+// Hilft, wenn ein Slave (z.B. VL53L0X) SDA auf LOW hält.
+static void recoverI2C(int sdaPin, int sclPin) {
+  pinMode(sdaPin, INPUT_PULLUP);
+  pinMode(sclPin, INPUT_PULLUP);
+  delay(10); // Kurze Wartezeit
+
+  // Wenn SCL oder SDA dauerhaft LOW sind, versuchen wir Recovery
+  if (digitalRead(sclPin) == LOW || digitalRead(sdaPin) == LOW) {
+    Serial.printf("[I2C-RECOVERY] Bus an Pin SDA=%d/SCL=%d scheint blockiert. Starte Reset-Sequenz...\n", sdaPin, sclPin);
+    
+    pinMode(sclPin, OUTPUT);
+    pinMode(sdaPin, INPUT); // SDA floaten lassen, Slave treibt es ggf. LOW
+    
+    // Bis zu 9 Clock-Pulse senden, damit der Slave sein Bit fertig sendet und SDA freigibt
+    for (int i = 0; i < 9; i++) {
+      digitalWrite(sclPin, HIGH);
+      delayMicroseconds(10);
+      if (digitalRead(sdaPin) == HIGH) {
+        // SDA ist high -> Slave hat losgelassen
+        break;
+      }
+      digitalWrite(sclPin, LOW);
+      delayMicroseconds(10);
+    }
+    
+    // STOP Condition senden
+    pinMode(sdaPin, OUTPUT);
+    digitalWrite(sdaPin, LOW);
+    digitalWrite(sclPin, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(sdaPin, HIGH);
+    delayMicroseconds(10);
+
+    Serial.println(F("[I2C-RECOVERY] Sequenz beendet."));
+  } else {
+    // Bus scheint frei zu sein
+    // Serial.println(F("[I2C-RECOVERY] Busleitungen sind HIGH (OK)."));
+  }
+}
+
 void setup()
 {
   Serial.begin(115200);
@@ -113,7 +154,11 @@ void setup()
   // net.configureResetPin moved to Network section
 
   // ===== 1) Basis: I2C-Busse =====
-  Wire.begin(I2C_SDA_1, I2C_SCL_1, 400000);
+  // Vor Wire.begin() versuchen, den Bus freizumachen
+  recoverI2C(I2C_SDA_1, I2C_SCL_1);
+
+  // Frequenz auf 100kHz reduziert für höhere Stabilität mit VL53L0X
+  Wire.begin(I2C_SDA_1, I2C_SCL_1, 100000);
   Wire1.begin(I2C_SDA_2, I2C_SCL_2, I2C_FREQ_2);
   health::set_i2c0(true);
   health::set_i2c1(true);
@@ -224,48 +269,15 @@ void setup()
   // Log-Intervall für Debug-Moves setzen (ms)
   step.setDebugMoveLogInterval(100);
 
-  // Homing-Routine (optional über lumina_config.h)
-  if (!g_setupMode && lumina::startup::DO_STEPPER_HOME_ON_BOOT) {
-    while (!step.home()) { step.tick(); }
-  }
-
-  // Optionales Start-Positionieren der LED (nur für Tests)
-  // step.moveTo(180.0f, 5); // 180mm nach unten, Geschwindigkeit Stufe 5
-  // waitUntilStill(step);  // Warten bis Stillstand
-
-  // ToF: Offset laden; optional automatisch kalibrieren (je nach Flag)
-  {
-    bool haveOffset = false;
-    if (LittleFS.exists("/tof_offset.dat")) {
-      File f = LittleFS.open("/tof_offset.dat", FILE_READ);
-      if (f) {
-        String s = f.readString();
-        f.close();
-        int val = 0; int n = 0;
-        if (s.length() > 0) n = sscanf(s.c_str(), "%d", &val);
-        if (n == 1) { tof.setOffsetMm((int16_t)val); haveOffset = true; }
-      }
-    }
-    if (!g_setupMode && lumina::startup::DO_TOF_CALIBRATE_ON_BOOT && !haveOffset) {
-      // Automatische Ein-Punkt-Offset-Kalibrierung
-      int measured = tof.readAvgMm(lumina::calib::TOF_CAL_SAMPLES);
-      if (measured >= 0) {
-        int target = lumina::calib::TOF_CAL_TARGET_MM;
-        int off = measured - target; // readRawMm() zieht diesen Offset ab
-        tof.setOffsetMm((int16_t)off);
-        File fw = LittleFS.open("/tof_offset.dat", FILE_WRITE);
-        if (fw) { fw.printf("%d\n", off); fw.close(); }
-        Serial.println(F("[CAL] ToF Offset kalibriert und gespeichert"));
-      }
-    }
-  }
+  // ToF: Kalibrierung erfolgt nur im Setup (NVS)
+  // Offset wird später via web.setHardware() aus NVS geladen
 
   // RTC (vor Netzstart initialisieren, damit NetCtrl darauf zugreifen darf)
   if (!rtc.begin(Wire1)) {
     Serial.println("[RTC] Keine Verbindung zur DS3231 (0x68).");
     health::set_rtc(false, F("RTC nicht erreichbar"));
   } else {
-        Serial.println("[RTC] Init OK (DS3231 gefunden).");
+    Serial.println("[RTC] Init OK (DS3231 gefunden).");
     health::set_rtc(true);
   }
 
@@ -280,18 +292,11 @@ void setup()
     digitalWrite(lumina::pins::PUMP_EN, LOW);
   }
 
-  // Netzwerkteil starten (AP immer, STA wenn konfiguriert); mDNS: luminagrowx.local (verschoben ans Ende)
-
   // ===== 5) Weitere Aktoren + Controller =====
   // Controller verbinden und konfigurieren (inkl. Stepper/ToF/RTC/Tuer)
   if (!g_setupMode) {
     controller.begin(sht_in, sht_out, dac, fan, step, tof, &rtc, lumina::plant::DOOR_SWITCH_PIN);
     controller.applyLuminaConfig();
-  }
-
-  // Nach Homing: blockierende Annäherung an Mindestabstand (optional über lumina_config.h)
-  if (!g_setupMode && lumina::startup::DO_APPROACH_MIN_DISTANCE_BOOT) {
-    controller.runStartupApproachBlocking();
   }
 
   // Netzwerk + Web am Ende
@@ -304,6 +309,27 @@ void setup()
   web.begin(&controller, &rtc, &net);
   // Hardware-Referenzen für Setup/Tests an WebCtrl geben (inkl. SHT41, Fan2, Fan3)
   web.setHardware(&dac, &fan, &fan2, &fan3, &step, &tof, &sht_in, &sht_out);
+
+  // Homing-Routine (optional über lumina_config.h)
+  // Hier NACH web.setHardware, damit die Kalibrierung nicht überschrieben wird
+  if (!g_setupMode && lumina::startup::DO_STEPPER_HOME_ON_BOOT) {
+    Serial.println(F("[INIT] Starte sicheres Boot-Homing (nur Nullpunkt oben)..."));
+    step.resetHoming();
+    if (step.home(false)) { // false = Nur zum oberen Nullpunkt fahren, keine Kalibrierfahrt nach unten
+      while (step.status().isHoming) {
+        step.tick();
+        delay(1);
+      }
+      Serial.println(F("[INIT] Boot-Homing abgeschlossen."));
+    } else {
+      Serial.println(F("[INIT] Boot-Homing konnte nicht gestartet werden!"));
+    }
+  }
+
+  // Nach Homing: blockierende Annäherung an Mindestabstand (optional über lumina_config.h)
+  if (!g_setupMode && lumina::startup::DO_APPROACH_MIN_DISTANCE_BOOT) {
+    controller.runStartupApproachBlocking();
+  }
 
   // Drying-Status laden und in Controller setzen
   if (!g_setupMode) {

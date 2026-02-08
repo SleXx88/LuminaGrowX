@@ -27,6 +27,7 @@ static const char* NVS_GROW = "grow";
 static const char* NVS_DRY = "drying";
 static const char* NVS_NOTIFY = "notify";
 static const char* NVS_STEPPER = "stepper";
+static const char* NVS_TOF = "tof";
 static const char* NVS_UPDATE = "update_cfg";
 static const char* NVS_PHASES = "cfg_phases";
 
@@ -147,6 +148,21 @@ bool WebCtrl::saveStepperCfg(const StepperCfg& c) {
     stepper_cfg_ = c; return true;
 }
 
+bool WebCtrl::loadTofCfg(ToFCfg& out) {
+    Preferences prefs;
+    if (!prefs.begin(NVS_TOF, true)) return false;
+    out.offset_mm = (int16_t)prefs.getShort("offset_mm", 0);
+    prefs.end();
+    return true;
+}
+bool WebCtrl::saveTofCfg(const ToFCfg& c) {
+    Preferences prefs;
+    if (!prefs.begin(NVS_TOF, false)) return false;
+    prefs.putShort("offset_mm", (int16_t)c.offset_mm);
+    prefs.end();
+    return true;
+}
+
 #pragma pack(push, 1)
 struct PhaseBlob {
   plant_ctrl::LightSchedule schedule;
@@ -229,7 +245,7 @@ void WebCtrl::begin(plant_ctrl::PlantCtrl* ctrl, RTC_Ctrl* rtc, NetCtrl* net) {
 
   // Ensure all NVS namespaces exist by opening in RW mode once
   {
-    const char* ns[] = {NVS_APP, NVS_GROW, NVS_DRY, NVS_NOTIFY, NVS_STEPPER, NVS_UPDATE, NVS_PHASES};
+    const char* ns[] = {NVS_APP, NVS_GROW, NVS_DRY, NVS_NOTIFY, NVS_STEPPER, NVS_TOF, NVS_UPDATE, NVS_PHASES};
     Preferences p; for (auto s : ns) { p.begin(s, false); p.end(); }
   }
 
@@ -242,11 +258,18 @@ void WebCtrl::begin(plant_ctrl::PlantCtrl* ctrl, RTC_Ctrl* rtc, NetCtrl* net) {
   notify_ = tmpN;
   StepperCfg tmpS; loadStepperCfg(tmpS);
   stepper_cfg_ = tmpS;
+  ToFCfg tmpT; loadTofCfg(tmpT);
+  tof_cfg_ = tmpT;
   
   if (ctrl_) {
     loadPhases(ctrl_);
     syncControllerStage_();
   }
+
+  // Sicherstellen, dass Verzeichnisse existieren
+  // Wir rufen mkdir direkt auf; falls es existiert, passiert nichts weiter.
+  // Das vermeidet den "does not exist"-Log von exists().
+  LittleFS.mkdir("/cfg");
 
   // Initialen Grow/Drying-Status an PlantCtrl weiterleiten
   if (ctrl_) {
@@ -277,6 +300,11 @@ void WebCtrl::setHardware(GP8211Ctrl* dac, FanCtrl* fan, FanCtrl* fan2, FanCtrl*
   if (step_) {
       // Apply loaded config
       step_->setMaxTravelMm(stepper_cfg_.max_travel_mm);
+  }
+
+  if (tof_) {
+      // Apply loaded config (NVS)
+      tof_->setOffsetMm(tof_cfg_.offset_mm);
   }
 }
 
@@ -395,10 +423,11 @@ void WebCtrl::setupRoutes_() {
                  if (measured < 0) { delay(10); tof_->reinit(); delay(10); }
                }
                if (measured >= 0) {
-                 off = measured - target; tof_->setOffsetMm((int16_t)off);
-                 LittleFS.begin(false, "/littlefs", 10, "littlefs");
-                 File fw = LittleFS.open("/tof_offset.dat", FILE_WRITE);
-                 if (fw) { fw.printf("%d\n", off); fw.close(); ok=true; }
+                 off = measured - target; 
+                 tof_->setOffsetMm((int16_t)off);
+                 tof_cfg_.offset_mm = (int16_t)off;
+                 ok = saveTofCfg(tof_cfg_);
+                 if (ok) Serial.printf("[WEB] ToF Offset kalibriert und in NVS gespeichert: %d mm\n", off);
                } else {
                  // Restore vorherigen Offset, wenn Messung fehlgeschlagen ist
                  tof_->setOffsetMm(prevOff);
@@ -614,12 +643,6 @@ void WebCtrl::setupRoutes_() {
   });
 
   http_.on("/api/setup/done", HTTP_POST, [this](AsyncWebServerRequest* req){
-    // Persistiere aktuellen ToF-Offset sicherheitshalber erneut
-    if (tof_) {
-      LittleFS.begin(false, "/littlefs", 10, "littlefs");
-      File fw = LittleFS.open("/tof_offset.dat", FILE_WRITE);
-      if (fw) { fw.printf("%d\n", (int)tof_->getOffsetMm()); fw.close(); }
-    }
     bool ok=setup_flag::set_done(true);
     // Erstelle Marker-Datei fÃ¼r "Erstinbetriebnahme erledigt"
     if (ok) {

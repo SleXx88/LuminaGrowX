@@ -205,7 +205,7 @@ void StepperCtrl::tick()
 
 /* ---------------- Homing ---------------- */
 
-bool StepperCtrl::startHoming()
+bool StepperCtrl::startHoming(bool fullCalibration)
 {
   if (mutex_) xSemaphoreTake(mutex_, portMAX_DELAY);
   
@@ -218,6 +218,7 @@ bool StepperCtrl::startHoming()
       return false; 
   }
 
+  fullCalibration_ = fullCalibration;
   homingBackoffActive_ = false;
   newCalibrationAvailable_ = false; // Reset flag
   hState_ = HomeState::PRE_BACKOFF;
@@ -626,9 +627,18 @@ void StepperCtrl::updateHoming_()
     if (!stepper_.isRunning())
     {
       stepper_.forceStopAndNewPosition(0); // Set Zero at Top (after backoff)
-      // Note: We are now at 0. Top Limit is actually -3mm (if backoff was 3mm).
-      // But standard is 0 = Top Switch position (after backoff).
       
+      if (!fullCalibration_) {
+          // Finish here for simple homing
+          hState_ = HomeState::DONE;
+          mode_ = Mode::IDLE;
+          lastOpDone_ = true;
+          homingFinished_ = true;
+          homingBackoffActive_ = false;
+          Serial.println("[HOMING] Simple Homing Complete (Top Zero).");
+          return;
+      }
+
       // Now start Phase 2: Find Bottom
       hState_ = HomeState::ZERO_TOP;
       // Fallthrough to next if immediately

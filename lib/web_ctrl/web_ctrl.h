@@ -23,6 +23,7 @@ struct GrowState { bool started=false; uint32_t start_epoch=0; uint16_t total_da
 struct DryingState { bool active=false; uint32_t start_epoch=0; };
 struct NotifyCfg { bool enabled=false; String phone; String apikey; };
 struct StepperCfg { float max_travel_mm = 440.0f; };
+struct ToFCfg { int16_t offset_mm = 0; };
 
 class WebCtrl {
 public:
@@ -48,6 +49,8 @@ public:
   bool saveNotify(const NotifyCfg& n);
   bool loadStepperCfg(StepperCfg& out);
   bool saveStepperCfg(const StepperCfg& c);
+  bool loadTofCfg(ToFCfg& out);
+  bool saveTofCfg(const ToFCfg& c);
   bool loadPhases(plant_ctrl::PlantCtrl* ctrl);
   bool savePhases(plant_ctrl::PlantCtrl* ctrl);
 
@@ -114,6 +117,7 @@ private:
   DryingState drying_;
   NotifyCfg notify_;
   StepperCfg stepper_cfg_;
+  ToFCfg tof_cfg_;
 
   uint32_t nextPushAt_ = 0;
   uint32_t nextProbeAt_ = 0;

@@ -79,8 +79,8 @@ public:
   void tick();
   bool testConnection(); // New method
 
-  bool startHoming();
-  inline bool home() { return startHoming(); }
+  bool startHoming(bool fullCalibration = true);
+  inline bool home(bool fullCalibration = true) { return startHoming(fullCalibration); }
   void resetHoming();
   inline void rehome() { resetHoming(); }
 
@@ -183,6 +183,7 @@ private:
   volatile bool      lastOpDone_   = false;
   volatile bool      homingFinished_ = false;
   bool      homingBackoffActive_ = false;
+  bool      fullCalibration_ = true;
   bool      newCalibrationAvailable_ = false;
 
   uint32_t  lastDebugPosMs_ = 0;
