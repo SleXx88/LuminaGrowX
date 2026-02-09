@@ -52,7 +52,7 @@ ToFCtrl::ToFCtrl()
   : _w(&Wire), _addr(0x29), _xshut(-1), _ok(false),
     _maxCm(TOF_MAX_CM), _minCm(TOF_MIN_CM),
     _stopVar(0), _timingBudgetUs(0),
-    _offsetMm(0) {}
+    _offsetMm(0), _lastMm(-1) {}
 
 // (Legacy) Kalibrier-Dateipfad entfernt – es wird nur noch Offset genutzt
 
@@ -328,15 +328,18 @@ bool ToFCtrl::initSensor(bool longRangeMode) {
   w8(SYSTEM_INTERRUPT_CLEAR, 0x01);
   // Default-Messbudget für bessere Genauigkeit im Nahbereich erhöhen
   // (z. B. 50 ms → weniger Rauschen als Standard)
+  // UPDATE: High Accuracy Mode = 200 ms (200000 us)
   (void)getMeasurementTimingBudget();
-  const uint32_t DefaultBudgetUs = 20000; // 50 ms
+  const uint32_t HighAccuracyBudgetUs = 200000; // 200 ms für hohe Genauigkeit
   w8(SYSTEM_SEQUENCE_CONFIG, 0xE8);
-  setMeasurementTimingBudget(DefaultBudgetUs);
+  setMeasurementTimingBudget(HighAccuracyBudgetUs);
   w8(SYSTEM_SEQUENCE_CONFIG, 0x01);
   if (!performSingleRefCalibration(0x40)) return false;
   w8(SYSTEM_SEQUENCE_CONFIG, 0x02);
   if (!performSingleRefCalibration(0x00)) return false;
   w8(SYSTEM_SEQUENCE_CONFIG, 0xE8);
+  // Starte kontinuierliche Messung im Hintergrund (Non-Blocking)
+  startContinuous();
   return true;
 }
 
@@ -393,22 +396,8 @@ uint32_t ToFCtrl::getMeasurementTimingBudget() {
   return budget;
 }
 
-// Liest einen Messwert im Single-Shot-Modus; interne Funktion für readRawMm()
-int ToFCtrl::readRangeContinuousMillimeters() {
-  uint32_t tStart = millis();
-  while ((r8(RESULT_INTERRUPT_STATUS) & 0x07) == 0) {
-    if (millis() - tStart > 250) return -1;
-    delay(5);
-  }
-  uint16_t range = r16(RESULT_RANGE_STATUS + 10);
-  w8(SYSTEM_INTERRUPT_CLEAR, 0x01);
-  return (int)range;
-}
-
-// Abfrage eines einzelnen Messwerts in mm
-int ToFCtrl::readRawMm() {
-  if (!_ok) return -1;
-  // Single-Shot starten (Sequenz nach Datenblatt)
+// Startet den Continuous Back-to-Back Modus
+void ToFCtrl::startContinuous() {
   w8(0x80, 0x01);
   w8(0xFF, 0x01);
   w8(0x00, 0x00);
@@ -416,18 +405,37 @@ int ToFCtrl::readRawMm() {
   w8(0x00, 0x01);
   w8(0xFF, 0x00);
   w8(0x80, 0x00);
-  w8(SYSRANGE_START, 0x01);
-  // Warten, bis das Start-Bit gelöscht ist
-  uint32_t tStart = millis();
-  while (r8(SYSRANGE_START) & 0x01) {
-    if (millis() - tStart > 250) return -1;
-    delay(5);
-  }
-  int mm = readRangeContinuousMillimeters();
-  if (mm < 0) return -1;
+  w8(SYSRANGE_START, 0x02); // 0x02 = VL53L0X_REG_SYSRANGE_MODE_BACKTOBACK
+}
 
-  // Software-Offset
-  mm -= _offsetMm;
+// Abfrage des aktuellen Messwerts (Non-Blocking)
+// Prüft, ob der Sensor fertig ist. Wenn ja, Update _lastMm.
+// Wenn nein, gib den letzten bekannten Wert zurück.
+int ToFCtrl::readRawMm() {
+  if (!_ok) return -1;
+
+  // Prüfen, ob neue Daten bereitstehen (Bit 0-2 in RESULT_INTERRUPT_STATUS)
+  if (r8(RESULT_INTERRUPT_STATUS) & 0x07) {
+    // Wert lesen
+    uint16_t range = r16(RESULT_RANGE_STATUS + 10);
+    // Interrupt clearen, damit nächste Messung starten kann
+    w8(SYSTEM_INTERRUPT_CLEAR, 0x01);
+
+    // Rohwert speichern (noch ohne Offset)
+    int mm = (int)range;
+    
+    // Software-Offset anwenden
+    mm -= _offsetMm;
+    
+    // Wert aktualisieren
+    _lastMm = mm;
+  }
+
+  // Mit dem letzten bekannten Wert arbeiten (egal ob gerade frisch oder alt)
+  int mm = _lastMm;
+
+  // Fehlerbehandlung für ungültige Werte (z.B. Init-Zustand -1)
+  if (mm < 0) return -1;
 
   // Prüfen auf Unterschreitung der minimalen Messdistanz. _minCm == 0 deaktiviert die Prüfung.
   if (_minCm > 0) {
@@ -445,6 +453,8 @@ int ToFCtrl::readRawMm() {
 // Durchschnitt mehrerer Messungen (optimiert für Geschwindigkeit)
 int ToFCtrl::readAvgMm(uint8_t samples) {
   if (samples == 0) return readRawMm();
+  // Im High Accuracy Continuous Mode ist samples=1 empfohlen (via Config).
+  // Falls samples > 1, wird hier schnell der gleiche Wert gelesen, was okay ist.
   // Robustere Mittelung: Trimmed Mean (schneidet Ausreißer ab)
   const uint8_t N = (samples > 32) ? 32 : samples;
   int vals[32];
@@ -473,5 +483,3 @@ int ToFCtrl::readAvgMm(uint8_t samples) {
   if (cnt == 0) return vals[n/2];
   return (int)((sum + (cnt/2)) / cnt);
 }
-
-

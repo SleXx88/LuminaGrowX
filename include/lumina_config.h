@@ -159,7 +159,7 @@ namespace lumina
 
     // ToF-Leseintervall und Mittelung
     constexpr uint32_t TOF_READ_INTERVAL_MS = 50;   // Sicherheitsabstand für Sensor-Timing
-    constexpr uint8_t  TOF_AVG_SAMPLES      = 10;   // Mittelung pro Messung
+    constexpr uint8_t  TOF_AVG_SAMPLES      = 1;    // High Accuracy Mode integriert intern (200ms), keine SW-Mittelung nötig
 
     // Verhalten der Distanzanpassung
     constexpr float    ADJUST_HYST_MM = 2.0f;       // Totband um Ziel

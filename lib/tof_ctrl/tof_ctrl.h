@@ -118,6 +118,7 @@ private:
   bool setMeasurementTimingBudget(uint32_t budget_us);
   uint32_t getMeasurementTimingBudget();
   int readRangeContinuousMillimeters();
+  void startContinuous(); // Startet den kontinuierlichen Modus
 
   struct SeqTimeouts {
     uint16_t pre_range_vcsel_period_pclks, final_range_vcsel_period_pclks;
@@ -171,6 +172,7 @@ private:
   uint8_t  _stopVar;   // interner Wert aus Sensor-Init
   uint32_t _timingBudgetUs; // gespeichertes Timing-Budget
   int16_t  _offsetMm = 0; // optionaler Offset für Kalibrierung
+  int      _lastMm = -1;  // Letzter gelesener Wert (für non-blocking)
 
   // Dateipfad für Offset-Kalibrierung (Definition in .cpp)
   static const char* kOffsetPath;
