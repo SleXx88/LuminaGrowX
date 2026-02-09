@@ -197,7 +197,7 @@ void setup()
   fan3.setPercent(0);
 
   // LED Initialisierung (GP8211)
-  if (!dac.begin(Wire1)) {
+  if (!dac.begin(Wire)) {
     Serial.println("[GP8211] init FAIL (I2C addr 0x58)");
     health::set_dac(false, F("GP8211 nicht erreichbar"));
   } else {
@@ -211,13 +211,13 @@ void setup()
   // ===== 2) Hardware-Sensoren =====
   // ToF aktivieren und starten
   // XSHUT nicht verwendet, direkt -1 übergeben
-  bool ok = tof.begin(Wire, 0x29, -1);
+  bool ok = tof.begin(Wire1, 0x29, -1);
   Serial.println(ok ? F("[ToF] Init OK") : F("[ToF] Init FAILED"));
   health::set_tof(ok, ok ? String("") : F("ToF Init fehlgeschlagen"));
 
   // SHT41 initialisieren
   Serial.println(F("[SHT41_in] Init..."));
-  if (!sht_in.begin(Wire1, true)) {
+  if (!sht_in.begin(Wire, true)) {
     Serial.println(F("[SHT41_in] Init FAILED (Sensor nicht erreichbar?)"));
     health::set_sht_in(false, F("SHT41 innen fehlt/fehlerhaft"));
   } else {
@@ -225,7 +225,7 @@ void setup()
     health::set_sht_in(true);
   }
   Serial.println(F("[SHT41_out] Init..."));
-  if (!sht_out.begin(Wire, true)) {
+  if (!sht_out.begin(Wire1, true)) {
     Serial.println(F("[SHT41_out] Init FAILED (Sensor nicht erreichbar?)"));
     health::set_sht_out(false, F("SHT41 außen fehlt/fehlerhaft"));
   } else {

@@ -37,16 +37,16 @@ Die Konfiguration stammt aus `include/lumina_config.h`.
 
 ### I2C Busse
 *   **Wire (I2C0):** GPIO 8 (SDA), GPIO 9 (SCL)
-    *   Verwendet für: SHT41 (Außen), ToF (VL53L0X)
+    *   Verwendet für: SHT41 (Innen) Klemme CH 1A, GP8211 (DAC/LED) Klemme CH 1B
 *   **Wire1 (I2C1):** GPIO 21 (SDA), GPIO 47 (SCL)
-    *   Verwendet für: SHT41 (Innen), GP8211 (DAC/LED), DS3231 (RTC)
+    *   Verwendet für: SHT41 (Außen) Klemme CH 2B, ToF (VL53L0X) Klemme CH 2A, DS3231 (RTC) Klemme RTC Onboard
 
 ### Stepper (TMC2209)
 *   Kommunikation über **UART** (GPIO 17/18) im Single-Wire Modus (Y-Kabel mit 1kΩ Widerstand nötig).
 *   **DIR Pin (11):** Bekanntes Problem mit Hardware-Verbindung ("Motor dreht nur in eine Richtung"). Workaround in Software aktiv.
 
 ### CO2 Sensor (MQ-2 Gas-Sensor)
-*   `CO2_MQ_VAL` wird über einen Spannungsteiler gemessen -> CO2 Analog Ausgang
+*   `CO2_MQ_VAL` -> CO2 Analog Ausgang
 
 ### Lüfter (PWM)
 *   Frequenz: 25 kHz

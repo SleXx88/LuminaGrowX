@@ -238,7 +238,7 @@ private:
 
   float  ledOut_ = 0.0f, fanOut_ = 0.0f, lastFanOut_ = 0.0f;
   float  ledApplied_ = NAN; // zuletzt an den DAC geschrieben
-  int8_t fanSign_ = +1; // +1: Lüfter erhöht VPD; -1: Lüfter senkt VPD
+  int8_t fanSign_ = +1; // +1: Lüfter senkt VPD (Außenluft feuchter); -1: Lüfter erhöht VPD (Außenluft trockener)
 
   // PI Zustand & Zeit
   float    iTermFan_  = 0.0f;

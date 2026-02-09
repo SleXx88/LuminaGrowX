@@ -13,13 +13,13 @@ using vpd_calc::computeDewPoint;
 static inline float midpoint(float a, float b) { return (a + b) * 0.5f; }
 
 PlantCtrl::PlantCtrl() {
-  // Standardwerte aus zentraler Konfiguration (Phasen/Modi) ?bernehmen
+  // Standardwerte aus zentraler Konfiguration (Phasen/Modi) übernehmen
   for (int si = 0; si < 3; ++si) {
     for (int mi = 0; mi < 3; ++mi) {
       settings_[si][mi] = lumina::defaults::PHASE_MODE[si][mi];
     }
   }
-  // Zeitpl?ne aus defaults kopieren
+  // Zeitpläne aus defaults kopieren
   schedules_[0] = lumina::schedule::SEEDLING;
   schedules_[1] = lumina::schedule::VEGETATIVE;
   schedules_[2] = lumina::schedule::FLOWERING;
@@ -42,7 +42,7 @@ void PlantCtrl::begin(SHT41Ctrl& sensorIndoor,
   rtc_       = rtc;
   doorPin_   = doorPin;
   if (doorPin_ >= 0) {
-    pinMode(doorPin_, INPUT); // LOW = T?r zu (gegen GND)
+    pinMode(doorPin_, INPUT); // LOW = Tür zu (gegen GND)
     lastDoorClosed_ = (digitalRead(doorPin_) == LOW);
   } else {
     lastDoorClosed_ = true; // ohne Sensor: als geschlossen behandeln
@@ -133,19 +133,18 @@ void PlantCtrl::applyLuminaConfig() {
   setDoorDetection(p.door_dRh, p.door_dT, p.door_hold_ms);
   setModeChangeHold(p.mode_hold_ms);
 
-  // Schimmelpr�vention / Per-Phase-Parameter �bernehmen
-
-  // Schimmelpr?vention / Per-Phase-Parameter ?bernehmen
+  // Schimmelprävention / Per-Phase-Parameter übernehmen
   rhCap_[0] = p.seedling_rh_cap;
   rhCap_[1] = p.vegetative_rh_cap;
   rhCap_[2] = p.flowering_rh_cap;
   if (p.use_flowering_late_cap) {
     rhCap_[2] = p.flowering_late_rh_cap;
   }
-  rhCapHyst_[0] = p.rh_cap_hyst;
-  rhCapHyst_[1] = p.rh_cap_hyst;
-  rhCapHyst_[2] = p.flowering_rh_cap_hyst; // Flowering eigene Hysterese
+  rhCapHyst_[0] = p.rh_cap_hyst; // Seedling
+  rhCapHyst_[1] = p.rh_cap_hyst; // Vegetative
+  rhCapHyst_[2] = p.flowering_rh_cap_hyst; // Flowering hat eigene Hysterese
 
+  // Taupunkt-Mindestabstände
   dpGapMin_[0] = p.seedling_dp_gap_min_C;
   dpGapMin_[1] = p.vegetative_dp_gap_min_C;
   dpGapMin_[2] = p.flowering_dp_gap_min_C;
@@ -178,13 +177,13 @@ void PlantCtrl::detectDoorOrTransient(float t_now, float rh_now, uint32_t now_ms
 }
 
 void PlantCtrl::updateFanSignFromDewpoints() {
-  // Passive Zuluft unten, Abluft oben: Mehr L�fter -> Innenklima n�hert sich Au�enklima
-  // Au�en feuchter (dpOut > dpIn): Mehr L�fter -> RH steigt -> VPD sinkt -> fanSign +1
-  // Au�en trockener (dpOut < dpIn): Mehr L�fter -> RH sinkt -> VPD steigt -> fanSign -1
+  // Passive Zuluft unten, Abluft oben: Mehr Lüfter -> Innenklima nähert sich Außenklima
+  // Außen feuchter (dpOut > dpIn): Mehr Lüfter -> RH steigt -> VPD sinkt -> fanSign +1
+  // Außen trockener (dpOut < dpIn): Mehr Lüfter -> RH sinkt -> VPD steigt -> fanSign -1
   float gap = (float)(dpOut_ - dpIn_);
-  if (gap > 0.5f)       fanSign_ = +1; // au�en feuchter: L�fter senkt VPD
-  else if (gap < -0.5f) fanSign_ = -1; // au�en trockener: L�fter erh�ht VPD
-  // nahe 0: Vorzeichen beibehalten
+  if (gap > dpHumidHyst_)       fanSign_ = +1; // außen feuchter: Lüfter senkt VPD
+  else if (gap < -dpHumidHyst_) fanSign_ = -1; // außen trockener: Lüfter erhöht VPD
+  // In der Hysterese-Zone: Vorzeichen beibehalten, um Schwingungen zu vermeiden
 }
 
 void PlantCtrl::setDryingMode(bool active) {
@@ -209,7 +208,7 @@ bool PlantCtrl::update() {
   tIn_ = tC_in; rhIn_ = rh_in;
   tOut_ = tC_out; rhOut_ = rh_out;
 
-  // T�r-Status aktualisieren (unabh�ngig vom Modus)
+  // Tür-Status aktualisieren (unabhängig vom Modus)
   if (doorPin_ >= 0) {
     bool closed = (digitalRead(doorPin_) == LOW);
     if (closed != lastDoorClosed_) {
@@ -249,7 +248,7 @@ bool PlantCtrl::update() {
     return true;
   }
 
-  // Trocknungsmodus: Einfache Regelung f�r 45-55% RH, LED 0%, min. 20% L�fter
+  // Trocknungsmodus: Einfache Regelung für 45-55% RH, LED 0%, min. 20% Lüfter
   if (dryingMode_) {
     // VPD berechnen (f�r Monitoring)
     vpdIn_ = computeVpd(tIn_, rhIn_);
@@ -264,14 +263,14 @@ bool PlantCtrl::update() {
     led_->setPercent(ledOut_);
     ledApplied_ = ledOut_;
 
-    // L�fterregelung f�r Ziel 45-55% RH
+    // Lüfterregelung für Ziel 45-55% RH
     const float targetRhMin = lumina::drying::TARGET_RH_MIN;
     const float targetRhMax = lumina::drying::TARGET_RH_MAX;
     const float targetRhMid = (targetRhMin + targetRhMax) / 2.0f;
     const float fanMin = lumina::drying::FAN_MIN_PERCENT;
     const float fanMax = lumina::drying::FAN_MAX_PERCENT;
 
-    // Einfache Proportionalregelung: je h�her RH �ber Ziel, desto mehr L�fter
+    // Einfache Proportionalregelung: je höher RH über Ziel, desto mehr Lüfter
     float fanCmd = fanMin;
     if (rhIn_ < targetRhMin) {
       // Zu trocken: Minimall�fter
@@ -290,8 +289,8 @@ bool PlantCtrl::update() {
     lastFanOut_ = fanOut_ = fanCmd;
     fan_->setPercent(fanOut_);
 
-    // W�hrend Trocknung: Stepper/LED-Abstandsregelung DEAKTIVIERT
-    // Motor bleibt aus, egal ob T�r offen/zu
+    // Während Trocknung: Stepper/LED-Abstandsregelung DEAKTIVIERT
+    // Motor bleibt aus, egal ob Tür offen/zu
     return true;
   }
 
@@ -299,19 +298,19 @@ bool PlantCtrl::update() {
   vpdIn_ = computeVpd(tIn_, rhIn_);
   dpIn_  = computeDewPoint(tIn_, rhIn_);
   dpOut_ = computeDewPoint(tOut_, rhOut_);
-  // Robustes EMA: bei Alpha au?erhalb [0,1] Filter umgehen
+  // Robustes EMA: bei Alpha außerhalb [0,1] Filter umgehen
   if (isnan(vpdFilt_)) {
     vpdFilt_ = vpdIn_;
   } else if (emaAlpha_ <= 0.0f || emaAlpha_ >= 1.0f) {
     vpdFilt_ = vpdIn_;
   } else {
-    vpdFilt_ = emaAlpha_ * vpdIn_ + (1.0f - emaAlpha_) * vpdFilt_;
+    vpdFilt_ = emaAlpha_ * vpdIn_ + (1.0f - emaAlpha_) * vpdFilt_; // EMA-Filter
   }
 
-  // 3) T?r-/Transienten-Erkennung
+  // 3) Tür-/Transienten-Erkennung
   detectDoorOrTransient(tIn_, rhIn_, now);
 
-  // 4) Tageszeit + Sunrise/Sunset-Rampen => LED-Ziel + Moduswahl (Day/Night)
+  // 4) Tageszeit + Sunrise/Sunset-Rampen => LED-Ziel + Moduswahl (Day/Night/NightSilent)
   float ledTarget = 0.0f;
   {
     bool haveRtc = (rtc_ != nullptr);
@@ -360,12 +359,12 @@ bool PlantCtrl::update() {
         ledTarget = clamp01(cur().ledPercent);
       }
     } else {
-      // Ohne RTC: Modus bleibt unver�ndert -> statischer LED-Wert des Modus
+      // Ohne RTC: Modus bleibt unverändert -> statischer LED-Wert des Modus
       ledTarget = clamp01(cur().ledPercent);
     }
   }
 
-  // 4b) Basiswerte f�r Regelung laden (nach evtl. Mode-Autowechsel)
+  // 4b) Basiswerte für Regelung laden (nach evtl. Mode-Autowechsel)
   PhaseModeSettings& ps = cur();
   const float vpdTarget = midpoint(ps.vpdMin, ps.vpdMax);
   const float baseFan   = ps.fanMin;
@@ -379,9 +378,9 @@ bool PlantCtrl::update() {
     ledOut_ = ledTarget;
     // BUGFIX: Beim Wechsel auf 0% (Sonnenuntergang) darf keine Totzone verhindern,
     //         dass 0% gesetzt wird. Sonst bleibt die LED z.B. bei 0.3% -> effektiv 1% stehen.
-    const bool forceOff = (!isnan(ledApplied_) && ledTarget <= 0.0f && ledApplied_ > 0.0f);
-    // Nur schreiben, wenn sich der Wert deutlich ge�ndert hat ODER wir 0% erzwingen m�ssen
-    if (isnan(ledApplied_) || forceOff || fabsf(ledTarget - ledApplied_) >= 0.5f) {
+    const bool forceOff = (!isnan(ledApplied_) && ledTarget <= 0.0f && ledApplied_ > 0.0f); // von >0 auf 0
+    // Nur schreiben, wenn sich der Wert deutlich geändert hat ODER wir 0% erzwingen müssen
+    if (isnan(ledApplied_) || forceOff || fabsf(ledTarget - ledApplied_) >= 0.25f) { // Schwelle reduziert auf 0.25%
       ledApplied_ = ledTarget;
       led_->setPercent(ledApplied_);
     }
@@ -399,10 +398,10 @@ bool PlantCtrl::update() {
   if (fanMaxEff < ps.fanMin) fanMaxEff = ps.fanMin;
   if (fanMaxEff > 100.0f)    fanMaxEff = 100.0f;
 
-    // Priorit�t 1: Schimmelpr�vention (Humidity-Priority)
+  // Priorität 1: Schimmelprävention (Humidity-Priority)
   const float cap   = rhCap_[si];
   const float hyst  = rhCapHyst_[si];
-  const float band  = fmaxf(0.0f, hyst * 0.5f); // symmetrische Hysterese �band
+  const float band  = fmaxf(0.0f, hyst * 0.5f); // symmetrisches Hysterese-Band
   const float dpGapReq = dpGapMin_[si];
   const bool dpTooNear = ((float)(tIn_ - dpIn_) < dpGapReq);
 
@@ -417,18 +416,18 @@ bool PlantCtrl::update() {
         }
       }
     }
-    // Austritt: erst wenn RH = cap - band und ?Tdp ausreichend
+    // Austritt: erst wenn RH = cap - band und ΔTdp ausreichend
     if (humidityPriorityActive_) {
       if (((float)rhIn_ <= (cap - band)) && !dpTooNear) {
         humidityPriorityActive_ = false;
-        // Cooldown starten (Taupunkt-Gefahr darf Cooldown �bersteuern)
+        // Cooldown starten (Taupunkt-Gefahr darf Cooldown übersteuern)
         hpCooldownUntilMs_ = millis() + hpCooldownMs_;
       }
     }
   } else {
     humidityPriorityActive_ = false;
-  }// 6) Au?en feuchter -> L?fter blockieren
-  //
+  }
+  // 6) Außen feuchter -> Lüfter blockieren
   // Outside humidity block: when the outdoor dew point is higher than the indoor
   // dew point by more than dpHumidHyst_, we should avoid pulling moist air into
   // the box.  Previously this block was only applied if no humidity priority
@@ -436,17 +435,17 @@ bool PlantCtrl::update() {
   // quickly (e.g. someone breathing on the sensor).  To ensure that humid air
   // isn�t driven into the enclosure we now always evaluate this block before
   // applying any other overrides.  If the condition is met we ramp the fan
-  // toward zero using the configured rate limit and return immediately.  This
+  // toward a minimum using the configured rate limit and return immediately.  This
   // allows the box to retain its drier air even when indoor RH is high.
   // FIX: Heat-Emergency BEFORE humid-block - bei Hitze trotzdem kuehlen
   const bool heatEmergency = (tIn_ > (maxTemp_ + 0.5f));
   // FIX: Moisture-Emergency - bei extremer Feuchte (z.B. >85%) Blockade ignorieren, um "Sumpf" bei Regen zu vermeiden
   const bool moisturePanic = (rhIn_ >= rhHighThr_);
 
-  if (!heatEmergency && !moisturePanic && blockOutsideHumid_ && (!isnan(dpIn_) && !isnan(dpOut_)) && (dpOut_ >= dpIn_ + dpHumidHyst_)) {
-    // Mindest-Luftwechsel beibehalten (15%) f�r CO2-Nachschub, auch wenn au�en feuchter
-    // Kleine Box braucht kontinuierlichen Luftaustausch f�r Pflanzenstoffwechsel
-    float fanCmd = 15.0f; // war 0.0f - vollst�ndige Blockade riskiert CO2-Mangel
+  if (!heatEmergency && !moisturePanic && blockOutsideHumid_ && (!isnan(dpIn_) && !isnan(dpOut_)) && ((float)dpOut_ >= (float)dpIn_ + dpHumidHyst_)) {
+    // Mindest-Luftwechsel beibehalten (15%) für CO2-Nachschub, auch wenn außen feuchter
+    // Kleine Box braucht kontinuierlichen Luftaustausch für Pflanzenstoffwechsel
+    float fanCmd = 15.0f; // war 0.0f - vollständige Blockade riskiert CO2-Mangel
     fanCmd = limitRate(fanCmd, lastFanOut_, dt_s);
     lastFanOut_ = fanOut_ = fanCmd;
     fan_->setPercent(fanOut_);
@@ -465,8 +464,8 @@ bool PlantCtrl::update() {
   if (humidityPriorityActive_) {
     //
     // When humidity priority is active we previously forced the fan directly to
-    // its maximum (fanMaxEff).  This leads to large swings between 20�% and
-    // 70�% in flowering because the fan saturates at 70�% whenever the dewpoint
+    // its maximum (fanMaxEff).  This leads to large swings between 20% and
+    // 70% in flowering because the fan saturates at 70% whenever the dewpoint
     // gap or RH thresholds are crossed and then drops back down as soon as the
     // thresholds clear.  To obtain smoother behaviour we scale the fan speed
     // based on how far the measured relative humidity and dewpoint gap exceed
@@ -487,8 +486,8 @@ bool PlantCtrl::update() {
     // commanded per percentage point of RH overshoot and per degree of dewpoint
     // gap deficit.  These values have been chosen empirically and can be
     // exposed via a setter if you wish to fine-tune them later.
-    const float wRH = 1.2f; // % fan increase per 1�%RH overshoot
-    const float wDP = 2.0f; // % fan increase per 1��C dewpoint gap deficit
+    const float wRH = 1.2f; // % fan increase per 1%RH overshoot
+    const float wDP = 2.0f; // % fan increase per 1°C dewpoint gap deficit
 
     // Compute the additional fan demand.  Start from the minimum fan for this
     // phase and add scaled overshoot contributions.  Note that this may
@@ -496,7 +495,7 @@ bool PlantCtrl::update() {
     float targetFan = ps.fanMin + (wRH * overshootRH) + (wDP * overshootDP);
 
     // Determine the absolute maximum fan that may be commanded.  In NightSilent
-    // mode the configuration may allow a +20�% boost above fanMaxEff to rescue
+    // mode the configuration may allow a +20% boost above fanMaxEff to rescue
     // the climate even if it means briefly being louder.  We also ensure
     // maxLimit never drops below fanMin to avoid pathological cases.
     float maxLimit = fanMaxEff;
@@ -537,7 +536,7 @@ bool PlantCtrl::update() {
     overrideActive = true;
   }
 
-  // 8) Holds (T?r/Modus)
+  // 8) Holds (Tür/Modus)
   if (!overrideActive && now < holdUntilMs_) {
     fanCmd = clamp(baseFan + iTermFan_, ps.fanMin, fanMaxEff);
   }
@@ -555,21 +554,21 @@ bool PlantCtrl::update() {
     else if (error < -localDeadband) e = error + localDeadband;
     else e = 0.0f;
 
-    fanCmd = baseFan + iTermFan_ - (float)fanSign_ * kpFan_ * e;
+    // *** KORRIGIERTE PI-FORMEL ***
+    fanCmd = baseFan + iTermFan_ + (float)fanSign_ * kpFan_ * e;
 
-    // PI-Terme mit Vorzeichenkonvention
-    const float iDelta = (-(float)fanSign_) * kiFan_ * e * dt_s;
+    // Integrator-Update mit Anti-Windup (Clamping)
+    const float iDelta = ((float)fanSign_) * kiFan_ * e * dt_s;
     float preClamp = fanCmd + iDelta;
     float clamped  = clamp(preClamp, ps.fanMin, fanMaxEff);
     if (fabsf(preClamp - clamped) < 1e-3f) {
-      iTermFan_ += iDelta; // Integrator nur ?bernehmen, wenn keine S?ttigung vorliegt
+      iTermFan_ += iDelta; // Integrator nur übernehmen, wenn keine Sättigung vorliegt
       if (iTermFan_ >  20.0f) iTermFan_ =  20.0f;
       if (iTermFan_ < -20.0f) iTermFan_ = -20.0f;
-      fanCmd = clamped;
     } else {
-      iTermFan_ *= 0.98f; // st?rkere Reduktion w?hrend S?ttigung
-      fanCmd = clamped;
+      iTermFan_ *= 0.98f; // stärkere Reduktion während Sättigung
     }
+    fanCmd = clamped;
   } else {
     // Integrator bei Hold/Override leicht entspannen
     iTermFan_ *= 0.995f;
@@ -577,8 +576,8 @@ bool PlantCtrl::update() {
 
       if (fanMaxEff < ps.fanMin) fanMaxEff = ps.fanMin;
   fanCmd = clamp(fanCmd, ps.fanMin, fanMaxEff);
-  fanCmd = limitRate(fanCmd, lastFanOut_, dt_s);
-  // Kleinsignal-Abschaltung: sehr kleine Werte auf 0 setzen, um minPercent-Mapping des L?fters nicht zu triggern
+  fanCmd = limitRate(fanCmd, lastFanOut_, dt_s); // Sanfter Übergang
+  // Kleinsignal-Abschaltung: sehr kleine Werte auf 0 setzen, um minPercent-Mapping des Lüfters nicht zu triggern
   const float offEps = 0.5f; // %
   if (fanCmd > 0.0f && fanCmd < offEps) {
     fanCmd = 0.0f;
@@ -603,13 +602,13 @@ bool PlantCtrl::update() {
     }
   }
 
-  // Distanzverwaltung (T?r/Schedule/Eventfenster + 1 mm Schritte)
+  // Distanzverwaltung (Tür/Schedule/Eventfenster + 1 mm Schritte)
   distanceTick_(now);
 
   return true;
 }
 
-// T?rlogik: LOW = T?r zu (gegen GND)
+// Türlogik: LOW = Tür zu (gegen GND)
 bool PlantCtrl::isDoorClosed_() {
   if (doorPin_ < 0) return true;
   return digitalRead(doorPin_) == LOW;
@@ -661,11 +660,11 @@ float PlantCtrl::targetDistanceMm_() const {
 
 void PlantCtrl::distanceTick_(uint32_t now) {
   if (!step_ || !tof_) return;
-  // T?r offen? Keine Bewegung zulassen
+  // Tür offen? Keine Bewegung zulassen
   if (!isDoorClosed_()) { adjustActive_ = false; return; }
 
   // ToF lesen
-  if (now - lastTofReadMs_ >= lumina::plant::TOF_READ_INTERVAL_MS) {
+  if (now - lastTofReadMs_ >= lumina::plant::TOF_READ_INTERVAL_MS) { // Nicht in jedem Loop lesen
     lastTofReadMs_ = now;
     int v = tof_->readAvgMm(lumina::plant::TOF_AVG_SAMPLES);
     if (v >= 0) lastTofMm_ = v;
@@ -698,7 +697,7 @@ void PlantCtrl::distanceTick_(uint32_t now) {
   }
 }
 
-// Dynamische, blockierende Ann?herung beim Setup
+// Dynamische, blockierende Annäherung beim Setup
 void PlantCtrl::runStartupApproachBlocking() {
   if (!step_ || !tof_) { initialApproachDone_ = true; return; }
 
@@ -733,14 +732,15 @@ void PlantCtrl::runStartupApproachBlocking() {
       }
       break; // innerhalb Bandbreite
     }
-    // noch kein g?ltiger Messwert
+    // noch kein gültiger Messwert
     step_->tick();
     delay(5);
   }
   initialApproachDone_ = true;
+  // Nach der Annäherung noch kurz ticken lassen, damit die Auto-Disable Logik (500ms) greifen kann
+  uint32_t startWait = millis();
+  while (millis() - startWait < 600) {
+    step_->tick();
+    delay(5);
+  }
 }
-
-
-
-
-
