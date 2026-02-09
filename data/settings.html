@@ -226,6 +226,37 @@
                 <button id="btnNotifySave" type="button">Speichern</button>
               </div>
             </div>
+
+            <hr />
+
+            <h4>MQTT & Home Assistant</h4>
+            <div style="margin-bottom: 1.5rem;">
+              <label>
+                <input type="checkbox" id="mqttEnabled" /> MQTT aktivieren (für Home Assistant)
+              </label>
+            </div>
+
+            <div id="mqttBlock" class="grid hidden" style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px; border-left: 3px solid #3b82f6;">
+              <label style="flex-direction: column; align-items: start;">
+                <span style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 0.25rem;">Broker Server (IP oder Hostname)</span>
+                <input id="mqttServer" placeholder="192.168.1.10" style="width: 100%;" />
+              </label>
+              <label style="flex-direction: column; align-items: start;">
+                <span style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 0.25rem;">Port</span>
+                <input id="mqttPort" type="number" placeholder="1883" value="1883" style="width: 100%;" />
+              </label>
+              <label style="flex-direction: column; align-items: start;">
+                <span style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 0.25rem;">Benutzer (optional)</span>
+                <input id="mqttUser" placeholder="" style="width: 100%;" />
+              </label>
+              <label style="flex-direction: column; align-items: start;">
+                <span style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 0.25rem;">Passwort (optional)</span>
+                <input id="mqttPass" type="password" placeholder="" style="width: 100%;" />
+              </label>
+              <div style="grid-column: 1 / -1; display:flex; gap:0.5rem; justify-content: flex-end; margin-top: 0.5rem;">
+                <button id="btnMqttSave" type="button">Speichern</button>
+              </div>
+            </div>
           </form>
         </div>
         <footer class="card-footer">
@@ -274,6 +305,20 @@
             $('notifyKey').value = j.notify.apikey || '';
             $('notifyBlock').classList.toggle('hidden', !$('notifyEnabled').checked);
           }
+
+          // MQTT Settings Load
+          try {
+            const m = await fetchJSON('/api/mqtt');
+            if (m) {
+              $('mqttEnabled').checked = !!m.enabled;
+              $('mqttServer').value = m.server || '';
+              $('mqttPort').value = m.port || 1883;
+              $('mqttUser').value = m.user || '';
+              $('mqttPass').value = m.pass || '';
+              $('mqttBlock').classList.toggle('hidden', !$('mqttEnabled').checked);
+            }
+          } catch (_) {}
+
           const net = j.network || {};
           currentSSID = net.ssid || '';
           
@@ -386,6 +431,7 @@
 
       $('useStatic').addEventListener('change', (e)=> $('staticBlock').classList.toggle('hidden', !e.target.checked));
       $('notifyEnabled').addEventListener('change', (e)=> $('notifyBlock').classList.toggle('hidden', !e.target.checked));
+      $('mqttEnabled').addEventListener('change', (e)=> $('mqttBlock').classList.toggle('hidden', !e.target.checked));
 
       $('btnNameSave').addEventListener('click', async ()=>{
         const name = $('deviceName').value.trim();
@@ -449,6 +495,22 @@
         const body = masked ? { phone } : { phone, apikey: key };
         try{ const r=await fetch('/api/notify/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); if(!r.ok) throw new Error(await r.text()); showToast('Testnachricht gesendet'); }
         catch(e){ showToast('Fehler beim Senden: '+e.message); }
+      });
+
+      $('btnMqttSave').addEventListener('click', async ()=>{
+        const enabled = $('mqttEnabled').checked;
+        const server = $('mqttServer').value.trim();
+        const port = parseInt($('mqttPort').value.trim()) || 1883;
+        const user = $('mqttUser').value.trim();
+        const pass = $('mqttPass').value; // allow spaces if any
+        
+        if (enabled && !server) { showToast('Bitte Server-Adresse eingeben'); return; }
+        
+        const payload = { enabled, server, port, user, pass };
+        try {
+          await fetchJSON('/api/mqtt', { method:'POST', body: JSON.stringify(payload) });
+          showToast('MQTT Einstellungen gespeichert');
+        } catch(e) { showToast('Fehler: ' + e.message); }
       });
 
       // Setup-Button mit Bestätigungsdialog

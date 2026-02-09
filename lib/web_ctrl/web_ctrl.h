@@ -6,6 +6,7 @@
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
 #include <Update.h>
+#include "../mqtt_ctrl/mqtt_ctrl.h"
 
 class RTC_Ctrl;
 class SHT41Ctrl;
@@ -38,6 +39,7 @@ public:
 
   // Optionale Hardware-Referenzen für Setup/Tests (LED-DAC, Lüfter, Stepper, ToF)
   void setHardware(GP8211Ctrl* dac, FanCtrl* fan, FanCtrl* fan2, FanCtrl* fan3, StepperCtrl* stepper, ToFCtrl* tof, SHT41Ctrl* shtIn = nullptr, SHT41Ctrl* shtOut = nullptr);
+  void setMqtt(MqttCtrl* mqtt);
 
   void loop(); // broadcast status, reboot scheduling, probes
 
@@ -56,6 +58,8 @@ public:
   bool saveTofCfg(const ToFCfg& c);
   bool loadPhases(plant_ctrl::PlantCtrl* ctrl);
   bool savePhases(plant_ctrl::PlantCtrl* ctrl);
+  bool loadMqttCfg(MqttConfig& out);
+  bool saveMqttCfg(const MqttConfig& c);
 
 private:
   // HTTP handlers
@@ -111,6 +115,7 @@ private:
   ToFCtrl* tof_ = nullptr;
   SHT41Ctrl* shtIn_ = nullptr;
   SHT41Ctrl* shtOut_ = nullptr;
+  MqttCtrl* mqtt_ = nullptr;
 
   AsyncWebServer http_{80};
   AsyncWebSocket ws_{"/ws"};
@@ -121,6 +126,7 @@ private:
   NotifyCfg notify_;
   StepperCfg stepper_cfg_;
   ToFCfg tof_cfg_;
+  MqttConfig mqtt_cfg_;
 
   uint32_t nextPushAt_ = 0;
   uint32_t nextProbeAt_ = 0;

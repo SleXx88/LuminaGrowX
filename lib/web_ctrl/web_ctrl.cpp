@@ -30,6 +30,7 @@ static const char* NVS_STEPPER = "stepper";
 static const char* NVS_TOF = "tof";
 static const char* NVS_UPDATE = "update_cfg";
 static const char* NVS_PHASES = "cfg_phases";
+static const char* NVS_MQTT = "mqtt";
 
 // GitHub Releases (latest) defaults â€“ fest im Code hinterlegt
 static const char* GH_OWNER = "SleXx88";
@@ -169,6 +170,41 @@ bool WebCtrl::saveTofCfg(const ToFCfg& c) {
     return true;
 }
 
+void WebCtrl::setMqtt(MqttCtrl* mqtt) {
+    mqtt_ = mqtt;
+    if (mqtt_) {
+        // Apply currently loaded config
+        mqtt_->begin(mqtt_cfg_, app_.name);
+    }
+}
+
+bool WebCtrl::loadMqttCfg(MqttConfig& out) {
+    Preferences prefs;
+    if (!prefs.begin(NVS_MQTT, true)) return false;
+    out.enabled = prefs.getBool("enabled", false);
+    out.server = prefs.getString("server", "");
+    out.port = (uint16_t)prefs.getUInt("port", 1883);
+    out.user = prefs.getString("user", "");
+    out.pass = prefs.getString("pass", "");
+    prefs.end();
+    mqtt_cfg_ = out;
+    return true;
+}
+
+bool WebCtrl::saveMqttCfg(const MqttConfig& c) {
+    Preferences prefs;
+    if (!prefs.begin(NVS_MQTT, false)) return false;
+    prefs.putBool("enabled", c.enabled);
+    prefs.putString("server", c.server);
+    prefs.putUInt("port", c.port);
+    prefs.putString("user", c.user);
+    prefs.putString("pass", c.pass);
+    prefs.end();
+    mqtt_cfg_ = c;
+    if (mqtt_) mqtt_->setConfig(c);
+    return true;
+}
+
 #pragma pack(push, 1)
 struct PhaseBlob {
   plant_ctrl::LightSchedule schedule;
@@ -251,7 +287,7 @@ void WebCtrl::begin(plant_ctrl::PlantCtrl* ctrl, RTC_Ctrl* rtc, NetCtrl* net) {
 
   // Ensure all NVS namespaces exist by opening in RW mode once
   {
-    const char* ns[] = {NVS_APP, NVS_GROW, NVS_DRY, NVS_NOTIFY, NVS_STEPPER, NVS_TOF, NVS_UPDATE, NVS_PHASES};
+    const char* ns[] = {NVS_APP, NVS_GROW, NVS_DRY, NVS_NOTIFY, NVS_STEPPER, NVS_TOF, NVS_UPDATE, NVS_PHASES, NVS_MQTT};
     Preferences p; for (auto s : ns) { p.begin(s, false); p.end(); }
   }
 
@@ -266,10 +302,16 @@ void WebCtrl::begin(plant_ctrl::PlantCtrl* ctrl, RTC_Ctrl* rtc, NetCtrl* net) {
   stepper_cfg_ = tmpS;
   ToFCfg tmpT; loadTofCfg(tmpT);
   tof_cfg_ = tmpT;
+  MqttConfig tmpM; loadMqttCfg(tmpM);
+  mqtt_cfg_ = tmpM;
   
   if (ctrl_) {
     loadPhases(ctrl_);
     syncControllerStage_();
+  }
+
+  if (mqtt_) {
+      mqtt_->begin(mqtt_cfg_, app_.name);
   }
 
   // Initialen Grow/Drying-Status an PlantCtrl weiterleiten
@@ -329,6 +371,17 @@ void WebCtrl::loop() {
       }
       lastDacFadeMs_ = now;
     }
+  }
+
+  if (mqtt_) {
+      mqtt_->loop();
+      static uint32_t lastMqttPush = 0;
+      if (now - lastMqttPush >= 2000) { // 2s update rate
+          lastMqttPush = now;
+          if (mqtt_->isConnected()) {
+              mqtt_->publishState(makeStatusJson_());
+          }
+      }
   }
 
   if (now >= nextProbeAt_) {
@@ -705,6 +758,29 @@ void WebCtrl::setupRoutes_() {
 
   http_.on("/api/info", HTTP_GET, [this](AsyncWebServerRequest* req){ req->send(200, "application/json", makeInfoJson_()); });
   http_.on("/api/status", HTTP_GET, [this](AsyncWebServerRequest* req){ req->send(200, "application/json", makeStatusJson_()); });
+  
+  http_.on("/api/mqtt", HTTP_GET, [this](AsyncWebServerRequest* req){
+      JsonDocument doc;
+      doc["enabled"] = mqtt_cfg_.enabled;
+      doc["server"] = mqtt_cfg_.server;
+      doc["port"] = mqtt_cfg_.port;
+      doc["user"] = mqtt_cfg_.user;
+      doc["pass"] = mqtt_cfg_.pass;
+      String out; serializeJson(doc, out); req->send(200, "application/json", out);
+  });
+  http_.on("/api/mqtt", HTTP_POST, [](AsyncWebServerRequest*){}, NULL,
+      [this](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t, size_t){
+          JsonDocument doc; if (deserializeJson(doc, data, len)) { req->send(400, "application/json", "{\"error\":\"bad json\"}"); return; }
+          MqttConfig c = mqtt_cfg_;
+          if (!doc["enabled"].isNull()) c.enabled = doc["enabled"].as<bool>();
+          if (!doc["server"].isNull()) c.server = String((const char*)doc["server"]);
+          if (!doc["port"].isNull()) c.port = (uint16_t)doc["port"].as<uint16_t>();
+          if (!doc["user"].isNull()) c.user = String((const char*)doc["user"]);
+          if (!doc["pass"].isNull()) c.pass = String((const char*)doc["pass"]);
+          
+          saveMqttCfg(c);
+          req->send(200, "application/json", "{\"ok\":true}");
+  });
 
   // Register updater routes
   registerUpdateRoutes_();
@@ -714,7 +790,11 @@ void WebCtrl::setupRoutes_() {
              JsonDocument doc; if (deserializeJson(doc, data, len)) { req->send(400, "application/json", "{\"error\":\"bad json\"}"); return; }
              bool changed = false;
              if (!doc["seed"].isNull()) { app_.seed = String((const char*)doc["seed"]); changed = true; }
-             if (!doc["name"].isNull()) { app_.name = String((const char*)doc["name"]); changed = true; }
+             if (!doc["name"].isNull()) { 
+                 app_.name = String((const char*)doc["name"]); 
+                 changed = true;
+                 if (mqtt_) mqtt_->setDeviceName(app_.name);
+             }
              if (changed) saveAppCfg(app_);
              req->send(200, "application/json", "{\"ok\":true}");
              if (ws_.count() > 0) ws_.textAll(makeStatusJson_());

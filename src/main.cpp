@@ -23,6 +23,7 @@
 #include "lumina_config.h"
 #include "net_ctrl.h"
 #include "web_ctrl.h"
+#include "../lib/mqtt_ctrl/mqtt_ctrl.h"
 #include "../include/health.h"
 #include "../include/version.h"
 #include "../include/setup_flag.h"
@@ -69,6 +70,7 @@ PlantCtrl controller;
 RTC_Ctrl rtc;
 net_ctrl::NetCtrl net;
 web_ctrl::WebCtrl web;
+MqttCtrl mqtt;
 static bool g_setupMode = false;
 
 static inline bool approxEq(float a, float b, float eps = 0.02f) {
@@ -309,6 +311,7 @@ void setup()
   web.begin(&controller, &rtc, &net);
   // Hardware-Referenzen für Setup/Tests an WebCtrl geben (inkl. SHT41, Fan2, Fan3)
   web.setHardware(&dac, &fan, &fan2, &fan3, &step, &tof, &sht_in, &sht_out);
+  web.setMqtt(&mqtt);
 
   // Homing-Routine (optional über lumina_config.h)
   // Hier NACH web.setHardware, damit die Kalibrierung nicht überschrieben wird
