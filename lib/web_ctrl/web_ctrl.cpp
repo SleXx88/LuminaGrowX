@@ -153,6 +153,7 @@ bool WebCtrl::loadTofCfg(ToFCfg& out) {
     if (!prefs.begin(NVS_TOF, true)) return false;
     out.offset_mm = (int16_t)prefs.getShort("offset_mm", 0);
     prefs.end();
+    tof_cfg_ = out; 
     return true;
 }
 bool WebCtrl::saveTofCfg(const ToFCfg& c) {
@@ -265,11 +266,6 @@ void WebCtrl::begin(plant_ctrl::PlantCtrl* ctrl, RTC_Ctrl* rtc, NetCtrl* net) {
     loadPhases(ctrl_);
     syncControllerStage_();
   }
-
-  // Sicherstellen, dass Verzeichnisse existieren
-  // Wir rufen mkdir direkt auf; falls es existiert, passiert nichts weiter.
-  // Das vermeidet den "does not exist"-Log von exists().
-  LittleFS.mkdir("/cfg");
 
   // Initialen Grow/Drying-Status an PlantCtrl weiterleiten
   if (ctrl_) {
@@ -644,11 +640,6 @@ void WebCtrl::setupRoutes_() {
 
   http_.on("/api/setup/done", HTTP_POST, [this](AsyncWebServerRequest* req){
     bool ok=setup_flag::set_done(true);
-    // Erstelle Marker-Datei fÃ¼r "Erstinbetriebnahme erledigt"
-    if (ok) {
-      File fm = LittleFS.open("/cfg/install_done.mark", FILE_WRITE);
-      if (fm) { fm.print("1"); fm.close(); }
-    }
     bool doReboot = true;
     if (req->hasParam("reboot")) {
       String rb = req->getParam("reboot")->value();
@@ -1004,7 +995,7 @@ String WebCtrl::makeSetupStatusJson_() {
     s["uart_ok"] = st.uart_ok;
     s["max_travel_mm"] = stepper_cfg_.max_travel_mm;
   }
-  doc["initial_setup_done"] = LittleFS.exists("/cfg/install_done.mark");
+  doc["initial_setup_done"] = setup_flag::is_done();
   String out; serializeJson(doc, out); return out;
 }
 
@@ -1170,6 +1161,11 @@ String WebCtrl::makeStatusJson_() {
   mods["tof"] = hs.mod.tof_ok;
   mods["fs"] = hs.mod.fs_ok;
 
+  doc["tof_offset"] = tof_cfg_.offset_mm;
+  if (tof_) {
+    doc["tof_mm"] = tof_->readAvgMm(1);
+  }
+
   // Grow block
   JsonObject g = doc["grow"].to<JsonObject>();
   g["started"] = grow_.started;
@@ -1267,6 +1263,9 @@ String WebCtrl::makeInfoJson_() {
   ntf["enabled"] = notify_.enabled;
   ntf["phone"] = notify_.phone;
   ntf["apikey"] = notify_.apikey; // Klartext, nur bei /api/info
+  
+  doc["tof_offset"] = tof_cfg_.offset_mm;
+  
   String out; serializeJson(doc, out); return out;
 }
 
