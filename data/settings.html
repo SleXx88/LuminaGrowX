@@ -6,71 +6,231 @@
     <title>LuminaGrowX – Einstellungen</title>
     <link rel="stylesheet" href="/pico.min.css" />
     <style>
-      :root{
-        --accent:#ef4444;--border:rgba(255,255,255,0.18);--text:#e5e7eb;--text-dim:#cbd5e1;
-        --glass:rgba(20,20,22,0.42);--glass-strong:rgba(20,20,22,0.62);
-        --radius:18px;--pico-background-color:transparent;--pico-card-background-color:transparent
+      :root {
+        --accent: #ef4444;
+        --accent-2: #dc2626;
+        --bg-main: #080809;
+        --glass: rgba(255, 255, 255, 0.03);
+        --glass-strong: rgba(255, 255, 255, 0.05);
+        --muted: rgba(255, 255, 255, 0.06);
+        --border: rgba(255, 255, 255, 0.1);
+        --text: #e5e7eb;
+        --text-dim: #9ca3af;
+        --ok: #22c55e;
+        --warn: #f59e0b;
+        --err: #ef4444;
+        --radius: 12px;
+        --pico-background-color: var(--bg-main);
+        --pico-card-background-color: var(--glass);
       }
-      html,body{height:100%}
-      body{position:relative;color:var(--text);background:transparent}
-      body::before{content:"";position:fixed;inset:0;background:linear-gradient(rgba(0,0,0,0.55),rgba(0,0,0,0.55)),url('/bg.jpg') center/cover no-repeat #0b0b0c;z-index:-1}
-      article{background:var(--glass);border:1px solid var(--border);border-radius:var(--radius);backdrop-filter:blur(3px)}
-      article>header{background:var(--glass-strong);border-bottom:1px solid var(--border);border-radius:var(--radius) var(--radius) 0 0;padding:.75rem 1rem}
-      .hidden{display:none}
-      input,select,button,[role=button],.button{border-radius:var(--radius)!important}
-      input,select{background:rgba(255,255,255,0.02)!important;color:var(--text)!important;border:1px solid var(--border)!important}
-      button,[role=button],.button{background:rgba(20,20,22,0.42);color:var(--text);border:1px solid var(--border);font-weight:700;font-size:1rem;line-height:1.2;padding:0.55rem 0.9rem;border-radius:var(--radius)!important}
-      @media (min-width:768px){button,[role=button],.button{font-size:0.95rem;padding:0.5rem 0.85rem}}
-      @media (min-width:1200px){button,[role=button],.button{font-size:0.9rem;padding:0.45rem 0.8rem}}
-      button:hover{background:rgba(255,255,255,0.06)}
-      button:active,button.primary,.primary{background:var(--accent)!important;color:#fff!important;border-color:var(--accent)!important}
-      input[type=checkbox],input[type=radio]{accent-color:var(--accent)}
-      input[type=checkbox]{width:1.1rem;height:1.1rem;margin-right:0.5rem;border:2px solid var(--border)!important;background:rgba(255,255,255,0.06)!important}
-      label>input[type=checkbox]{vertical-align:middle}
+      html, body { 
+        height: 100%; 
+        background-color: var(--bg-main);
+      }
+      body {
+        position: relative;
+        color: var(--text);
+      }
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background: linear-gradient(rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.55)), url('/bg.jpg') center/cover no-repeat #0b0b0c;
+        z-index: -1;
+      }
+      
+      article {
+        background: var(--glass);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        margin-bottom: 1.5rem;
+        padding: 0;
+        overflow: hidden;
+        backdrop-filter: blur(10px);
+      }
+      article > header {
+        background: var(--glass-strong);
+        border-bottom: 1px solid var(--border);
+        padding: 1.25rem 1.5rem;
+      }
+      article > header h2 { margin: 0; font-size: 1.5rem; color: #fff; }
+      
+      .content { padding: 1.5rem; }
+      .hidden { display: none !important; }
+      
+      h4 { color: var(--accent); margin-top: 1.5rem; margin-bottom: 0.75rem; text-transform: uppercase; font-size: 0.9rem; letter-spacing: 0.05em; }
+      
+      input:not([type="checkbox"]), select {
+        background: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid var(--border) !important;
+        color: var(--text) !important;
+        border-radius: 6px !important;
+      }
+      input:not([type="checkbox"]):focus, select:focus {
+        border-color: var(--accent) !important;
+        box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2) !important;
+      }
+
+      button, .button {
+        background: var(--accent);
+        border: 1px solid var(--accent);
+        color: #fff;
+        border-radius: 6px !important;
+        font-weight: 600;
+        cursor: pointer;
+        padding: 0.6rem 1rem;
+        transition: all 0.2s;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      button:hover, .button:hover {
+        background: var(--accent-2);
+        border-color: var(--accent-2);
+        color: #fff;
+      }
+      button.secondary, .button.secondary {
+        background: rgba(239, 68, 68, 0.1);
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      button.secondary:hover, .button.secondary:hover {
+        background: var(--accent);
+        color: #fff;
+      }
+
+      /* Checkbox Fix - match setup.html exactly */
+      input[type="checkbox"] {
+        width: 1.2rem;
+        height: 1.2rem;
+        accent-color: var(--ok);
+        margin-right: 0.5rem;
+        cursor: pointer;
+        /* Do NOT set background-color here as it breaks the checkmark in Pico */
+      }
+      
+      label {
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+        margin-bottom: 0.5rem;
+      }
+
+      hr { opacity: 0.1; margin: 2rem 0; }
+      
+      .grid { display: grid; grid-template-columns: 1fr; gap: 1rem; margin-bottom: 1rem; }
+      @media(min-width: 768px) { .grid { grid-template-columns: 1fr 1fr; } }
+      
+      footer.card-footer {
+        display: flex;
+        gap: 0.5rem;
+        padding: 1.25rem 1.5rem;
+        background: var(--glass-strong);
+        border-top: 1px solid var(--border);
+      }
     </style>
   </head>
   <body>
-    <main class="container" style="margin-top:1rem">
+    <main class="container" style="margin-top:2rem">
       <article>
         <header>
           <h2>Einstellungen</h2>
         </header>
-        <div class="content" style="padding:1rem; display:grid; gap:1rem;">
+        <div class="content">
           <form id="netForm">
-            <h4>WLAN</h4>
-            <div class="grid">
-              <label>SSID <input id="ssid" name="ssid" placeholder="MeinWiFi" /></label>
-              <label>Passwort <input id="pass" name="pass" type="password" placeholder="********" /></label>
+            <h4>Allgemein</h4>
+            <div style="display: grid; grid-template-columns: 1fr auto; gap: 0.5rem; align-items: end; margin-bottom: 1rem;">
+              <label style="flex-direction: column; align-items: start; margin: 0;">
+                <span style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 0.25rem;">Gerätename (max. 10 Zeichen)</span>
+                <input id="deviceName" name="name" maxlength="10" placeholder="z.B. LisaPro-1" style="margin:0; width: 100%;" />
+              </label>
+              <button type="button" id="btnNameSave" style="margin:0; height: 100%;">Speichern</button>
             </div>
-            <div class="grid">
-              <label><input type="checkbox" id="useStatic" name="useStatic" role="switch" /> Statische IP-Adresse verwenden</label>
-            </div>
-            <div id="staticBlock" class="grid hidden">
-              <label>IP-Adresse <input id="ip" name="ip" placeholder="192.168.1.50" /></label>
-              <label>Subnetzmaske <input id="mask" name="mask" placeholder="255.255.255.0" /></label>
-              <label>Gateway <input id="gw" name="gw" placeholder="192.168.1.1" /></label>
-              <label>DNS (optional) <input id="dns" name="dns" placeholder="1.1.1.1" /></label>
-            </div>
-            <footer style="display:flex; justify-content:flex-end; gap:.5rem; padding-top:.5rem;">
-              <button type="button" id="btnNetSave" class="primary">Speichern</button>
-            </footer>
 
             <hr />
-            <h4>Benachrichtigungen (WhatsApp via CallMeBot)</h4>
-            <label><input type="checkbox" id="notifyEnabled" role="switch" /> Benachrichtigungen aktivieren</label>
-            <div id="notifyBlock" class="grid hidden">
-              <label>Telefonnummer (+Ländervorwahl) <input id="notifyPhone" placeholder="+49XXXXXXXXXX" /></label>
-              <label>API-Key <input id="notifyKey" placeholder="1234567" /></label>
-              <div style="display:flex; gap:.5rem;">
-                <button id="btnNotifySave" type="button" class="primary">Speichern</button>
-                <button id="btnNotifyTest" type="button">Testnachricht senden</button>
+
+            <h4>WLAN Konfiguration</h4>
+            <div style="display: grid; grid-template-columns: 1fr auto; gap: 0.5rem; align-items: end; margin-bottom: 1rem;">
+              <label style="flex-direction: column; align-items: start; margin: 0;">
+                <span style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 0.25rem;">Netzwerk (SSID)</span>
+                <div style="display:flex; gap:0.5rem; width: 100%;">
+                  <select id="wifiSSID" name="ssid" style="flex:1; margin:0">
+                    <option value="" disabled selected>Suche Netzwerke...</option>
+                  </select>
+                  <input id="ssidManual" placeholder="Manuelle SSID" class="hidden" style="flex:1; margin:0" />
+                </div>
+              </label>
+              <button type="button" id="btnScan" class="secondary" style="margin:0; height: 100%;">Scan</button>
+            </div>
+            
+            <div class="grid">
+              <label style="flex-direction: column; align-items: start;">
+                <span style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 0.25rem;">Passwort</span>
+                <input id="pass" name="pass" type="password" placeholder="********" style="width: 100%;" />
+              </label>
+              <label style="height: 100%; align-items: end; padding-bottom: 0.6rem;">
+                <input type="checkbox" id="showPass" /> Passwort anzeigen
+              </label>
+            </div>
+
+            <div style="margin: 1.5rem 0;">
+              <label>
+                <input type="checkbox" id="useStatic" name="useStatic" /> Statische IP-Adresse verwenden
+              </label>
+            </div>
+
+            <div id="staticBlock" class="grid hidden" style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px; border-left: 3px solid var(--accent);">
+              <label style="flex-direction: column; align-items: start;">
+                <span style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 0.25rem;">IP-Adresse</span>
+                <input id="ip" name="ip" placeholder="192.168.1.50" />
+              </label>
+              <label style="flex-direction: column; align-items: start;">
+                <span style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 0.25rem;">Subnetzmaske</span>
+                <input id="mask" name="mask" placeholder="255.255.255.0" />
+              </label>
+              <label style="flex-direction: column; align-items: start;">
+                <span style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 0.25rem;">Gateway</span>
+                <input id="gw" name="gw" placeholder="192.168.1.1" />
+              </label>
+              <label style="flex-direction: column; align-items: start;">
+                <span style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 0.25rem;">DNS (optional)</span>
+                <input id="dns" name="dns" placeholder="1.1.1.1" />
+              </label>
+            </div>
+            
+            <div style="display:flex; justify-content:flex-end; margin-top: 1rem;">
+              <button type="button" id="btnNetSave">WLAN Einstellungen speichern</button>
+            </div>
+
+            <hr />
+            
+            <h4>Benachrichtigungen</h4>
+            <div style="margin-bottom: 1.5rem;">
+              <label>
+                <input type="checkbox" id="notifyEnabled" /> WhatsApp Benachrichtigungen aktivieren
+              </label>
+            </div>
+            
+            <div id="notifyBlock" class="grid hidden" style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px; border-left: 3px solid var(--ok);">
+              <label style="flex-direction: column; align-items: start;">
+                <span style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 0.25rem;">Telefonnummer (+49...)</span>
+                <input id="notifyPhone" placeholder="+49XXXXXXXXXX" style="width: 100%;" />
+              </label>
+              <label style="flex-direction: column; align-items: start;">
+                <span style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 0.25rem;">CallMeBot API-Key</span>
+                <input id="notifyKey" placeholder="1234567" style="width: 100%;" />
+              </label>
+              <div style="grid-column: 1 / -1; display:flex; gap:0.5rem; justify-content: flex-end; margin-top: 0.5rem;">
+                <button id="btnNotifyTest" type="button" class="secondary">Test-Nachricht</button>
+                <button id="btnNotifySave" type="button">Speichern</button>
               </div>
             </div>
           </form>
         </div>
-        <footer style="display:flex; gap:.5rem; padding:.75rem 1rem; border-top:1px solid var(--border); margin-top:.5rem;">
-          <a href="/" role="button">Zurück</a>
-          <a href="/setup" id="btnSetup" role="button">Setup</a>
+        <footer class="card-footer">
+          <a href="/" class="button secondary" style="flex: 1; justify-content: center;">Abbrechen</a>
+          <a href="/setup" id="btnSetup" class="button secondary" style="flex: 1; justify-content: center; border-color: var(--accent); color: var(--accent);">Assistent neu starten</a>
         </footer>
       </article>
     </main>
@@ -96,20 +256,51 @@
 
       async function fetchJSON(url, options){ const r=await fetch(url, Object.assign({headers:{'Content-Type':'application/json'}}, options||{})); if(!r.ok) throw new Error(r.status+' '+r.statusText); return await r.json().catch(()=> ({})); }
 
+      let currentSSID = "";
+
       async function loadInfo(){
         try{
           const j = await fetchJSON('/api/info');
+          if (j && j.device_name) {
+            $('deviceName').value = j.device_name;
+          } else if (j && j.app && j.app.name) {
+            // Fallback for different API structures
+            $('deviceName').value = j.app.name;
+          }
+          
           if (j && j.notify){
             $('notifyEnabled').checked = !!j.notify.enabled;
             $('notifyPhone').value = j.notify.phone || '';
             $('notifyKey').value = j.notify.apikey || '';
             $('notifyBlock').classList.toggle('hidden', !$('notifyEnabled').checked);
           }
-          const w = (j && j.wifi) || {};
-          $('ssid').value = w.ssid || '';
-          $('pass').value = '';
-          $('useStatic').checked = !!(w.use_static);
-          const st = (w.static) || {};
+          const net = j.network || {};
+          currentSSID = net.ssid || '';
+          
+          const sel = $('wifiSSID');
+          sel.innerHTML = '';
+          if (currentSSID) {
+            const opt = document.createElement('option');
+            opt.value = currentSSID;
+            opt.textContent = currentSSID + ' (gespeichert)';
+            opt.selected = true;
+            sel.appendChild(opt);
+          } else {
+            const opt = document.createElement('option');
+            opt.value = "";
+            opt.textContent = "Wähle ein Netzwerk...";
+            opt.disabled = true;
+            opt.selected = true;
+            sel.appendChild(opt);
+          }
+          const optManual = document.createElement('option');
+          optManual.value = "__manual__";
+          optManual.textContent = "Manuell eingeben...";
+          sel.appendChild(optManual);
+
+          $('pass').value = net.pass || '';
+          $('useStatic').checked = !!(net.use_static);
+          const st = (net.static) || {};
           $('ip').value = st.ip || '';
           $('mask').value = st.mask || '';
           $('gw').value = st.gw || '';
@@ -117,6 +308,60 @@
           $('staticBlock').classList.toggle('hidden', !$('useStatic').checked);
         }catch(_){ }
       }
+
+      $('wifiSSID').addEventListener('change', (e) => {
+        if (e.target.value === "__manual__") {
+          $('ssidManual').classList.remove('hidden');
+          $('ssidManual').focus();
+        } else {
+          $('ssidManual').classList.add('hidden');
+        }
+      });
+
+      $('showPass').addEventListener('change', (e) => {
+        $('pass').type = e.target.checked ? 'text' : 'password';
+      });
+
+      $('btnScan').addEventListener('click', async () => {
+        const btn = $('btnScan');
+        const sel = $('wifiSSID');
+        btn.disabled = true; btn.textContent = "...";
+        try {
+          let nets = null;
+          for (let i = 0; i < 15; i++) {
+            const r = await fetch("/api/wifi/scan");
+            if (r.status === 200) { nets = await r.json(); break; }
+            await new Promise(res => setTimeout(res, 1000));
+          }
+          if (nets) {
+            sel.innerHTML = '';
+            if (currentSSID) {
+              const opt = document.createElement('option');
+              opt.value = currentSSID;
+              opt.textContent = currentSSID + ' (gespeichert)';
+              sel.appendChild(opt);
+            }
+            nets.sort((a,b) => b.rssi - a.rssi);
+            const seen = new Set();
+            if (currentSSID) seen.add(currentSSID);
+            nets.forEach(n => {
+              if (n.ssid && !seen.has(n.ssid)) {
+                seen.add(n.ssid);
+                const opt = document.createElement('option');
+                opt.value = n.ssid;
+                opt.textContent = `${n.ssid} (${n.rssi}dBm) ${n.secure?"🔒":""}`;
+                sel.appendChild(opt);
+              }
+            });
+            const optManual = document.createElement('option');
+            optManual.value = "__manual__";
+            optManual.textContent = "Manuell eingeben...";
+            sel.appendChild(optManual);
+            showToast("Scan abgeschlossen");
+          }
+        } catch (e) { showToast("Scan Fehler: " + e.message); }
+        finally { btn.disabled = false; btn.textContent = "Scan"; }
+      });
 
       // Setup-Button Status aktualisieren
       async function updateSetupButton(){
@@ -142,30 +387,42 @@
       $('useStatic').addEventListener('change', (e)=> $('staticBlock').classList.toggle('hidden', !e.target.checked));
       $('notifyEnabled').addEventListener('change', (e)=> $('notifyBlock').classList.toggle('hidden', !e.target.checked));
 
+      $('btnNameSave').addEventListener('click', async ()=>{
+        const name = $('deviceName').value.trim();
+        if(!name){ showToast('Bitte Namen eingeben'); return; }
+        if(name.includes(' ')){ showToast('Name darf keine Leerzeichen enthalten'); return; }
+        try{
+          await fetchJSON('/api/app', { method:'POST', body: JSON.stringify({ name }) });
+          showToast('Gerätename gespeichert');
+        } catch(e){ showToast('Fehler: ' + e.message); }
+      });
+
       $('btnNetSave').addEventListener('click', async ()=>{
-        const ssid=$('ssid').value.trim();
+        const selSSID = $('wifiSSID').value;
+        const manualSSID = $('ssidManual').value.trim();
+        const ssid = (selSSID === "__manual__") ? manualSSID : selSSID;
         const pass=$('pass').value;
         const useStatic=$('useStatic').checked;
         const ip=$('ip').value.trim();
         const mask=$('mask').value.trim();
         const gw=$('gw').value.trim();
         const dns=$('dns').value.trim();
-        const wantsStaticBlock = useStatic || ip || mask || gw || dns;
-        if(!ssid && !wantsStaticBlock){ showToast('Keine WLAN-Änderungen erkannt'); return; }
+        
+        if(!ssid){ showToast('Bitte SSID wählen oder eingeben'); return; }
+        
         if(useStatic){
           for(const [val,label] of [[ip,'IP-Adresse'],[mask,'Subnetzmaske'],[gw,'Gateway']]){
             if(!ipv4ok(val)){ showToast('Ungültige IPv4 in '+label); return; }
           }
           if(dns && !ipv4ok(dns)){ showToast('Ungültige IPv4 in DNS'); return; }
         }
-        const payload = {};
-        if(ssid) payload.ssid = ssid;
-        if(pass) payload.pass = pass;
+        const payload = { ssid };
+        if(pass && pass !== "********") payload.pass = pass;
         payload.use_static = !!useStatic;
         payload.static = useStatic ? { ip, mask, gw, dns } : null;
         payload.reboot = true;
-        // Genau wie vorher: Hinweis anzeigen und Request feuern, ohne auf Antwort zu warten (Reboot kann Verbindung trennen)
-        showToastHtml('WLAN gespeichert. Bitte jetzt ins Heimnetz wechseln und <a href="http://luminagrowx.local/" target="_blank">http://luminagrowx.local/</a> aufrufen.');
+        
+        showToastHtml('WLAN gespeichert. Das Gerät startet neu. Bitte jetzt ins Heimnetz wechseln und <a href="http://luminagrowx.local/" target="_blank">http://luminagrowx.local/</a> aufrufen.');
         try{ fetch('/api/network', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)}); }catch(_){ }
       });
 
@@ -197,16 +454,16 @@
       // Setup-Button mit Bestätigungsdialog
       $('btnSetup').addEventListener('click', async (e)=>{
         e.preventDefault();
-        const confirmed = confirm('WARNUNG: Der Setup-Modus löscht alle Einstellungen und startet das Gerät neu.\n\nMöchten Sie fortfahren?');
+        const confirmed = confirm('Hinweis: Der Setup-Modus startet den Assistenten neu. Bestehende Kalibrierungen bleiben erhalten.\n\nMöchten Sie fortfahren?');
         if (!confirmed) return;
 
         try{
           const r = await fetch('/api/setup/reset', {method:'POST'});
           if (r.ok) {
-            showToast('Setup wird zurückgesetzt. Gerät startet neu...');
+            showToast('Assistent wird gestartet. Gerät startet neu...');
             setTimeout(()=> window.location.href = '/setup', 3000);
           } else {
-            showToast('Fehler beim Zurücksetzen: ' + r.statusText);
+            showToast('Fehler: ' + r.statusText);
           }
         } catch(e) {
           showToast('Fehler: ' + e.message);

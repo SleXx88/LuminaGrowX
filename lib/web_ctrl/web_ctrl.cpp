@@ -44,6 +44,8 @@ bool WebCtrl::loadAppCfg(AppCfg& out) {
   if (!prefs.begin(NVS_APP, true)) return false;
   if (prefs.isKey("seed")) out.seed = prefs.getString("seed");
   else out.seed = "Northern Lights";
+  if (prefs.isKey("name")) out.name = prefs.getString("name");
+  else out.name = "LisaPro";
   prefs.end();
   app_ = out; return true;
 }
@@ -51,8 +53,11 @@ bool WebCtrl::saveAppCfg(const AppCfg& c) {
   Preferences prefs;
   if (!prefs.begin(NVS_APP, false)) return false;
   prefs.putString("seed", c.seed);
+  prefs.putString("name", c.name);
   prefs.end();
-  app_ = c; return true;
+  app_ = c;
+  Serial.printf("[WEB] App config saved to NVS (Name: %s, Seed: %s)\n", c.name.c_str(), c.seed.c_str());
+  return true;
 }
 bool WebCtrl::loadGrow(GrowState& out) {
   Preferences prefs;
@@ -704,10 +709,13 @@ void WebCtrl::setupRoutes_() {
   // Register updater routes
   registerUpdateRoutes_();
 
-  http_.on("/api/seed", HTTP_POST, [](AsyncWebServerRequest*){}, NULL,
+  http_.on("/api/app", HTTP_POST, [](AsyncWebServerRequest*){}, NULL,
            [this](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t, size_t){
              JsonDocument doc; if (deserializeJson(doc, data, len)) { req->send(400, "application/json", "{\"error\":\"bad json\"}"); return; }
-             if (!doc["seed"].isNull()) { app_.seed = String((const char*)doc["seed"]); saveAppCfg(app_); }
+             bool changed = false;
+             if (!doc["seed"].isNull()) { app_.seed = String((const char*)doc["seed"]); changed = true; }
+             if (!doc["name"].isNull()) { app_.name = String((const char*)doc["name"]); changed = true; }
+             if (changed) saveAppCfg(app_);
              req->send(200, "application/json", "{\"ok\":true}");
              if (ws_.count() > 0) ws_.textAll(makeStatusJson_());
            });
@@ -995,6 +1003,9 @@ String WebCtrl::makeSetupStatusJson_() {
     s["uart_ok"] = st.uart_ok;
     s["max_travel_mm"] = stepper_cfg_.max_travel_mm;
   }
+  if (net_) {
+    doc["wifi_ssid"] = net_->cfg().ssid;
+  }
   doc["initial_setup_done"] = setup_flag::is_done();
   String out; serializeJson(doc, out); return out;
 }
@@ -1217,6 +1228,7 @@ String WebCtrl::makeStatusJson_() {
   }
 
   doc["seed"] = app_.seed;
+  doc["device_name"] = app_.name;
   doc["fw"] = FW_VERSION;
   doc["build"] = String(__DATE__) + String(" ") + String(__TIME__);
   doc["ts"] = (uint64_t)millis();
@@ -1249,9 +1261,11 @@ String WebCtrl::makeStatusJson_() {
 String WebCtrl::makeInfoJson_() {
   JsonDocument doc;
   doc["seed"] = app_.seed;
+  doc["device_name"] = app_.name;
   JsonObject netw = doc["network"].to<JsonObject>();
   if (net_) {
     netw["ssid"] = net_->cfg().ssid;
+    netw["pass"] = net_->cfg().pass.length() > 0 ? "********" : "";
     netw["use_static"] = net_->cfg().useStatic;
     JsonObject st = netw["static"].to<JsonObject>();
     st["ip"]   = net_->cfg().ip;

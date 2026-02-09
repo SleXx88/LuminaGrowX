@@ -171,10 +171,32 @@
         Willkommen! Bitte gehe die folgenden Schritte nacheinander durch, um sicherzustellen, dass Deine Box einwandfrei funktioniert.
       </p>
 
-      <!-- SCHRITT 1: ZEIT -->
+      <!-- SCHRITT 1: NAME -->
       <article>
         <header>
-          <h3><span class="step-number">1</span> <span>Systemzeit</span></h3>
+          <h3><span class="step-number">1</span> <span>Gerätename</span></h3>
+        </header>
+        <div class="content">
+          <div class="instruction">
+            Gib Deiner LisaPro einen Namen (max. 10 Zeichen, keine Leerzeichen). Dies hilft Dir, mehrere Geräte im Netzwerk zu unterscheiden.
+          </div>
+          <div class="btn-row" style="display: flex; gap: 0.5rem; align-items: stretch;">
+            <input id="deviceName" type="text" maxlength="10" placeholder="z.B. LisaPro-1" style="flex: 1; margin: 0;" />
+            <button id="nameSave" type="button" class="primary" style="margin: 0;">Speichern</button>
+          </div>
+          <div id="nameState" style="text-align: center; font-weight: bold; margin: 0.5rem 0;">Status: -</div>
+          
+          <div class="checklist-box">
+            <strong>Checkliste:</strong>
+            <label><input type="checkbox" id="cb_name" /> Name wurde erfolgreich gespeichert</label>
+          </div>
+        </div>
+      </article>
+
+      <!-- SCHRITT 2: ZEIT -->
+      <article>
+        <header>
+          <h3><span class="step-number">2</span> <span>Systemzeit</span></h3>
           <span class="badge" id="b_rtc_top">Uhr</span>
         </header>
         <div class="content">
@@ -326,6 +348,9 @@
           <div style="text-align: center; margin: 0.6rem 0; white-space: nowrap;">
             Abstand&nbsp;live:&nbsp;<strong id="tofLive">-</strong>&nbsp;mm
           </div>
+          <div id="tofExisting" style="text-align: center; font-size: 0.85rem; opacity: 0.8; margin-top: -0.5rem; display: none;">
+            Bestehender Offset: <strong id="valTofOffExisting">-</strong> mm
+          </div>
           
           <button id="tofCal" type="button" class="primary" style="width: 100%;" disabled>2. Kalibrieren starten</button>
           <div style="text-align: center; margin-top: -0.25rem;"><small id="tofMsg">–</small></div>
@@ -360,6 +385,9 @@
           <button id="stepHome" type="button" class="primary" style="width: 100%; padding: 1rem;">
             Referenzfahrt starten (Kalibrierung)
           </button>
+          <div id="stepExisting" style="text-align: center; font-size: 0.85rem; opacity: 0.8; margin-top: 0.2rem; display: none;">
+            Bestehender Fahrweg: <strong id="valStepMaxExisting">-</strong> mm
+          </div>
           <div style="text-align: center; margin-top: 0.5rem;">
             <small id="stepMsg" style="display: block; min-height: 1.2em;">–</small>
             <div id="calibResult" style="font-size: 0.85rem; margin-top: 0.2rem; display: none;">
@@ -626,9 +654,27 @@
             const v = st.tof_mm;
             $("tofLive").textContent = v >= 0 ? v : "Fehler";
           }
+
+          // Show existing ToF offset if any
+          if (st.tof_offset != null) {
+            $("valTofOffExisting").textContent = st.tof_offset;
+            $("tofExisting").style.display = "block";
+          }
+
+          // Show existing Stepper travel if any
+          if (st.stepper && st.stepper.max_travel_mm > 0) {
+            $("valStepMaxExisting").textContent = st.stepper.max_travel_mm.toFixed(1);
+            $("stepExisting").style.display = "block";
+          }
+
+          // Show existing WiFi
+          if (st.wifi_ssid && st.wifi_ssid.length > 0) {
+            const wifiBadge = $("b_wifi");
+            wifiBadge.textContent = "WLAN: " + st.wifi_ssid;
+            wifiBadge.classList.add("ok");
+          }
           
           // "Zurück" button logic:
-          // Only show if initial setup was ever done (install_done.mark exists).
           const btnBack = $("btnAbort");
           if (btnBack) {
              const canGoBack = !!st.initial_setup_done;
@@ -641,6 +687,11 @@
         try {
           const live = await fetchJSON("/api/status");
           
+          // Name prefill
+          if (live && live.device_name && !$("deviceName").value) {
+            $("deviceName").value = live.device_name;
+          }
+
           // SHT
           const tIn = live && live.temp_c, hIn = live && live.humi_rh;
           const tOut = live && live.temp_out_c, hOut = live && live.humi_out_rh;
@@ -710,7 +761,26 @@
 
       // --- EVENT LISTENERS ---
 
-      // 1. RTC
+      // 1. NAME
+      $("nameSave").addEventListener("click", async () => {
+        const name = $("deviceName").value.trim();
+        if (!name) return showToast("Bitte einen Namen eingeben");
+        if (name.includes(" ")) return showToast("Der Name darf keine Leerzeichen enthalten");
+        
+        try {
+          const r = await fetchJSON("/api/app", { method: "POST", body: JSON.stringify({ name }) });
+          if (r.ok) { 
+            $("cb_name").checked = true; 
+            $("nameState").textContent = "Status: Gespeichert (" + name + ")";
+            $("nameState").classList.add("text-ok");
+            showToast("Gerätename gespeichert"); 
+          } 
+          else showToast("Fehler beim Speichern");
+          updateDoneEnabled();
+        } catch (e) { showToast("Fehler: " + e.message); }
+      });
+
+      // 2. RTC
       $("rtcSet").addEventListener("click", async () => {
         const v = $("rtcDt").value;
         if (!v) return showToast("Bitte Datum wählen");
@@ -1059,7 +1129,7 @@
       // Global Check
       function updateDoneEnabled() {
         const need = [
-          "cb_rtc", "cb_sht", "cb_sht_out", "cb_fan", "cb_fan2", "cb_fan3",
+          "cb_name", "cb_rtc", "cb_sht", "cb_sht_out", "cb_fan", "cb_fan2", "cb_fan3",
           "cb_led", "cb_step_home", "cb_step_down", "cb_step_up", 
           "cb_tof_1", "cb_tof_2", "cb_tof", "cb_door", "cb_water", "cb_pump", "cb_wifi_done"
         ];

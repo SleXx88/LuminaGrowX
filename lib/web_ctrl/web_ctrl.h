@@ -18,7 +18,10 @@ namespace net_ctrl { class NetCtrl; }
 
 namespace web_ctrl {
 
-struct AppCfg { String seed = "Northern Lights"; };
+struct AppCfg { 
+  String seed = "Northern Lights"; 
+  String name = "LisaPro";
+};
 struct GrowState { bool started=false; uint32_t start_epoch=0; uint16_t total_days=90; };
 struct DryingState { bool active=false; uint32_t start_epoch=0; };
 struct NotifyCfg { bool enabled=false; String phone; String apikey; };
