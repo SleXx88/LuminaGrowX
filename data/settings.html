@@ -129,6 +129,26 @@
         background: var(--glass-strong);
         border-top: 1px solid var(--border);
       }
+
+      /* Desktop-Optimierung */
+      @media (min-width: 1024px) {
+        main.container {
+          max-width: 98% !important;
+          width: 98% !important;
+          margin: 1rem auto !important;
+        }
+        html { font-size: 15px; }
+        article > header h2 { font-size: 1.25rem !important; }
+        h4 { margin-top: 1rem; margin-bottom: 0.5rem; }
+        button, .button { 
+          font-size: 0.85rem !important; 
+          padding: 0.4rem 0.8rem !important; 
+        }
+        input:not([type="checkbox"]), select {
+          padding: 0.4rem 0.6rem !important;
+          font-size: 0.9rem !important;
+        }
+      }
     </style>
   </head>
   <body>

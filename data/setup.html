@@ -158,6 +158,26 @@
         font-size: 0.9rem;
         opacity: 0.9;
       }
+
+      /* Desktop-Optimierung */
+      @media (min-width: 1024px) {
+        main.container {
+          max-width: 98% !important;
+          width: 98% !important;
+          margin: 1rem auto !important;
+        }
+        html { font-size: 15px; }
+        header.hero { padding: 1rem !important; }
+        header.hero h1 { font-size: 2rem !important; }
+        article > header { padding: 0.75rem 1.25rem !important; }
+        article > header h3 { font-size: 1rem !important; }
+        .instruction { font-size: 0.85rem !important; padding: 0.5rem !important; }
+        button, .button { 
+          font-size: 0.85rem !important; 
+          padding: 0.4rem 0.8rem !important; 
+        }
+        .badge { font-size: 0.7rem !important; padding: 0.15rem 0.5rem !important; }
+      }
     </style>
   </head>
   <body>

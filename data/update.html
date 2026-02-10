@@ -27,6 +27,21 @@
       pre#log{max-height:calc(1.4em * 10); overflow:auto}
       small.dim{color:var(--text-dim)}
       .btn-grid{display:grid;gap:.6rem;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+
+      /* Desktop-Optimierung */
+      @media (min-width: 1024px) {
+        main.container {
+          max-width: 98% !important;
+          width: 98% !important;
+          margin: 1rem auto !important;
+        }
+        html { font-size: 15px; }
+        h2 { font-size: 1.25rem !important; }
+        button, [role="button"], .button { 
+          font-size: 0.85rem !important; 
+          padding: 0.4rem 0.8rem !important; 
+        }
+      }
     </style>
   </head>
   <body>

@@ -118,6 +118,112 @@
       .grow-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-dim); }
       .progress { height: 10px; background: rgba(255, 255, 255, 0.12); border-radius: 999px; overflow: hidden; border: 1px solid var(--border); }
       .progress > span { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+
+      /* Desktop-Optimierung: Spezielles Spalten-Layout */
+      @media (min-width: 1024px) {
+        main.container {
+          max-width: 98% !important;
+          width: 98% !important;
+          margin: 1rem auto !important;
+        }
+        html { font-size: 15px; }
+        header.hero h1.brand { font-size: 2.2rem !important; }
+        
+        .grid {
+          display: grid !important;
+          grid-template-columns: 1fr 1fr !important;
+          grid-template-areas: 
+            "grow live"
+            "dry live"
+            "footer live" !important;
+          align-items: start;
+          gap: 1rem !important;
+        }
+        #artGrow { grid-area: grow; }
+        #artDry { grid-area: dry; }
+        #artLive { grid-area: live; }
+        #mainFooter { grid-area: footer; }
+
+        button, [role="button"], .button { 
+          font-size: 0.85rem !important; 
+          padding: 0.4rem 0.8rem !important; 
+        }
+        .badge { font-size: 0.75rem !important; padding: 0.2rem 0.5rem !important; }
+      }
+
+      /* Einklapp-Stile */
+      .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+      }
+      .collapse-icon {
+        transition: transform 0.3s;
+      }
+      .collapsed .collapse-icon {
+        transform: rotate(-90deg);
+      }
+      .collapsed .card-content {
+        display: none !important;
+      }
+
+      /* Profi-Modus Optimierungen */
+      .mode-settings-block {
+        background: rgba(255, 255, 255, 0.03);
+        padding: 0.75rem;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+      }
+      .mode-label {
+        display: block;
+        margin-bottom: 0.75rem;
+        color: var(--accent);
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+      }
+      .mode-inputs-list {
+        display: grid;
+        gap: 0.4rem;
+      }
+      .input-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: rgba(0,0,0,0.15);
+        padding: 0.25rem 0.5rem;
+        border-radius: 6px;
+      }
+      .input-row label {
+        flex: 1;
+        margin: 0;
+        font-size: 0.8rem;
+        color: var(--text-dim);
+      }
+      .input-row input {
+        width: 65px !important;
+        margin: 0 !important;
+        padding: 0.2rem 0.4rem !important;
+        text-align: center;
+        height: auto !important;
+        font-size: 0.85rem !important;
+      }
+      .input-row .unit {
+        font-size: 0.7rem;
+        color: var(--text-dim);
+        width: 25px;
+        text-align: left;
+      }
+
+      @media (min-width: 1024px) {
+        #modesGrid {
+          display: grid !important;
+          grid-template-columns: repeat(3, 1fr) !important;
+          gap: 0.75rem !important;
+        }
+      }
     </style>
   </head>
   <body>
@@ -146,9 +252,12 @@
       </header>
 
       <div class="grid" style="margin-top: 0">
-        <article>
-          <header><h2>Grow</h2></header>
-          <div class="content" style="padding: 1rem; display: grid; gap: 0.8rem">
+        <article id="artGrow">
+          <header class="card-header" onclick="toggleCard('artGrow')">
+            <h2>Grow</h2>
+            <span class="collapse-icon"><svg style="width:18px;height:18px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></span>
+          </header>
+          <div class="card-content" style="padding: 1rem; display: grid; gap: 0.8rem">
             <h3 id="growTitle" class="grow-title">Noch nicht gestartet</h3>
             <div class="grow-meta">
               <span>Gesamt: <strong><span id="totalDays">90</span> Tage</strong></span>
@@ -156,6 +265,10 @@
             </div>
             <div class="progress"><span id="growProgress"></span></div>
             <div style="display: grid; gap: 0.5rem;">
+              <div id="seedInputContainer">
+                <label style="font-size: 0.8rem; color: var(--text-dim); margin-bottom: 0.25rem;">Sorte / Strain Name</label>
+                <input type="text" id="seedInp" placeholder="z.B. Northern Lights" style="margin: 0; padding: 0.4rem 0.6rem; height: auto;">
+              </div>
               <button id="toggleGrow" type="button">START</button>
               
               <div id="startOptions">
@@ -224,9 +337,12 @@
           </div>
         </article>
 
-        <article>
-          <header><h2>Trocknung</h2></header>
-          <div class="content" style="padding: 1rem; display: grid; gap: 0.8rem">
+        <article id="artDry">
+          <header class="card-header" onclick="toggleCard('artDry')">
+            <h2>Trocknung</h2>
+            <span class="collapse-icon"><svg style="width:18px;height:18px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></span>
+          </header>
+          <div class="card-content" style="padding: 1rem; display: grid; gap: 0.8rem">
             <h3 id="dryTitle" class="grow-title">Nicht aktiv</h3>
             <div class="grow-meta">
               <span>Dauer: <strong>14 Tage</strong></span>
@@ -242,7 +358,7 @@
           </div>
         </article>
 
-        <article>
+        <article id="artLive">
           <header><h2>Live Status</h2></header>
           <div class="content" style="padding: 0.75rem; display: grid; gap: 0.75rem;">
             <!-- Growbox -->
@@ -366,25 +482,27 @@
           </div>
         </div>
 
-        <div style="display: flex; gap: 0.5rem; padding: 1rem 0; margin-top: auto;">
-          <a href="/settings" class="button" role="button">Einstellungen</a>
-          <a href="/info" class="button" role="button">Info</a>
-          <a href="/update" class="button" role="button">Update</a>
-        </div>
+        <div id="mainFooter" style="display: flex; flex-direction: column; gap: 1rem;">
+          <div style="display: flex; gap: 0.5rem; padding: 0;">
+            <a href="/settings" class="button" role="button">Einstellungen</a>
+            <a href="/info" class="button" role="button">Info</a>
+            <a href="/update" class="button" role="button">Update</a>
+          </div>
 
-        <footer class="site" style="padding: 0.9rem 1.1rem; margin-top: auto; margin-bottom: 1rem; background: var(--glass); border: 1px solid var(--border); border-radius: var(--radius); backdrop-filter: blur(3px);">
-          <small style="display:block">&copy; 2025 Martin Teske – Alle Rechte vorbehalten.</small>
-          <small style="display:block">
-            <strong>LuminaGrowX</strong> ist eine Open-Source-Software von 
-            <a href="https://martinteske-blog.de" target="_blank">MartinTeske-Blog.de</a>, 
-            entwickelt für die <strong>LisaPro Growbox</strong>.
-            <br>
-            Die LisaPro Growbox ist exklusiv erhältlich bei 
-            <a href="https://mutualgarden.de" target="_blank">MutualGarden.de</a>.
-          </small>
-          <small style="display:block"><span id="apInfo" class="mono"></span></small>
-        </footer>
-      </div> <!-- Ende von Grid Area wrapper? Nein, hier muss main container zu -->
+          <footer class="site" style="padding: 0.9rem 1.1rem; background: var(--glass); border: 1px solid var(--border); border-radius: var(--radius); backdrop-filter: blur(3px);">
+            <small style="display:block">&copy; 2025 Martin Teske – Alle Rechte vorbehalten.</small>
+            <small style="display:block">
+              <strong>LuminaGrowX</strong> ist eine Open-Source-Software von 
+              <a href="https://martinteske-blog.de" target="_blank">MartinTeske-Blog.de</a>, 
+              entwickelt für die <strong>LisaPro Growbox</strong>.
+              <br>
+              Die LisaPro Growbox ist exklusiv erhältlich bei 
+              <a href="https://mutualgarden.de" target="_blank">MutualGarden.de</a>.
+            </small>
+            <small style="display:block"><span id="apInfo" class="mono"></span></small>
+          </footer>
+        </div>
+      </div> <!-- Ende von Grid Area wrapper -->
     </main>
 
     <dialog id="dlgNet" class="modal">
@@ -482,8 +600,39 @@
       function updateToggleButton(started) { $("toggleGrow").textContent = started ? "STOP" : "START"; $("toggleGrow").classList.toggle("primary", started); }
       function updateDryButton(active) { $("toggleDry").textContent = active ? "TROCKNUNG STOPPEN" : "TROCKNUNG STARTEN"; $("toggleDry").classList.toggle("primary", active); }
 
+      function toggleCard(id) {
+        $(id).classList.toggle("collapsed");
+      }
+      function setCardCollapsed(id, collapsed) {
+        if (collapsed) $(id).classList.add("collapsed");
+        else $(id).classList.remove("collapsed");
+      }
+
+      let autoCollapseDone = false;
+
       function updateStatus(s) {
         live.lastStatus = s;
+        
+        // Auto-Collapse Logik (nur einmalig nach dem Laden oder bei Statusänderung)
+        if (s.grow && s.drying) {
+          const growRunning = !!s.grow.started;
+          const dryRunning = !!s.drying.active;
+          
+          if (!autoCollapseDone) {
+            if (growRunning) {
+              setCardCollapsed("artDry", true);
+              setCardCollapsed("artGrow", false);
+            } else if (dryRunning) {
+              setCardCollapsed("artGrow", true);
+              setCardCollapsed("artDry", false);
+            } else {
+              setCardCollapsed("artGrow", false);
+              setCardCollapsed("artDry", false);
+            }
+            autoCollapseDone = true;
+          }
+        }
+        
         // Internet/WLAN
         const liveEl = $("liveIcon");
         if (liveEl) {
@@ -515,6 +664,14 @@
 
         if (s.grow) {
           $("growTitle").textContent = s.grow.started ? ("Tag #" + s.grow.day + " - " + (s.grow.phase || "")) : "Noch nicht gestartet";
+          if (s.grow.started) {
+            $("seedInputContainer").classList.add("hidden");
+            if (s.seed) {
+              $("growTitle").innerHTML += `<div style="font-size: 0.9rem; opacity: 0.8; font-weight: normal; margin-top: 0.2rem;">Sorte: <strong>${s.seed}</strong></div>`;
+            }
+          } else {
+            $("seedInputContainer").classList.remove("hidden");
+          }
           totalDays.textContent = (s.grow.total_days != null ? s.grow.total_days : 90);
           $("growStart").textContent = s.grow.start_epoch ? new Date(s.grow.start_epoch * 1000).toLocaleDateString() : "-";
           
@@ -705,6 +862,7 @@
         const total_days = tdEl ? parseInt(tdEl.textContent, 10) : 90;
         const startDayInp = document.getElementById("growStartDayInp");
         const start_day = startDayInp ? parseInt(startDayInp.value, 10) : 1;
+        const seed = $("seedInp").value.trim();
         
         // Berechne Epoch basierend auf Start-Tag
         const now = Math.floor(Date.now() / 1000);
@@ -714,7 +872,7 @@
           await fetch("/api/grow", { 
             method: "POST", 
             headers: { "Content-Type": "application/json" }, 
-            body: JSON.stringify({ action: "start", total_days, start_epoch: epoch }) 
+            body: JSON.stringify({ action: "start", total_days, start_epoch: epoch, seed }) 
           }); 
         } catch (_) {}
       });
@@ -816,16 +974,14 @@
 
       function renderModeInputs(modeKey, label) {
         return `
-          <div style="background:var(--muted); padding:0.5rem; border-radius:8px; margin-bottom:0.5rem;">
-            <strong style="display:block; margin-bottom:0.5rem; color:var(--accent)">${label}</strong>
-            <div class="grid">
-              <label>LED % <input type="number" step="1" data-mode="${modeKey}" data-field="led"></label>
-              <label>Fan Min % <input type="number" step="1" data-mode="${modeKey}" data-field="fan_min"></label>
-              <label>Fan Max % <input type="number" step="1" data-mode="${modeKey}" data-field="fan_max"></label>
-            </div>
-            <div class="grid">
-              <label>VPD Min <input type="number" step="0.01" data-mode="${modeKey}" data-field="vpd_min"></label>
-              <label>VPD Max <input type="number" step="0.01" data-mode="${modeKey}" data-field="vpd_max"></label>
+          <div class="mode-settings-block">
+            <strong class="mode-label">${label}</strong>
+            <div class="mode-inputs-list">
+              <div class="input-row"><label>LED</label><input type="number" step="1" data-mode="${modeKey}" data-field="led"><span class="unit">%</span></div>
+              <div class="input-row"><label>Lüfter Min</label><input type="number" step="1" data-mode="${modeKey}" data-field="fan_min"><span class="unit">%</span></div>
+              <div class="input-row"><label>Lüfter Max</label><input type="number" step="1" data-mode="${modeKey}" data-field="fan_max"><span class="unit">%</span></div>
+              <div class="input-row"><label>VPD Min</label><input type="number" step="0.01" data-mode="${modeKey}" data-field="vpd_min"><span class="unit">kPa</span></div>
+              <div class="input-row"><label>VPD Max</label><input type="number" step="0.01" data-mode="${modeKey}" data-field="vpd_max"><span class="unit">kPa</span></div>
             </div>
           </div>
         `;

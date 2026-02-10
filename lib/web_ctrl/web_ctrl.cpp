@@ -968,6 +968,14 @@ void WebCtrl::setupRoutes_() {
                  req->send(400, "application/json", "{\"error\":\"Drying mode active\"}");
                  return;
                }
+               
+               // Seed-Name speichern, falls vorhanden
+               if (!doc["seed"].isNull()) {
+                 app_.seed = String((const char*)doc["seed"]);
+                 saveAppCfg(app_);
+                 if (mqtt_) mqtt_->publishState(makeStatusJson_());
+               }
+
                grow_.started = true; 
                if (!doc["start_epoch"].isNull()) grow_.start_epoch = doc["start_epoch"].as<uint32_t>();
                else grow_.start_epoch = (uint32_t)now;

@@ -102,6 +102,25 @@
         text-transform: uppercase;
         letter-spacing: 0.05em;
       }
+
+      /* Desktop-Optimierung */
+      @media (min-width: 1024px) {
+        main.container {
+          max-width: 98% !important;
+          width: 98% !important;
+          margin: 1rem auto !important;
+        }
+        html { font-size: 15px; }
+        header.hero h1.brand { font-size: 2.2rem !important; }
+        h2 { font-size: 1.25rem !important; }
+        .tech-card { padding: 0.4rem !important; }
+        .tech-val { font-size: 0.9rem !important; }
+        .tech-label { font-size: 0.65rem !important; }
+        button, [role="button"], .button { 
+          font-size: 0.85rem !important; 
+          padding: 0.4rem 0.8rem !important; 
+        }
+      }
     </style>
   </head>
   <body>
