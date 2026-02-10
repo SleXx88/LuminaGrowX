@@ -120,7 +120,12 @@ void MqttCtrl::publishDiscovery_(const char* component, const char* objectId, co
     doc["name"] = deviceName_ + " " + name;
     doc["uniq_id"] = "lumina_" + deviceId_ + "_" + sanId;
     doc["stat_t"] = getBaseTopic_() + "/state";
-    doc["val_tpl"] = "{{ value_json." + String(objectId) + " }}";
+    
+    if (strcmp(component, "binary_sensor") == 0) {
+        doc["val_tpl"] = "{{ 'ON' if value_json." + String(objectId) + " else 'OFF' }}";
+    } else {
+        doc["val_tpl"] = "{{ value_json." + String(objectId) + " }}";
+    }
     
     if (unit) doc["unit_of_meas"] = unit;
     if (devClass) doc["dev_cla"] = devClass;
@@ -143,7 +148,7 @@ void MqttCtrl::sendDiscovery() {
     if (!client_.connected()) return;
     Serial.println("[MQTT] Sending HA Discovery...");
 
-    // Sensors
+    // Basic Sensors
     publishDiscovery_("sensor", "temp_c", "Temperatur", "°C", "temperature", "measurement");
     publishDiscovery_("sensor", "humi_rh", "Luftfeuchtigkeit", "%", "humidity", "measurement");
     publishDiscovery_("sensor", "vpd_kpa", "VPD", "kPa", "pressure", "measurement");
@@ -152,16 +157,42 @@ void MqttCtrl::sendDiscovery() {
     publishDiscovery_("sensor", "temp_out_c", "Temp Außen", "°C", "temperature", "measurement");
     publishDiscovery_("sensor", "humi_out_rh", "RH Außen", "%", "humidity", "measurement");
 
+    // Fans & Light
     publishDiscovery_("sensor", "fan_pct", "Lüfter", "%", nullptr, "measurement", "mdi:fan");
     publishDiscovery_("sensor", "fan_rpm", "Lüfter RPM", "rpm", nullptr, "measurement", "mdi:fan");
+    publishDiscovery_("sensor", "fan2_pct", "Lüfter 2", "%", nullptr, "measurement", "mdi:fan");
+    publishDiscovery_("sensor", "fan2_rpm", "Lüfter 2 RPM", "rpm", nullptr, "measurement", "mdi:fan");
+    publishDiscovery_("sensor", "fan3_pct", "Lüfter 3", "%", nullptr, "measurement", "mdi:fan");
     publishDiscovery_("sensor", "light_pct", "Licht", "%", nullptr, "measurement", "mdi:led-strip");
     
+    // Distance
     publishDiscovery_("sensor", "tof_mm", "Abstand", "mm", "distance", "measurement", "mdi:ruler");
     
+    // Binary Status
     publishDiscovery_("binary_sensor", "door_open", "Tür", nullptr, "door", nullptr);
     publishDiscovery_("binary_sensor", "pump_on", "Pumpe", nullptr, "running", nullptr);
+    publishDiscovery_("binary_sensor", "light_on", "Licht Status", nullptr, "light", nullptr);
+    publishDiscovery_("binary_sensor", "fan_on", "Lüfter Status", nullptr, "running", nullptr);
 
-    // Grow Status (nested in JSON)
+    // Stepper
+    publishDiscovery_("sensor", "stepper.pos_mm", "Lampen Höhe", "mm", nullptr, "measurement", "mdi:arrow-up-down");
+    publishDiscovery_("binary_sensor", "stepper.moving", "Motor fährt", nullptr, "moving", nullptr);
+    publishDiscovery_("binary_sensor", "stepper.homing", "Referenzfahrt", nullptr, nullptr, nullptr, "mdi:home-search");
+    publishDiscovery_("binary_sensor", "stepper.uart_ok", "Motor UART OK", nullptr, "connectivity", nullptr);
+
+    // Grow & Info
     publishDiscovery_("sensor", "grow.phase", "Phase", nullptr, nullptr, nullptr, "mdi:sprout");
     publishDiscovery_("sensor", "grow.day", "Tag", "d", nullptr, "total_increasing", "mdi:calendar-today");
+    publishDiscovery_("sensor", "grow.total_days", "Gesamttage", "d", nullptr, nullptr, "mdi:calendar-range");
+    publishDiscovery_("sensor", "seed", "Sorte", nullptr, nullptr, nullptr, "mdi:seed");
+
+    // System Diagnostic
+    publishDiscovery_("sensor", "health.state", "System Status", nullptr, nullptr, nullptr, "mdi:heart-pulse");
+    publishDiscovery_("sensor", "rssi", "WLAN Signal", "dBm", "signal_strength", "measurement");
+    publishDiscovery_("sensor", "uptime_s", "Laufzeit", "s", "duration", "total_increasing");
+    publishDiscovery_("sensor", "ip", "IP Adresse", nullptr, nullptr, nullptr, "mdi:ip-network");
+    publishDiscovery_("sensor", "ssid", "WLAN SSID", nullptr, nullptr, nullptr, "mdi:wifi");
+    publishDiscovery_("binary_sensor", "wifi_connected", "WLAN verbunden", nullptr, "connectivity", nullptr);
+    publishDiscovery_("binary_sensor", "internet_ok", "Internet OK", nullptr, "connectivity", nullptr);
+    publishDiscovery_("binary_sensor", "update.has_update", "Update verfügbar", nullptr, "update", nullptr);
 }

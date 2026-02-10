@@ -49,10 +49,10 @@ static const uint8_t DefTuning[] PROGMEM = {
 
 // Konstruktor: setzt Basiswerte, allerdings ohne Hardware zu initialisieren
 ToFCtrl::ToFCtrl()
-  : _w(&Wire), _addr(0x29), _xshut(-1), _ok(false),
+  : _w(&Wire), _addr(0x29), _xshut(-1), _ok(false), _debug(false),
     _maxCm(TOF_MAX_CM), _minCm(TOF_MIN_CM),
     _stopVar(0), _timingBudgetUs(0),
-    _offsetMm(0), _lastMm(-1) {}
+    _offsetMm(0), _lastMm(-1), _lastSuccessMs(0), _errorCount(0) {}
 
 // (Legacy) Kalibrier-Dateipfad entfernt – es wird nur noch Offset genutzt
 
@@ -102,20 +102,37 @@ bool ToFCtrl::getModelInfo(uint8_t &modelId, uint8_t &revisionId) {
 uint8_t ToFCtrl::r8(uint8_t reg) {
   _w->beginTransmission(_addr);
   _w->write(reg);
-  if (_w->endTransmission(false) != 0) return 0;
+  uint8_t err = _w->endTransmission(false);
+  if (err != 0) {
+    _errorCount++;
+    if (_debug) Serial.printf("[ToF] I2C r8 Error %d at reg 0x%02X\n", err, reg);
+    return 0;
+  }
   _w->requestFrom((int)_addr, 1);
-  if (_w->available()) return _w->read();
+  if (_w->available()) {
+    _errorCount = 0;
+    return _w->read();
+  }
+  _errorCount++;
   return 0;
 }
 
 uint16_t ToFCtrl::r16(uint8_t reg) {
   _w->beginTransmission(_addr);
   _w->write(reg);
-  if (_w->endTransmission(false) != 0) return 0;
+  uint8_t err = _w->endTransmission(false);
+  if (err != 0) {
+    _errorCount++;
+    if (_debug) Serial.printf("[ToF] I2C r16 Error %d at reg 0x%02X\n", err, reg);
+    return 0;
+  }
   _w->requestFrom((int)_addr, 2);
   uint16_t v = 0;
   if (_w->available() >= 2) {
+    _errorCount = 0;
     v = ((uint16_t)_w->read() << 8) | _w->read();
+  } else {
+    _errorCount++;
   }
   return v;
 }
@@ -412,10 +429,37 @@ void ToFCtrl::startContinuous() {
 // Prüft, ob der Sensor fertig ist. Wenn ja, Update _lastMm.
 // Wenn nein, gib den letzten bekannten Wert zurück.
 int ToFCtrl::readRawMm() {
-  if (!_ok) return -1;
+  if (!_ok) {
+    // Falls nicht OK, versuche alle 5 Sekunden ein Reinit
+    static uint32_t lastTry = 0;
+    if (millis() - lastTry > 5000) {
+      lastTry = millis();
+      if (_debug) Serial.println("[ToF] Versuche Reinit da _ok=false...");
+      reinit();
+    }
+    return -1;
+  }
 
-  // Prüfen, ob neue Daten bereitstehen (Bit 0-2 in RESULT_INTERRUPT_STATUS)
-  if (r8(RESULT_INTERRUPT_STATUS) & 0x07) {
+  // Recovery-Logik: Falls zu viele I2C-Fehler oder Sensor-Timeout (> 3s)
+  if (_errorCount > 10 || (millis() - _lastSuccessMs > 3000 && _lastSuccessMs > 0)) {
+    if (_debug) Serial.printf("[ToF] Recovery! Errors: %d, LastSuccess: %lu ms ago\n", _errorCount, millis() - _lastSuccessMs);
+    _errorCount = 0;
+    _lastSuccessMs = millis(); // Reset Timer für nächsten Versuch
+    reinit();
+    return -1;
+  }
+
+  uint8_t status = r8(RESULT_INTERRUPT_STATUS);
+  
+  // Prüfen auf Error-Bit (Bit 3) im Status
+  if (status & 0x08) {
+    if (_debug) Serial.println("[ToF] Sensor meldet Hardware-Error Bit!");
+    w8(SYSTEM_INTERRUPT_CLEAR, 0x01);
+    return -1;
+  }
+
+  // Prüfen, ob neue Daten bereitstehen (Bit 0-2)
+  if (status & 0x07) {
     // Wert lesen
     uint16_t range = r16(RESULT_RANGE_STATUS + 10);
     // Interrupt clearen, damit nächste Messung starten kann
@@ -424,29 +468,33 @@ int ToFCtrl::readRawMm() {
     // Rohwert speichern (noch ohne Offset)
     int mm = (int)range;
     
-    // Software-Offset anwenden
-    mm -= _offsetMm;
-    
-    // Wert aktualisieren
-    _lastMm = mm;
-  }
-
-  // Mit dem letzten bekannten Wert arbeiten (egal ob gerade frisch oder alt)
-  int mm = _lastMm;
-
-  // Fehlerbehandlung für ungültige Werte (z.B. Init-Zustand -1)
-  if (mm < 0) return -1;
-
-  // Prüfen auf Unterschreitung der minimalen Messdistanz. _minCm == 0 deaktiviert die Prüfung.
-  if (_minCm > 0) {
-    int minMm = (int)_minCm * 10;
-    if (mm < minMm) {
-      return -2; // zu nah
+    // 8190/8191 mm ist beim VL53L0X oft "out of range" oder "signal fail"
+    if (range > 8000) {
+       _lastMm = (int)_maxCm * 10 + 100; // Als out of range markieren
+    } else {
+      // Software-Offset anwenden
+      mm -= _offsetMm;
+      _lastMm = mm;
+      _lastSuccessMs = millis(); // Erfolg markieren
     }
   }
+
+  // Mit dem letzten bekannten Wert arbeiten
+  int mm = _lastMm;
+
+  // Initialwert abfangen
+  if (mm < 0 && _lastSuccessMs == 0) return -1;
+
+  // Prüfen auf Unterschreitung der minimalen Messdistanz.
+  if (_minCm > 0) {
+    int minMm = (int)_minCm * 10;
+    if (mm < minMm) return -2; // zu nah
+  }
+
   // Prüfen auf Überschreitung der maximalen Messdistanz
   int maxMm = (int)_maxCm * 10;
   if (mm > maxMm) return -1;
+
   return mm;
 }
 

@@ -214,6 +214,7 @@ void setup()
   // ToF aktivieren und starten
   // XSHUT nicht verwendet, direkt -1 übergeben
   bool ok = tof.begin(Wire1, 0x29, -1);
+  tof.setDebug(true); // Debugging für ToF-Sensor aktivieren
   Serial.println(ok ? F("[ToF] Init OK") : F("[ToF] Init FAILED"));
   health::set_tof(ok, ok ? String("") : F("ToF Init fehlgeschlagen"));
 

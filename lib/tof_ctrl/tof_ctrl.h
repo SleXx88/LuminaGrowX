@@ -73,6 +73,9 @@ public:
   // oder nach disable().
   bool isOk() const { return _ok; }
 
+  // Aktiviert oder deaktiviert Debug-Ausgaben auf der seriellen Schnittstelle.
+  void setDebug(bool enabled) { _debug = enabled; }
+
   // Setzt die maximale Messreichweite in Zentimetern. Bei Messungen > maxCm wird -1 gemeldet.
   void setMaxRangeCm(uint16_t cm) { _maxCm = cm; }
 
@@ -167,12 +170,15 @@ private:
   uint8_t  _addr;      // I²C‑Adresse des Sensors
   int8_t   _xshut;     // GPIO für XSHUT; -1, wenn unbenutzt
   bool     _ok;        // Status der Initialisierung
+  bool     _debug = false; // Debug-Ausgabe aktiv?
   uint16_t _maxCm;     // maximale Messdistanz in cm
   uint16_t _minCm;     // minimale Messdistanz in cm
   uint8_t  _stopVar;   // interner Wert aus Sensor-Init
   uint32_t _timingBudgetUs; // gespeichertes Timing-Budget
   int16_t  _offsetMm = 0; // optionaler Offset für Kalibrierung
   int      _lastMm = -1;  // Letzter gelesener Wert (für non-blocking)
+  uint8_t  _errorCount = 0;    // Zähler für aufeinanderfolgende I2C-Fehler
+  uint32_t _lastSuccessMs = 0; // Zeitstempel der letzten erfolgreichen Messung
 
   // Dateipfad für Offset-Kalibrierung (Definition in .cpp)
   static const char* kOffsetPath;

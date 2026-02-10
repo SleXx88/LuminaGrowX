@@ -24,7 +24,7 @@ namespace lumina
     // I2C-Bus 2
     constexpr int I2C2_SDA = 21;
     constexpr int I2C2_SCL = 47;
-    constexpr uint32_t I2C2_FREQ = 400000; // 400 kHz
+    constexpr uint32_t I2C2_FREQ = 100000; // 100 kHz
 
     // 4-Pin-Lüfter (PWM)
     constexpr uint8_t FAN_PWM_LED = 1;
