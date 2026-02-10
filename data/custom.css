@@ -12,15 +12,6 @@
   --border-radius: 0.8rem;
 }
 
-/* Fixed Hintergrundbild für Body (deckt immer den Viewport ab, scrollt nicht mit) */
-body {
-  background-image: url('/bg.jpg');
-  background-repeat: no-repeat;
-  background-attachment: fixed;
-  background-size: cover;
-  background-position: center;
-}
-
 /* Buttons etwas moderner */
 button, .button, [role="button"] {
   border-radius: var(--border-radius);

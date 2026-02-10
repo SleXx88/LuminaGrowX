@@ -1318,6 +1318,11 @@ String WebCtrl::makeStatusJson_() {
   upd["has_update"] = latestKnownHasUpdate_;
   upd["latest"] = latestKnownTag_;
 
+  // MQTT status
+  JsonObject mqttObj = doc["mqtt"].to<JsonObject>();
+  mqttObj["enabled"] = mqtt_cfg_.enabled;
+  mqttObj["connected"] = mqtt_ ? mqtt_->isConnected() : false;
+
   // Schedule background update check: once after first NTP sync (boot) and then daily ~03:00 if internet is OK
   if (!updateCheckJobRunning_ && net_ && net_->internetOK()) {
     time_t now = time(nullptr);

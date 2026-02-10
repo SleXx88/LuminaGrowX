@@ -36,7 +36,7 @@
         content: "";
         position: fixed;
         inset: 0;
-        background: linear-gradient(rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.55)), url("/bg.jpg") center/cover no-repeat #0b0b0c;
+        background: #0b0b0c;
         z-index: -1;
       }
       header.hero, article, footer.site, dialog.modal article {
@@ -132,6 +132,7 @@
           <li class="nav-status-row" style="margin: 0;">
             <span class="badge" title="Internetverbindung"><span id="liveIcon" class="icon"></span></span>
             <span class="badge" title="Benachrichtigungen"><span id="waIcon" class="icon"></span></span>
+            <span class="badge" title="MQTT Status"><span id="mqttIcon" class="icon"></span></span>
             <span class="fw-stack" title="Firmware">
               <span class="badge fw-old"><span id="fwTop" class="mono">-</span></span>
               <a id="fwTopUpd" class="badge-accent fw-new" href="/update" style="display:none"></a>
@@ -454,6 +455,7 @@
         clock: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14" stroke-linecap="round" stroke-linejoin="round"/></svg>',
         network: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>',
         signal: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 18v-6m4 6V9m4 9V6m4 12v-9" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        mqtt: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3L2 21h5L12 9l5 12h5L12 3zM12 11l-2 5h4l-2-5z" stroke-linecap="round" stroke-linejoin="round"/></svg>',
       };
       const live = { ws: null, timer: null, lastStatus: null };
       let netDialogOpen = false;
@@ -496,6 +498,19 @@
           waEl.classList.remove("ok", "warn", "err");
           const enabled = !!(s && s.notify && s.notify.enabled);
           waEl.classList.add(enabled ? "ok" : "err");
+        }
+        // MQTT
+        const mqttEl = $("mqttIcon");
+        if (mqttEl) {
+          if (!mqttEl.innerHTML) mqttEl.innerHTML = icons.mqtt;
+          mqttEl.classList.remove("ok", "warn", "err");
+          if (s && s.mqtt) {
+            if (s.mqtt.connected) mqttEl.classList.add("ok");
+            else if (s.mqtt.enabled) mqttEl.classList.add("err");
+            else mqttEl.classList.add("warn"); // Enabled false = warn (orange/neutral)
+          } else {
+            mqttEl.classList.add("err");
+          }
         }
 
         if (s.grow) {
