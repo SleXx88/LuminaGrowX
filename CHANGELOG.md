@@ -2,6 +2,27 @@
 
 Alle wichtigen Änderungen und Features der automatisierten Growbox-Steuerung.
 
+## [V1.0.1] - 2026-02-12
+### Web-UI Redesign & Stabilitäts-Updates
+
+Dieses Update konzentriert sich auf die Verbesserung der Benutzererfahrung im Web-Interface und eine robustere Netzwerk-Konfiguration.
+
+#### 🎨 Web-Interface (UI/UX)
+*   **Modernisierte Update-Seite:** Neues Design mit Fortschrittsbalken, Echtzeit-Log-Fenster und automatischer Anzeige der Versions-Highlights direkt aus dem lokalen Changelog.
+*   **Optimierte Einstellungen:** Layout für Desktop-Nutzung verbessert (Grid-System). Buttons ohne Unterstreichungen für einen saubereren Look.
+*   **Interaktiver Inbetriebnahme-Assistent:** Der Reset des Setups erfolgt nun über einen Bestätigungs-Dialog mit klarer Funktions-Übersicht (WLAN-Reset, Kalibrierung von ToF/RTC).
+*   **Begriffs-Korrektur:** Alle Referenzen auf nicht vorhandene Hardware (Waage) im Setup entfernt.
+
+#### 🔧 System & Netzwerk
+*   **AP-Persistence:** Im Setup-Modus bleibt der Access Point nun dauerhaft aktiv, auch wenn eine Verbindung zum Heim-WLAN besteht. Dies verhindert den Verbindungsverlust während der Einrichtung.
+*   **Changelog-Integration:** Die `CHANGELOG.md` wird nun automatisch auf den ESP32 synchronisiert und ist direkt über das Web-Interface (`/CHANGELOG.md`) abrufbar.
+*   **API-Fixes:** Mehrere Kompilierfehler und Scope-Probleme in der Web-Steuerung (`web_ctrl.cpp`) behoben.
+
+#### 🛠 Build & Automation
+*   **Build-Skripte:** Automatischer Export des Changelogs in die Daten-Ordner (`data/` und `www/`) vor dem Packen des Release-Tars oder Factory-Bins integriert.
+
+---
+
 ## [V1.0.0] - 2026-02-11
 ### Initial Stable Release - LisaPro Edition
 

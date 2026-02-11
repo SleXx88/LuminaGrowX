@@ -85,7 +85,7 @@ void NetCtrl::trySetRTCOnce_() {
   rtcSetOnce_ = true;
 }
 
-void NetCtrl::begin(bool forceAP, const char* mdnsName, RTC_Ctrl* rtc) {
+void NetCtrl::begin(bool forceAP, const char* mdnsName, RTC_Ctrl* rtc, bool keepAP) {
   rtc_ = rtc;
   mdnsName_ = mdnsName ? String(mdnsName) : String();
   tzInit();
@@ -146,10 +146,14 @@ void NetCtrl::begin(bool forceAP, const char* mdnsName, RTC_Ctrl* rtc) {
       MDNS.addService("http", "tcp", 80);
       mdnsOk_ = true;
     }
-    // Deaktiviere den Access Point, sobald STA verbunden ist
-    WiFi.softAPdisconnect(true);
-    apActive_ = false;
-    Serial.printf("[NET] STA verbunden: IP=%s (AP deaktiviert)\n", WiFi.localIP().toString().c_str());
+    // Deaktiviere den Access Point, sobald STA verbunden ist - AUSSER wir sind im Setup/keepAP
+    if (!keepAP) {
+      WiFi.softAPdisconnect(true);
+      apActive_ = false;
+      Serial.printf("[NET] STA verbunden: IP=%s (AP deaktiviert)\n", WiFi.localIP().toString().c_str());
+    } else {
+      Serial.printf("[NET] STA verbunden: IP=%s (AP bleibt AKTIV)\n", WiFi.localIP().toString().c_str());
+    }
   }
 
   internetOK_ = probeInternet();

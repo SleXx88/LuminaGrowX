@@ -3,33 +3,33 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>LuminaGrowX – Einstellungen</title>
+    <title>Lisa Pro – Einstellungen</title>
     <link rel="stylesheet" href="/pico.min.css" />
     <style>
       :root {
         --accent: #ef4444;
         --accent-2: #dc2626;
-        --bg-main: #080809;
-        --glass: rgba(255, 255, 255, 0.03);
-        --glass-strong: rgba(255, 255, 255, 0.05);
+        --glass: rgba(20, 20, 22, 0.42);
+        --glass-strong: rgba(20, 20, 22, 0.62);
         --muted: rgba(255, 255, 255, 0.06);
-        --border: rgba(255, 255, 255, 0.1);
+        --border: rgba(255, 255, 255, 0.18);
         --text: #e5e7eb;
-        --text-dim: #9ca3af;
+        --text-dim: #cbd5e1;
         --ok: #22c55e;
         --warn: #f59e0b;
         --err: #ef4444;
-        --radius: 12px;
-        --pico-background-color: var(--bg-main);
-        --pico-card-background-color: var(--glass);
+        --radius: 18px;
+        --pico-background-color: transparent;
+        --pico-card-background-color: transparent;
       }
-      html, body { 
-        height: 100%; 
-        background-color: var(--bg-main);
-      }
+      html, body { height: 100%; }
       body {
         position: relative;
         color: var(--text);
+        background: transparent;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
       }
       body::before {
         content: "";
@@ -44,80 +44,75 @@
         border: 1px solid var(--border);
         border-radius: var(--radius);
         margin-bottom: 1.5rem;
-        padding: 0;
-        overflow: hidden;
-        backdrop-filter: blur(10px);
+        backdrop-filter: blur(3px);
       }
       article > header {
         background: var(--glass-strong);
         border-bottom: 1px solid var(--border);
-        padding: 1.25rem 1.5rem;
+        border-radius: var(--radius) var(--radius) 0 0;
+        padding: 0.75rem 1rem;
       }
-      article > header h2 { margin: 0; font-size: 1.5rem; color: #fff; }
+      h2, h3, h4 { color: var(--text); margin: 0; }
       
-      .content { padding: 1.5rem; }
+      .content { padding: 1rem; }
       .hidden { display: none !important; }
       
-      h4 { color: var(--accent); margin-top: 1.5rem; margin-bottom: 0.75rem; text-transform: uppercase; font-size: 0.9rem; letter-spacing: 0.05em; }
+      h4 { 
+        color: var(--accent); 
+        margin-top: 1.5rem; 
+        margin-bottom: 0.75rem; 
+        text-transform: uppercase; 
+        font-size: 0.85rem; 
+        font-weight: 700;
+        letter-spacing: 0.05em; 
+      }
       
       input:not([type="checkbox"]), select {
-        background: rgba(255, 255, 255, 0.05) !important;
+        background: rgba(255, 255, 255, 0.02) !important;
         border: 1px solid var(--border) !important;
         color: var(--text) !important;
-        border-radius: 6px !important;
+        border-radius: var(--radius) !important;
       }
       input:not([type="checkbox"]):focus, select:focus {
         border-color: var(--accent) !important;
-        box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2) !important;
       }
 
-      button, .button {
-        background: var(--accent);
-        border: 1px solid var(--accent);
-        color: #fff;
-        border-radius: 6px !important;
-        font-weight: 600;
-        cursor: pointer;
-        padding: 0.6rem 1rem;
+      button, [role="button"], .button {
+        background: rgba(20, 20, 22, 0.42);
+        color: var(--text);
+        border: 1px solid var(--border);
+        font-weight: 700;
+        font-size: 1rem;
+        line-height: 1.2;
+        padding: 0.55rem 0.9rem;
+        border-radius: var(--radius) !important;
         transition: all 0.2s;
-        text-decoration: none;
         display: inline-flex;
         align-items: center;
         gap: 0.5rem;
+        justify-content: center;
+        text-decoration: none !important;
       }
-      button:hover, .button:hover {
-        background: var(--accent-2);
-        border-color: var(--accent-2);
-        color: #fff;
-      }
-      button.secondary, .button.secondary {
-        background: rgba(239, 68, 68, 0.1);
-        border-color: var(--accent);
-        color: var(--accent);
-      }
-      button.secondary:hover, .button.secondary:hover {
-        background: var(--accent);
-        color: #fff;
-      }
+      button:hover, [role="button"]:hover, .button:hover { background: rgba(255, 255, 255, 0.06); color: #fff; text-decoration: none !important; }
+      button.primary, .primary { background: var(--accent) !important; color: #fff !important; border-color: var(--accent) !important; text-decoration: none !important; }
+      button.secondary, .secondary { border-color: var(--accent); color: var(--accent); text-decoration: none !important; }
 
-      /* Checkbox Fix - match setup.html exactly */
       input[type="checkbox"] {
-        width: 1.2rem;
-        height: 1.2rem;
-        accent-color: var(--ok);
+        width: 1.1rem;
+        height: 1.1rem;
+        accent-color: var(--accent);
         margin-right: 0.5rem;
         cursor: pointer;
-        /* Do NOT set background-color here as it breaks the checkmark in Pico */
       }
       
       label {
-        display: flex;
+        display: inline-flex;
         align-items: center;
         cursor: pointer;
-        margin-bottom: 0.5rem;
+        margin-bottom: 0.25rem;
       }
 
-      hr { opacity: 0.1; margin: 2rem 0; }
+      hr { opacity: 0.15; margin: 1.5rem 0; }
       
       .grid { display: grid; grid-template-columns: 1fr; gap: 1rem; margin-bottom: 1rem; }
       @media(min-width: 768px) { .grid { grid-template-columns: 1fr 1fr; } }
@@ -125,34 +120,40 @@
       footer.card-footer {
         display: flex;
         gap: 0.5rem;
-        padding: 1.25rem 1.5rem;
-        background: var(--glass-strong);
+        padding: 0.75rem 1rem;
         border-top: 1px solid var(--border);
+      }
+
+      .config-block {
+        background: rgba(0,0,0,0.15);
+        padding: 1rem;
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
       }
 
       /* Desktop-Optimierung */
       @media (min-width: 1024px) {
         main.container {
-          max-width: 98% !important;
-          width: 98% !important;
-          margin: 1rem auto !important;
+          max-width: 900px !important;
+          margin: 2rem auto !important;
         }
         html { font-size: 15px; }
         article > header h2 { font-size: 1.25rem !important; }
         h4 { margin-top: 1rem; margin-bottom: 0.5rem; }
-        button, .button { 
+        button, [role="button"], .button { 
           font-size: 0.85rem !important; 
           padding: 0.4rem 0.8rem !important; 
         }
         input:not([type="checkbox"]), select {
-          padding: 0.4rem 0.6rem !important;
+          padding: 0.35rem 0.6rem !important;
           font-size: 0.9rem !important;
+          height: auto !important;
         }
       }
     </style>
   </head>
   <body>
-    <main class="container" style="margin-top:2rem">
+    <main class="container">
       <article>
         <header>
           <h2>Einstellungen</h2>
@@ -160,131 +161,157 @@
         <div class="content">
           <form id="netForm">
             <h4>Allgemein</h4>
-            <div style="display: grid; grid-template-columns: 1fr auto; gap: 0.5rem; align-items: end; margin-bottom: 1rem;">
-              <label style="flex-direction: column; align-items: start; margin: 0;">
-                <span style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 0.25rem;">Gerätename (max. 10 Zeichen)</span>
-                <input id="deviceName" name="name" maxlength="10" placeholder="z.B. LisaPro-1" style="margin:0; width: 100%;" />
-              </label>
-              <button type="button" id="btnNameSave" style="margin:0; height: 100%;">Speichern</button>
+            <div style="display: flex; gap: 0.5rem; align-items: flex-end; margin-bottom: 1rem; flex-wrap: wrap;">
+              <div style="flex: 1; min-width: 200px;">
+                <label style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.2rem;">Gerätename (max. 10 Zeichen)</label>
+                <input id="deviceName" name="name" maxlength="10" placeholder="z.B. LisaPro-1" style="margin:0;" />
+              </div>
+              <button type="button" id="btnNameSave" class="primary" style="margin:0;">Speichern</button>
             </div>
 
             <hr />
 
             <h4>WLAN Konfiguration</h4>
-            <div style="display: grid; grid-template-columns: 1fr auto; gap: 0.5rem; align-items: end; margin-bottom: 1rem;">
-              <label style="flex-direction: column; align-items: start; margin: 0;">
-                <span style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 0.25rem;">Netzwerk (SSID)</span>
-                <div style="display:flex; gap:0.5rem; width: 100%;">
+            <div style="display: flex; gap: 0.5rem; align-items: flex-end; margin-bottom: 1rem; flex-wrap: wrap;">
+              <div style="flex: 1; min-width: 200px;">
+                <label style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.2rem;">Netzwerk (SSID)</label>
+                <div style="display:flex; gap:0.5rem;">
                   <select id="wifiSSID" name="ssid" style="flex:1; margin:0">
                     <option value="" disabled selected>Suche Netzwerke...</option>
                   </select>
                   <input id="ssidManual" placeholder="Manuelle SSID" class="hidden" style="flex:1; margin:0" />
                 </div>
-              </label>
-              <button type="button" id="btnScan" class="secondary" style="margin:0; height: 100%;">Scan</button>
+              </div>
+              <button type="button" id="btnScan" style="margin:0;">WLAN Scan</button>
             </div>
             
             <div class="grid">
-              <label style="flex-direction: column; align-items: start;">
-                <span style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 0.25rem;">Passwort</span>
-                <input id="pass" name="pass" type="password" placeholder="********" style="width: 100%;" />
-              </label>
-              <label style="height: 100%; align-items: end; padding-bottom: 0.6rem;">
-                <input type="checkbox" id="showPass" /> Passwort anzeigen
-              </label>
+              <div>
+                <label style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.2rem;">Passwort</label>
+                <input id="pass" name="pass" type="password" placeholder="********" style="margin:0;" />
+              </div>
+              <div style="display: flex; align-items: center; padding-top: 1rem;">
+                <label style="margin:0;"><input type="checkbox" id="showPass" /> Passwort anzeigen</label>
+              </div>
             </div>
 
-            <div style="margin: 1.5rem 0;">
-              <label>
-                <input type="checkbox" id="useStatic" name="useStatic" /> Statische IP-Adresse verwenden
-              </label>
+            <div style="margin: 1rem 0;">
+              <label><input type="checkbox" id="useStatic" name="useStatic" role="switch" /> Statische IP-Adresse verwenden</label>
             </div>
 
-            <div id="staticBlock" class="grid hidden" style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px; border-left: 3px solid var(--accent);">
-              <label style="flex-direction: column; align-items: start;">
-                <span style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 0.25rem;">IP-Adresse</span>
-                <input id="ip" name="ip" placeholder="192.168.1.50" />
-              </label>
-              <label style="flex-direction: column; align-items: start;">
-                <span style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 0.25rem;">Subnetzmaske</span>
-                <input id="mask" name="mask" placeholder="255.255.255.0" />
-              </label>
-              <label style="flex-direction: column; align-items: start;">
-                <span style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 0.25rem;">Gateway</span>
-                <input id="gw" name="gw" placeholder="192.168.1.1" />
-              </label>
-              <label style="flex-direction: column; align-items: start;">
-                <span style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 0.25rem;">DNS (optional)</span>
-                <input id="dns" name="dns" placeholder="1.1.1.1" />
-              </label>
+            <div id="staticBlock" class="config-block hidden" style="border-left: 3px solid var(--accent);">
+              <div class="grid">
+                <div>
+                  <label style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.2rem;">IP-Adresse</label>
+                  <input id="ip" name="ip" placeholder="192.168.1.50" style="margin:0;" />
+                </div>
+                <div>
+                  <label style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.2rem;">Subnetzmaske</label>
+                  <input id="mask" name="mask" placeholder="255.255.255.0" style="margin:0;" />
+                </div>
+                <div>
+                  <label style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.2rem;">Gateway</label>
+                  <input id="gw" name="gw" placeholder="192.168.1.1" style="margin:0;" />
+                </div>
+                <div>
+                  <label style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.2rem;">DNS (optional)</label>
+                  <input id="dns" name="dns" placeholder="1.1.1.1" style="margin:0;" />
+                </div>
+              </div>
             </div>
             
             <div style="display:flex; justify-content:flex-end; margin-top: 1rem;">
-              <button type="button" id="btnNetSave">WLAN Einstellungen speichern</button>
+              <button type="button" id="btnNetSave" class="primary">WLAN Einstellungen & Reboot</button>
             </div>
 
             <hr />
             
             <h4>Benachrichtigungen</h4>
-            <div style="margin-bottom: 1.5rem;">
-              <label>
-                <input type="checkbox" id="notifyEnabled" /> WhatsApp Benachrichtigungen aktivieren
-              </label>
+            <div style="margin-bottom: 1rem;">
+              <label><input type="checkbox" id="notifyEnabled" role="switch" /> WhatsApp Benachrichtigungen (CallMeBot)</label>
             </div>
             
-            <div id="notifyBlock" class="grid hidden" style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px; border-left: 3px solid var(--ok);">
-              <label style="flex-direction: column; align-items: start;">
-                <span style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 0.25rem;">Telefonnummer (+49...)</span>
-                <input id="notifyPhone" placeholder="+49XXXXXXXXXX" style="width: 100%;" />
-              </label>
-              <label style="flex-direction: column; align-items: start;">
-                <span style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 0.25rem;">CallMeBot API-Key</span>
-                <input id="notifyKey" placeholder="1234567" style="width: 100%;" />
-              </label>
-              <div style="grid-column: 1 / -1; display:flex; gap:0.5rem; justify-content: flex-end; margin-top: 0.5rem;">
-                <button id="btnNotifyTest" type="button" class="secondary">Test-Nachricht</button>
-                <button id="btnNotifySave" type="button">Speichern</button>
+            <div id="notifyBlock" class="config-block hidden" style="border-left: 3px solid var(--ok);">
+              <div class="grid">
+                <div>
+                  <label style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.2rem;">Telefonnummer (+49...)</label>
+                  <input id="notifyPhone" placeholder="+49XXXXXXXXXX" style="margin:0;" />
+                </div>
+                <div>
+                  <label style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.2rem;">API-Key</label>
+                  <input id="notifyKey" placeholder="1234567" style="margin:0;" />
+                </div>
+              </div>
+              <div style="display:flex; gap:0.5rem; justify-content: flex-end; margin-top: 0.5rem;">
+                <button id="btnNotifyTest" type="button">Test-Nachricht</button>
+                <button id="btnNotifySave" type="button" class="primary">Speichern</button>
               </div>
             </div>
 
             <hr />
 
             <h4>MQTT & Home Assistant</h4>
-            <div style="margin-bottom: 1.5rem;">
-              <label>
-                <input type="checkbox" id="mqttEnabled" /> MQTT aktivieren (für Home Assistant)
-              </label>
+            <div style="margin-bottom: 1rem;">
+              <label><input type="checkbox" id="mqttEnabled" role="switch" /> MQTT aktivieren</label>
             </div>
 
-            <div id="mqttBlock" class="grid hidden" style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px; border-left: 3px solid #3b82f6;">
-              <label style="flex-direction: column; align-items: start;">
-                <span style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 0.25rem;">Broker Server (IP oder Hostname)</span>
-                <input id="mqttServer" placeholder="192.168.1.10" style="width: 100%;" />
-              </label>
-              <label style="flex-direction: column; align-items: start;">
-                <span style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 0.25rem;">Port</span>
-                <input id="mqttPort" type="number" placeholder="1883" value="1883" style="width: 100%;" />
-              </label>
-              <label style="flex-direction: column; align-items: start;">
-                <span style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 0.25rem;">Benutzer (optional)</span>
-                <input id="mqttUser" placeholder="" style="width: 100%;" />
-              </label>
-              <label style="flex-direction: column; align-items: start;">
-                <span style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 0.25rem;">Passwort (optional)</span>
-                <input id="mqttPass" type="password" placeholder="" style="width: 100%;" />
-              </label>
-              <div style="grid-column: 1 / -1; display:flex; gap:0.5rem; justify-content: flex-end; margin-top: 0.5rem;">
-                <button id="btnMqttSave" type="button">Speichern</button>
+            <div id="mqttBlock" class="config-block hidden" style="border-left: 3px solid #3b82f6;">
+              <div class="grid">
+                <div>
+                  <label style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.2rem;">Broker (IP/Host)</label>
+                  <input id="mqttServer" placeholder="192.168.1.10" style="margin:0;" />
+                </div>
+                <div>
+                  <label style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.2rem;">Port</label>
+                  <input id="mqttPort" type="number" placeholder="1883" value="1883" style="margin:0;" />
+                </div>
+                <div>
+                  <label style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.2rem;">Benutzer</label>
+                  <input id="mqttUser" placeholder="optional" style="margin:0;" />
+                </div>
+                <div>
+                  <label style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.2rem;">Passwort</label>
+                  <input id="mqttPass" type="password" placeholder="optional" style="margin:0;" />
+                </div>
+              </div>
+              <div style="display:flex; justify-content: flex-end; margin-top: 0.5rem;">
+                <button id="btnMqttSave" type="button" class="primary">Speichern</button>
               </div>
             </div>
+
+            <hr />
           </form>
         </div>
         <footer class="card-footer">
-          <a href="/" class="button secondary" style="flex: 1; justify-content: center;">Abbrechen</a>
-          <a href="/setup" id="btnSetup" class="button secondary" style="flex: 1; justify-content: center; border-color: var(--accent); color: var(--accent);">Assistent neu starten</a>
+          <a href="/" class="button" style="flex: 1;">Abbrechen</a>
+          <button id="btnSetup" class="secondary" style="flex: 1;">Inbetriebnahme Assistent starten</button>
         </footer>
       </article>
     </main>
+
+    <!-- Dialog: Inbetriebnahme Bestätigung -->
+    <dialog id="dlgSetupConfirm" class="modal">
+      <article style="max-width: 600px;">
+        <header>
+          <h3>Inbetriebnahme Assistent</h3>
+        </header>
+        <div class="content" style="padding: 1rem;">
+          <p>Du bist dabei, den Einrichtungsassistenten neu zu starten. Dies ist nützlich, um:</p>
+          <ul>
+            <li>Die Growbox in einem <strong>neuen WLAN</strong> anzumelden.</li>
+            <li>Hardware-Komponenten (ToF-Abstand, RTC-Uhrzeit) erneut zu <strong>kalibrieren</strong>.</li>
+          </ul>
+          <div style="background: rgba(0,0,0,0.2); padding: 0.75rem; border-radius: 12px; font-size: 0.85rem; border-left: 3px solid var(--accent);">
+            <strong>Ablauf:</strong> Das Gerät startet neu und eröffnet ein eigenes WLAN-Netzwerk für die Einrichtung. Deine Grow-Daten (Tag, Sorte) bleiben erhalten.
+          </div>
+          <p style="margin-top: 1rem;">Möchtest du den Neustart jetzt ausführen?</p>
+        </div>
+        <footer style="display:flex; gap: 0.5rem; justify-content:flex-end; padding:.75rem 1rem;">
+          <button class="secondary" onclick="$('dlgSetupConfirm').close()">Abbrechen</button>
+          <button class="primary" id="btnConfirmSetupRun">Neustarten & Setup starten</button>
+        </footer>
+      </article>
+    </dialog>
 
     <dialog id="toast" class="modal">
       <article>
@@ -315,7 +342,6 @@
           if (j && j.device_name) {
             $('deviceName').value = j.device_name;
           } else if (j && j.app && j.app.name) {
-            // Fallback for different API structures
             $('deviceName').value = j.app.name;
           }
           
@@ -326,7 +352,6 @@
             $('notifyBlock').classList.toggle('hidden', !$('notifyEnabled').checked);
           }
 
-          // MQTT Settings Load
           try {
             const m = await fetchJSON('/api/mqtt');
             if (m) {
@@ -425,10 +450,9 @@
             showToast("Scan abgeschlossen");
           }
         } catch (e) { showToast("Scan Fehler: " + e.message); }
-        finally { btn.disabled = false; btn.textContent = "Scan"; }
+        finally { btn.disabled = false; btn.textContent = "WLAN Scan"; }
       });
 
-      // Setup-Button Status aktualisieren
       async function updateSetupButton(){
         try{
           const st = await fetchJSON('/api/status');
@@ -489,7 +513,7 @@
         payload.reboot = true;
         
         showToastHtml('WLAN gespeichert. Das Gerät startet neu. Bitte jetzt ins Heimnetz wechseln und <a href="http://luminagrowx.local/" target="_blank">http://luminagrowx.local/</a> aufrufen.');
-        try{ fetch('/api/network', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)}); }catch(_){ }
+        try{ fetch('/api/network', {method:'POST', body: JSON.stringify(payload)}); }catch(_){ }
       });
 
       $('btnNotifySave').addEventListener('click', async ()=>{
@@ -522,7 +546,7 @@
         const server = $('mqttServer').value.trim();
         const port = parseInt($('mqttPort').value.trim()) || 1883;
         const user = $('mqttUser').value.trim();
-        const pass = $('mqttPass').value; // allow spaces if any
+        const pass = $('mqttPass').value;
         
         if (enabled && !server) { showToast('Bitte Server-Adresse eingeben'); return; }
         
@@ -533,16 +557,16 @@
         } catch(e) { showToast('Fehler: ' + e.message); }
       });
 
-      // Setup-Button mit Bestätigungsdialog
-      $('btnSetup').addEventListener('click', async (e)=>{
-        e.preventDefault();
-        const confirmed = confirm('Hinweis: Der Setup-Modus startet den Assistenten neu. Bestehende Kalibrierungen bleiben erhalten.\n\nMöchten Sie fortfahren?');
-        if (!confirmed) return;
+      $('btnSetup').addEventListener('click', () => {
+        $('dlgSetupConfirm').showModal();
+      });
 
+      $('btnConfirmSetupRun').addEventListener('click', async () => {
+        $('dlgSetupConfirm').close();
         try{
           const r = await fetch('/api/setup/reset', {method:'POST'});
           if (r.ok) {
-            showToast('Assistent wird gestartet. Gerät startet neu...');
+            showToast('Inbetriebnahme Assistent wird gestartet. Gerät startet neu...');
             setTimeout(()=> window.location.href = '/setup', 3000);
           } else {
             showToast('Fehler: ' + r.statusText);
@@ -556,4 +580,4 @@
       updateSetupButton();
     </script>
   </body>
-  </html>
+</html>

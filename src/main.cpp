@@ -307,7 +307,8 @@ void setup()
                         /*activeHigh=*/lumina::netcfg::AP_RESET_ACTIVE_HIGH);
   {
     bool forceAP = net.shouldForceAPAtBoot(lumina::netcfg::AP_RESET_HOLD_MS);
-    net.begin(forceAP, "luminagrowx", &rtc);
+    // keepAP = g_setupMode (AP bleibt aktiv, auch wenn STA verbindet)
+    net.begin(forceAP, "luminagrowx", &rtc, g_setupMode);
   }
   web.begin(&controller, &rtc, &net);
   // Hardware-Referenzen für Setup/Tests an WebCtrl geben (inkl. SHT41, Fan2, Fan3)

@@ -30,7 +30,7 @@ public:
   bool shouldForceAPAtBoot(uint32_t holdMs = 5000);
 
   // Start WiFi: AP is always started; optional STA connect using stored config unless forceAP
-  void begin(bool forceAP, const char* mdnsName, RTC_Ctrl* rtc = nullptr);
+  void begin(bool forceAP, const char* mdnsName, RTC_Ctrl* rtc = nullptr, bool keepAP = false);
 
   // Try reconnecting STA immediately with stored cfg (non-blocking of main loop, but waits up to timeoutMs here)
   bool reconnectSTA(bool closeAPOnSuccess = true, uint32_t timeoutMs = 12000);
