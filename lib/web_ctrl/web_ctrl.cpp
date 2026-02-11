@@ -459,6 +459,7 @@ void WebCtrl::setupRoutes_() {
   http_.on("/pico.min.css", HTTP_GET, [this](AsyncWebServerRequest* req){ sendFile_(req, "/pico.min.css", "text/css"); });
   http_.on("/custom.css", HTTP_GET, [this](AsyncWebServerRequest* req){ sendFile_(req, "/custom.css", "text/css"); });
   http_.on("/bg.jpg", HTTP_GET, [this](AsyncWebServerRequest* req){ sendFile_(req, "/bg.jpg", "image/jpeg"); });
+  http_.on("/CHANGELOG.md", HTTP_GET, [this](AsyncWebServerRequest* req){ sendFile_(req, "/CHANGELOG.md", "text/plain; charset=utf-8"); });
 
   // Setup-Seite und APIs
   http_.on("/setup", HTTP_GET, [this](AsyncWebServerRequest* req){

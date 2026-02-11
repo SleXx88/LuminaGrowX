@@ -44,6 +44,13 @@ if (Test-Path $dataDir) {
   Write-Warning "data/ not found; package will contain only firmware (if present)"
 }
 
+# Copy CHANGELOG.md to www
+$changelogPath = Join-Path $root 'CHANGELOG.md'
+if (Test-Path $changelogPath) {
+  Write-Host "==> Include CHANGELOG.md" -ForegroundColor Cyan
+  Copy-Item $changelogPath (Join-Path $wwwDir 'CHANGELOG.md') -Force
+}
+
 $fwIncluded = $false
 if (-not $NoFirmware) {
   $fwPath = Join-Path $root (".pio/build/{0}/firmware.bin" -f $Env)
