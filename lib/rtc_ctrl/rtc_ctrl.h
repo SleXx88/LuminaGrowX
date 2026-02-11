@@ -96,5 +96,8 @@ private:
   // Cache der letzten gelesenen lokalen Zeit (für Einzel-Getter)
   DateTime lastLocal_ = {2000,1,1,0,0,0};
   bool lastReadOk_ = false;
+  
+  bool _error = false;
+  uint32_t _lastErrorMs = 0;
 };
 

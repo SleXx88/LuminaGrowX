@@ -285,6 +285,14 @@ static uint64_t uptime_s() { return millis() / 1000ULL; }
 void WebCtrl::begin(plant_ctrl::PlantCtrl* ctrl, RTC_Ctrl* rtc, NetCtrl* net) {
   ctrl_ = ctrl; rtc_ = rtc; net_ = net;
 
+  // RTC-Check beim Start
+  if (rtc_) {
+    rtcPresent_ = rtc_->isConnected(); // Einmalig prüfen
+    if (!rtcPresent_) {
+      Serial.println(F("[WEB] RTC nicht gefunden - deaktiviere RTC-Sync"));
+    }
+  }
+
   // Ensure all NVS namespaces exist by opening in RW mode once
   {
     const char* ns[] = {NVS_APP, NVS_GROW, NVS_DRY, NVS_NOTIFY, NVS_STEPPER, NVS_TOF, NVS_UPDATE, NVS_PHASES, NVS_MQTT};
@@ -391,7 +399,7 @@ void WebCtrl::loop() {
 
   // System-Zeit aus RTC setzen wenn NTP nicht verfÃ¼gbar
   static bool systemTimeSetFromRTC = false;
-  if (!systemTimeSetFromRTC && rtc_) {
+  if (!systemTimeSetFromRTC && rtc_ && rtcPresent_) { // Check rtcPresent_
     time_t tnow = time(nullptr);
     // Wenn Systemzeit noch nicht gesetzt (vor 2023), aus RTC initialisieren
     if (tnow < 1700000000) {
@@ -404,7 +412,7 @@ void WebCtrl::loop() {
   }
 
   // Periodische RTC-Synchronisierung: einmal nach erstem Internet (SNTP) und danach tÃ¤glich gegen 03:05 Lokalzeit
-  if (net_ && net_->internetOK() && rtc_) {
+  if (net_ && net_->internetOK() && rtc_ && rtcPresent_) { // Check rtcPresent_
     time_t tnow = time(nullptr);
     // Nur synchronisieren, wenn Systemzeit valide (SNTP) ist
     if (tnow >= 1700000000) {

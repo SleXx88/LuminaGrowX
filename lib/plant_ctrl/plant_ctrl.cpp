@@ -201,12 +201,65 @@ bool PlantCtrl::update() {
   const float dt_s = (lastMs_ == 0) ? 0.0f : (float)(now - lastMs_) / 1000.0f;
   lastMs_ = now;
 
-  // 1) Sensoren lesen
-  float tC_in, rh_in, tC_out, rh_out;
-  if (!sensorIn_->read(tC_in, rh_in)) return false;
-  if (!sensorOut_->read(tC_out, rh_out)) return false;
-  tIn_ = tC_in; rhIn_ = rh_in;
-  tOut_ = tC_out; rhOut_ = rh_out;
+  // 1) Sensoren lesen mit Backoff bei Fehlern
+  // Retry-Intervalle für defekte Sensoren
+  static uint32_t lastRetryIn = 0;
+  static uint32_t lastRetryOut = 0;
+  const uint32_t RETRY_MS = 10000; // alle 10s versuchen, falls Sensor weg
+
+  float tC_in = NAN, rh_in = NAN;
+  float tC_out = NAN, rh_out = NAN;
+  bool okIn = false, okOut = false;
+
+  // Sensor Innen
+  if (sensorIn_) {
+    // Wenn letzter Lesevorgang OK war, lesen wir normal.
+    // Wenn nicht, warten wir RETRY_MS.
+    if (!sensorIn_->hasError() || (now - lastRetryIn > RETRY_MS)) {
+      if (sensorIn_->read(tC_in, rh_in)) {
+        tIn_ = tC_in; rhIn_ = rh_in;
+        okIn = true;
+        lastRetryIn = now; // Zeitstempel aktualisieren bei Erfolg
+      } else {
+        lastRetryIn = now; // Fehlerzeitpunkt merken für Backoff
+      }
+    } else {
+      // Im Fehler-Backoff -> letzte bekannte Werte nutzen (oder NAN lassen)
+      tIn_ = NAN; rhIn_ = NAN; // Als ungültig markieren
+    }
+  }
+
+  // Sensor Außen
+  if (sensorOut_) {
+    if (!sensorOut_->hasError() || (now - lastRetryOut > RETRY_MS)) {
+      if (sensorOut_->read(tC_out, rh_out)) {
+        tOut_ = tC_out; rhOut_ = rh_out;
+        okOut = true;
+        lastRetryOut = now;
+      } else {
+        lastRetryOut = now;
+      }
+    } else {
+      tOut_ = NAN; rhOut_ = NAN;
+    }
+  }
+
+  // Falls Sensoren fehlen, brechen wir hier nicht hart ab, sondern arbeiten mit Defaultwerten 
+  // oder deaktivieren die Logik, aber erlauben dem System weiterzulaufen (WLAN!).
+  if (!okIn && !okOut) {
+    // Kritischer Fehler: Keine Sensoren -> Keine Regelung möglich.
+    // Aber: return true, damit der Rest (WLAN, Webserver) weiterlaufen kann!
+    // Alle Aktoren sicherheitshalber aus.
+    if (fan_) fan_->setPercent(0.0f);
+    if (led_) led_->setPercent(0.0f);
+    
+    // VPD auf NAN setzen, damit UI Fehler anzeigt
+    vpdIn_ = NAN; 
+    
+    // Wir tun so, als wäre alles "erledigt", damit loop() nicht blockiert.
+    return true; 
+  }
+
 
   // Tür-Status aktualisieren (unabhängig vom Modus)
   if (doorPin_ >= 0) {

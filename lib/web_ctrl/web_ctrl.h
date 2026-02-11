@@ -134,6 +134,7 @@ private:
   // RTC sync
   uint32_t lastRtcSyncYMD_ = 0; // YYYYMMDD of last RTC sync
   bool rtcSyncedOnce_ = false;
+  bool rtcPresent_ = false; // Neu: Status merken
   bool syncRTCFromSystem_();
   bool syncSystemFromRTC_();
   void syncControllerStage_();

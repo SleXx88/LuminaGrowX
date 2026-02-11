@@ -176,9 +176,10 @@ private:
   uint8_t  _stopVar;   // interner Wert aus Sensor-Init
   uint32_t _timingBudgetUs; // gespeichertes Timing-Budget
   int16_t  _offsetMm = 0; // optionaler Offset für Kalibrierung
-  int      _lastMm = -1;  // Letzter gelesener Wert (für non-blocking)
+  int _lastMm = -1;  // Letzter gelesener Wert (für non-blocking)
   uint8_t  _errorCount = 0;    // Zähler für aufeinanderfolgende I2C-Fehler
   uint32_t _lastSuccessMs = 0; // Zeitstempel der letzten erfolgreichen Messung
+  bool     _i2cErr = false; // Flag für I2C Fehler während einer Sequenz
 
   // Dateipfad für Offset-Kalibrierung (Definition in .cpp)
   static const char* kOffsetPath;

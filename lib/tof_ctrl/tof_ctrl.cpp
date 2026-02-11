@@ -52,7 +52,7 @@ ToFCtrl::ToFCtrl()
   : _w(&Wire), _addr(0x29), _xshut(-1), _ok(false), _debug(false),
     _maxCm(TOF_MAX_CM), _minCm(TOF_MIN_CM),
     _stopVar(0), _timingBudgetUs(0),
-    _offsetMm(0), _lastMm(-1), _lastSuccessMs(0), _errorCount(0) {}
+    _offsetMm(0), _lastMm(-1), _lastSuccessMs(0), _errorCount(0), _i2cErr(false) {}
 
 // (Legacy) Kalibrier-Dateipfad entfernt – es wird nur noch Offset genutzt
 
@@ -100,10 +100,12 @@ bool ToFCtrl::getModelInfo(uint8_t &modelId, uint8_t &revisionId) {
 
 // --- Low-Level I2C Helferfunktionen ---
 uint8_t ToFCtrl::r8(uint8_t reg) {
+  if (_i2cErr) return 0; // Abbrechen bei vorherigem Fehler
   _w->beginTransmission(_addr);
   _w->write(reg);
   uint8_t err = _w->endTransmission(false);
   if (err != 0) {
+    _i2cErr = true;
     _errorCount++;
     if (_debug) Serial.printf("[ToF] I2C r8 Error %d at reg 0x%02X\n", err, reg);
     return 0;
@@ -113,15 +115,18 @@ uint8_t ToFCtrl::r8(uint8_t reg) {
     _errorCount = 0;
     return _w->read();
   }
+  _i2cErr = true; // Request failed
   _errorCount++;
   return 0;
 }
 
 uint16_t ToFCtrl::r16(uint8_t reg) {
+  if (_i2cErr) return 0;
   _w->beginTransmission(_addr);
   _w->write(reg);
   uint8_t err = _w->endTransmission(false);
   if (err != 0) {
+    _i2cErr = true;
     _errorCount++;
     if (_debug) Serial.printf("[ToF] I2C r16 Error %d at reg 0x%02X\n", err, reg);
     return 0;
@@ -132,15 +137,17 @@ uint16_t ToFCtrl::r16(uint8_t reg) {
     _errorCount = 0;
     v = ((uint16_t)_w->read() << 8) | _w->read();
   } else {
+    _i2cErr = true;
     _errorCount++;
   }
   return v;
 }
 
 void ToFCtrl::rMulti(uint8_t reg, uint8_t *buf, int len) {
+  if (_i2cErr) return;
   _w->beginTransmission(_addr);
   _w->write(reg);
-  if (_w->endTransmission(false) != 0) return;
+  if (_w->endTransmission(false) != 0) { _i2cErr = true; return; }
   _w->requestFrom((int)_addr, len);
   for (int i = 0; i < len && _w->available(); ++i) {
     buf[i] = _w->read();
@@ -148,35 +155,40 @@ void ToFCtrl::rMulti(uint8_t reg, uint8_t *buf, int len) {
 }
 
 void ToFCtrl::w8(uint8_t reg, uint8_t val) {
+  if (_i2cErr) return;
   _w->beginTransmission(_addr);
   _w->write(reg);
   _w->write(val);
-  _w->endTransmission();
+  if (_w->endTransmission() != 0) _i2cErr = true;
 }
 
 void ToFCtrl::w16(uint8_t reg, uint16_t val) {
+  if (_i2cErr) return;
   _w->beginTransmission(_addr);
   _w->write(reg);
   _w->write((uint8_t)(val >> 8));
   _w->write((uint8_t)val);
-  _w->endTransmission();
+  if (_w->endTransmission() != 0) _i2cErr = true;
 }
 
 void ToFCtrl::wMulti(uint8_t reg, const uint8_t *buf, int len) {
+  if (_i2cErr) return;
   _w->beginTransmission(_addr);
   _w->write(reg);
   for (int i = 0; i < len; ++i) {
     _w->write(buf[i]);
   }
-  _w->endTransmission();
+  if (_w->endTransmission() != 0) _i2cErr = true;
 }
 
 void ToFCtrl::wList(const uint8_t *list) {
+  if (_i2cErr) return;
   uint8_t count = pgm_read_byte(list++);
   while (count--) {
     uint8_t reg = pgm_read_byte(list++);
     uint8_t val = pgm_read_byte(list++);
     w8(reg, val);
+    if (_i2cErr) return;
   }
 }
 
@@ -306,19 +318,30 @@ bool ToFCtrl::getSpadInfo(uint8_t *count, uint8_t *typeIsAperture) {
 
 // --- Hauptinitialisierung ---
 bool ToFCtrl::initSensor(bool longRangeMode) {
+  _i2cErr = false; // Reset error flag before init
+
   // Externe Stromquelle 2.8V aktivieren
   w8(VHV_CONFIG_PAD_SCL_SDA__EXTSUP_HV, (uint8_t)(r8(VHV_CONFIG_PAD_SCL_SDA__EXTSUP_HV) | 0x01));
+  if (_i2cErr) return false; // Early exit on first I2C error
+
   // I2C‑Modus programmieren
   wList(I2CMode);
   _stopVar = r8(0x91);
   wList(I2CMode2);
+  if (_i2cErr) return false;
+
   // MSRC/Pre-Range Limits deaktivieren, Min Count Rate setzen
   w8(REG_MSRC_CONFIG_CONTROL, (uint8_t)(r8(REG_MSRC_CONFIG_CONTROL) | 0x12));
   w16(FINAL_RANGE_CONFIG_MIN_COUNT_RATE_RTN_LIMIT, 32); // 0.25 in Q9.7
   w8(SYSTEM_SEQUENCE_CONFIG, 0xFF);
+  
+  if (_i2cErr) return false;
+
   // SPAD-Konfiguration
   uint8_t spadCount = 0, isAp = 0;
   if (!getSpadInfo(&spadCount, &isAp)) return false;
+  if (_i2cErr) return false;
+
   uint8_t spadMap[6]; rMulti(GLOBAL_CONFIG_SPAD_ENABLES_REF_0, spadMap, 6);
   wList(SPAD);
   uint8_t first = isAp ? 12 : 0;
@@ -333,6 +356,9 @@ bool ToFCtrl::initSensor(bool longRangeMode) {
   wMulti(GLOBAL_CONFIG_SPAD_ENABLES_REF_0, spadMap, 6);
   // Standard-Tuning laden
   wList(DefTuning);
+  
+  if (_i2cErr) return false;
+
   // optional: Long-Range-Modus
   if (longRangeMode) {
     w16(FINAL_RANGE_CONFIG_MIN_COUNT_RATE_RTN_LIMIT, 13);
@@ -343,6 +369,9 @@ bool ToFCtrl::initSensor(bool longRangeMode) {
   w8(SYSTEM_INTERRUPT_CONFIG_GPIO, 0x04);
   w8(GPIO_HV_MUX_ACTIVE_HIGH, (uint8_t)(r8(GPIO_HV_MUX_ACTIVE_HIGH) & ~0x10));
   w8(SYSTEM_INTERRUPT_CLEAR, 0x01);
+  
+  if (_i2cErr) return false;
+
   // Default-Messbudget für bessere Genauigkeit im Nahbereich erhöhen
   // (z. B. 50 ms → weniger Rauschen als Standard)
   // UPDATE: High Accuracy Mode = 200 ms (200000 us)
@@ -355,9 +384,12 @@ bool ToFCtrl::initSensor(bool longRangeMode) {
   w8(SYSTEM_SEQUENCE_CONFIG, 0x02);
   if (!performSingleRefCalibration(0x00)) return false;
   w8(SYSTEM_SEQUENCE_CONFIG, 0xE8);
+  
+  if (_i2cErr) return false;
+
   // Starte kontinuierliche Messung im Hintergrund (Non-Blocking)
   startContinuous();
-  return true;
+  return !_i2cErr;
 }
 
 bool ToFCtrl::performSingleRefCalibration(uint8_t vhv_init_byte) {

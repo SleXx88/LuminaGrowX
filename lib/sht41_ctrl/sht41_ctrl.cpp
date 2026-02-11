@@ -7,8 +7,10 @@ bool SHT41Ctrl::begin(TwoWire& wire, bool doSoftReset) {
   _wire->beginTransmission(_addr);
   uint8_t err = _wire->endTransmission();
   if (err != 0) {
+    _lastError = true;
     return false;
   }
+  _lastError = false;
 
   if (doSoftReset) {
     if (!softReset()) return false;
@@ -29,12 +31,13 @@ bool SHT41Ctrl::softReset() {
 }
 
 bool SHT41Ctrl::read(float& temp_c, float& rh) {
-  if (_wire == nullptr) return false;
+  if (_wire == nullptr) { _lastError = true; return false; }
 
   // Messung "high precision, no heater": 0xFD
   _wire->beginTransmission(_addr);
   _wire->write(0xFD);
   if (_wire->endTransmission() != 0) {
+    _lastError = true;
     return false;
   }
 
@@ -46,6 +49,7 @@ bool SHT41Ctrl::read(float& temp_c, float& rh) {
   uint8_t buf[toRead] = {0};
   uint8_t n = _wire->requestFrom(_addr, toRead);
   if (n != toRead) {
+    _lastError = true;
     return false;
   }
   for (uint8_t i = 0; i < toRead; ++i) {
@@ -53,9 +57,10 @@ bool SHT41Ctrl::read(float& temp_c, float& rh) {
   }
 
   // CRC prüfen (Sensirion CRC-8, poly 0x31, init 0xFF)
-  if (crc8(buf, 2) != buf[2]) return false;
-  if (crc8(buf + 3, 2) != buf[5]) return false;
+  if (crc8(buf, 2) != buf[2]) { _lastError = true; return false; }
+  if (crc8(buf + 3, 2) != buf[5]) { _lastError = true; return false; }
 
+  _lastError = false; // Success
   uint16_t rawT  = (static_cast<uint16_t>(buf[0]) << 8) | buf[1];
   uint16_t rawRH = (static_cast<uint16_t>(buf[3]) << 8) | buf[4];
 

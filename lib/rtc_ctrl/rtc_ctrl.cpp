@@ -10,24 +10,41 @@ RTC_Ctrl::RTC_Ctrl() {}
 bool RTC_Ctrl::begin(TwoWire& w, uint8_t i2cAddr) {
   wire_ = &w;
   addr_ = i2cAddr;
+  _error = false;
   return isConnected();
 }
 
 bool RTC_Ctrl::isConnected() {
+  if (_error && (millis() - _lastErrorMs < 10000)) return false; // 10s Backoff
   wire_->beginTransmission(addr_);
-  return (wire_->endTransmission() == 0);
+  if (wire_->endTransmission() == 0) {
+    _error = false;
+    return true;
+  }
+  _error = true; _lastErrorMs = millis();
+  return false;
 }
 
 /* ===================== DS3231 rohes Lesen/Schreiben (UTC) ===================== */
 // DS3231 Register (ab 0x00): Sekunden, Minuten, Stunden, Wochentag, Datum, Monat, Jahr
 // Wir ignorieren Wochentag, nutzen 24h-Format (Bit6=0).
 bool RTC_Ctrl::readRTC_UTC(DateTime& dt) {
+  if (_error && (millis() - _lastErrorMs < 10000)) return false; // 10s Backoff
+
   wire_->beginTransmission(addr_);
   wire_->write(0x00); // ab Sekunden
-  if (wire_->endTransmission(false) != 0) return false;
+  if (wire_->endTransmission(false) != 0) {
+     _error = true; _lastErrorMs = millis();
+     return false;
+  }
 
   uint8_t n = wire_->requestFrom((int)addr_, 7);
-  if (n != 7) return false;
+  if (n != 7) {
+     _error = true; _lastErrorMs = millis();
+     return false;
+  }
+  
+  _error = false; // Success
 
   uint8_t ss = wire_->read();
   uint8_t mm = wire_->read();

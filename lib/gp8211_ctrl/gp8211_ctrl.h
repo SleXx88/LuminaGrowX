@@ -18,8 +18,12 @@ public:
   // Übergib den bereits initialisierten I²C-Bus
   bool begin(TwoWire& wire = Wire) {
     _wire = &wire;
+    _error = false; // Reset error state on begin
     // 10V Range setzen (Reg 0x01 <- 0x77), danach kurzen Tick warten
-    if (!writeReg1Byte(0x01, 0x77)) return false;
+    if (!writeReg1Byte(0x01, 0x77)) {
+       _error = true; _lastErrorMs = millis();
+       return false;
+    }
     delay(2);
     // kleiner Ping: schreibe 0% (=0V)
     return setPercent(0.0f);
@@ -81,6 +85,9 @@ public:
 
   // Direkter 15-Bit DAC-Code (0..0x7FFF). Achtung: keine Prüfung der Range!
   bool setRaw(uint16_t code15) {
+    // Backoff bei Fehler: Wenn letzter Fehler < 5s her ist, nichts tun
+    if (_error && (millis() - _lastErrorMs < 5000)) return false;
+
     code15 &= 0x7FFF;
     // Daten laut Datasheet 3.3.3:
     // [START] [ADDR W] [0x02] [DATA_L] [DATA_H] [STOP]
@@ -89,7 +96,12 @@ public:
     _wire->write(uint8_t(code15 & 0xFF));       // DATA Low
     _wire->write(uint8_t((code15 >> 8) & 0x7F)); // DATA High (Bit14..8)
     const uint8_t err = _wire->endTransmission();
-    return (err == 0);
+    if (err != 0) {
+       _error = true; _lastErrorMs = millis();
+       return false;
+    }
+    _error = false;
+    return true;
   }
 
   // Optional: 0–5V-Bereich setzen
@@ -101,6 +113,9 @@ private:
   TwoWire* _wire;
   float    minVoltAt1Pct_ = 1.0f; // Default: 1.0V bei 1%
   float    lastPercent_ = 0.0f;
+  
+  bool     _error = false;
+  uint32_t _lastErrorMs = 0;
 
   static float clampVmin_(float v) {
     if (!isfinite(v)) return 1.0f;

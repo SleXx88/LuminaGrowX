@@ -18,10 +18,12 @@ public:
   bool softReset();
 
   uint8_t address() const { return _addr; }
+  bool hasError() const { return _lastError; }
 
 private:
   TwoWire* _wire = nullptr;
   uint8_t  _addr  = 0x44;
+  bool     _lastError = false;
 
   static uint8_t crc8(const uint8_t* data, uint8_t len);
   static float convertTemp(uint16_t raw) {
