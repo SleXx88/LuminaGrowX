@@ -1457,7 +1457,7 @@ void WebCtrl::registerUpdateRoutes_() {
     resp["tar_url"] = "";
     if (!net_ || !net_->isConnected()) { String out; serializeJson(resp, out); req->send(200, "application/json", out); return; }
     // Prefer GitHub latest if configured
-    String ghUrl, latestTag;
+    String ghUrl, latestTag, changelog;
     if (ghLatestTarUrl_(ghUrl, latestTag, changelog)) {
       resp["latest"] = latestTag;
       resp["tar_url"] = ghUrl;
@@ -1591,8 +1591,8 @@ void WebCtrl::updateTaskRun_(bool useRemote, const String& localTarPath) {
   // Resolve TAR URL if remote
   if (useRemote) {
     updatePhase_ = "checking"; updateMsg_ = "resolve latest";
-    String tarUrl, latestTag;
-    if (!ghLatestTarUrl_(tarUrl, latestTag)) {
+    String tarUrl, latestTag, changelog;
+    if (!ghLatestTarUrl_(tarUrl, latestTag, changelog)) {
       // Fallback to manifest
       String manUrl = manifestUrl_();
       if (!manUrl.length()) { updatePhase_ = "error"; updateErr_ = "manifest url not set"; updateJobRunning_ = false; return; }
