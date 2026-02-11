@@ -23,12 +23,17 @@ function Exec($exe, $arguments) {
 
 $root = Split-Path -Parent $PSScriptRoot
 $releaseDir = Join-Path $root 'release'
-$wwwDir = Join-Path $releaseDir 'www'
+$stagingDir = Join-Path $root 'temp_staging'
+$wwwDir = Join-Path $stagingDir 'www'
 
-Write-Host "==> Preparing release folder" -ForegroundColor Cyan
-Remove-Item -Recurse -Force $releaseDir -ErrorAction SilentlyContinue | Out-Null
-New-Item -ItemType Directory -Path $releaseDir | Out-Null
+Write-Host "==> Preparing staging folder" -ForegroundColor Cyan
+Remove-Item -Recurse -Force $stagingDir -ErrorAction SilentlyContinue | Out-Null
+New-Item -ItemType Directory -Path $stagingDir | Out-Null
 New-Item -ItemType Directory -Path $wwwDir | Out-Null
+
+if (!(Test-Path $releaseDir)) {
+  New-Item -ItemType Directory -Path $releaseDir | Out-Null
+}
 
 # Copy Web assets
 $dataDir = Join-Path $root 'data'
@@ -48,7 +53,7 @@ if (-not $NoFirmware) {
   }
   if (Test-Path $fwPath) {
     Write-Host "==> Include firmware.bin" -ForegroundColor Cyan
-    Copy-Item $fwPath (Join-Path $releaseDir 'firmware.bin') -Force
+    Copy-Item $fwPath (Join-Path $stagingDir 'firmware.bin') -Force
     $fwIncluded = $true
   } else {
     Write-Warning "firmware.bin not found; continuing without firmware"
@@ -56,21 +61,21 @@ if (-not $NoFirmware) {
 }
 
 # Create TAR
-$outTar = Join-Path $root $Out
+$outTar = Join-Path $releaseDir 'LuminaGrowX_Update.tar'
 if (Test-Path $outTar) { Remove-Item $outTar -Force }
 
-Write-Host "==> Creating TAR: $Out" -ForegroundColor Cyan
+Write-Host "==> Creating TAR: $outTar" -ForegroundColor Cyan
 $tarCmd = Get-Command tar -ErrorAction SilentlyContinue
 if ($tarCmd) {
   if ($fwIncluded) {
-    & tar -cvf $outTar -C $releaseDir firmware.bin www | Out-Null
+    & tar -cvf $outTar -C $stagingDir firmware.bin www | Out-Null
   } else {
-    & tar -cvf $outTar -C $releaseDir www | Out-Null
+    & tar -cvf $outTar -C $stagingDir www | Out-Null
   }
 } else {
   $seven = Get-Command 7z -ErrorAction SilentlyContinue
   if (-not $seven) { throw "Neither 'tar' nor '7z' found in PATH" }
-  Push-Location $releaseDir
+  Push-Location $stagingDir
   try {
     if ($fwIncluded) {
       & 7z a -ttar $outTar firmware.bin www | Out-Null
@@ -80,7 +85,10 @@ if ($tarCmd) {
   } finally { Pop-Location }
 }
 
+# Cleanup staging
+Remove-Item -Recurse -Force $stagingDir
+
 if (-not (Test-Path $outTar)) { throw "TAR not created: $outTar" }
 $size = (Get-Item $outTar).Length
-Write-Host ("==> Done: {0} ({1:N0} bytes)" -f $Out, $size) -ForegroundColor Green
+Write-Host ("==> Done: LuminaGrowX_Update.tar ({0:N0} bytes)" -f $size) -ForegroundColor Green
 

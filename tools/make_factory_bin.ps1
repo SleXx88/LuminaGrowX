@@ -5,8 +5,8 @@ $ErrorActionPreference = "Stop"
 
 # Pfade
 $pioBuildDir = ".pio\build\esp32-s3-devkitc-1"
-$outDir = "release\factory"
-$outFile = "$outDir\LuminaGrowX_Factory.bin"
+$releaseDir = "release"
+$outFile = "$releaseDir\LuminaGrowX_Factory.bin"
 
 # Python Interpreter von PlatformIO suchen
 $python = "$env:USERPROFILE\.platformio\penv\Scripts\python.exe"
@@ -33,9 +33,9 @@ if (!$frameworkDir) {
 Write-Host "Python: $python" -ForegroundColor Gray
 Write-Host "Esptool: $espTool" -ForegroundColor Gray
 
-# 1. Output Ordner erstellen
-if (!(Test-Path $outDir)) {
-    New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+# 1. Release Ordner sicherstellen
+if (!(Test-Path $releaseDir)) {
+    New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
 }
 
 Write-Host "1. Baue Firmware..." -ForegroundColor Cyan

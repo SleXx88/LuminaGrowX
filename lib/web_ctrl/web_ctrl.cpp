@@ -35,7 +35,7 @@ static const char* NVS_MQTT = "mqtt";
 // GitHub Releases (latest) defaults â€“ fest im Code hinterlegt
 static const char* GH_OWNER = "SleXx88";
 static const char* GH_REPO  = "LuminaGrowX";
-static const char* GH_ASSET = "LuminaGrowX-package.tar";
+static const char* GH_ASSET = "LuminaGrowX_Update.tar";
 static const char* UPDATE_MANIFEST_URL = ""; // leer -> aus NVS lesen
 
 WebCtrl::WebCtrl() : targetDacPct_(0.0f), currentDacPct_(0.0f), lastDacFadeMs_(0) {}
