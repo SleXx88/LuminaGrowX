@@ -84,7 +84,7 @@ private:
   bool loadUpdateCfg_(String& manifestUrl, String& ghOwner, String& ghRepo, String& ghAsset);
   bool saveUpdateCfg_(const String& manifestUrl, const String& ghOwner, const String& ghRepo, const String& ghAsset);
   String manifestUrl_();
-  bool ghLatestTarUrl_(String& outUrl, String& outLatestTag);
+  bool ghLatestTarUrl_(String& outUrl, String& outLatestTag, String& outChangelog);
 
   // FS diagnostics
   String fsInfoJson_();

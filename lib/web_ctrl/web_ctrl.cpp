@@ -1458,9 +1458,10 @@ void WebCtrl::registerUpdateRoutes_() {
     if (!net_ || !net_->isConnected()) { String out; serializeJson(resp, out); req->send(200, "application/json", out); return; }
     // Prefer GitHub latest if configured
     String ghUrl, latestTag;
-    if (ghLatestTarUrl_(ghUrl, latestTag)) {
+    if (ghLatestTarUrl_(ghUrl, latestTag, changelog)) {
       resp["latest"] = latestTag;
       resp["tar_url"] = ghUrl;
+      resp["changelog"] = changelog;
       resp["hasUpdate"] = (latestTag.length() && latestTag != String(FW_VERSION));
       String out; serializeJson(resp, out); req->send(200, "application/json", out); return;
     }
@@ -1628,9 +1629,8 @@ void WebCtrl::updateCheckTaskTrampoline_(void* arg) {
 
 void WebCtrl::updateCheckTaskRun_() {
   // Perform a lightweight "latest" check (GitHub preferred, manifest fallback), update cached fields
-  String latestTag;
-  String url;
-  bool ok = ghLatestTarUrl_(url, latestTag);
+  String latestTag, url, changelog;
+  bool ok = ghLatestTarUrl_(url, latestTag, changelog);
   if (!ok) {
     // Fallback: manifest
     String manUrl = manifestUrl_();
@@ -1851,8 +1851,8 @@ String WebCtrl::manifestUrl_() {
   if (loadUpdateCfg_(u, o, r, a)) return u; return String("");
 }
 
-bool WebCtrl::ghLatestTarUrl_(String& outUrl, String& outLatestTag) {
-  outUrl = ""; outLatestTag = "";
+bool WebCtrl::ghLatestTarUrl_(String& outUrl, String& outLatestTag, String& outChangelog) {
+  outUrl = ""; outLatestTag = ""; outChangelog = "";
   // Wenn eine Manifest-URL fest definiert ist, bevorzugen wir diese nicht; GH hat Vorrang, falls Owner/Repo/Asset vorhanden.
   String man, owner, repo, asset;
   loadUpdateCfg_(man, owner, repo, asset);
@@ -1871,6 +1871,7 @@ bool WebCtrl::ghLatestTarUrl_(String& outUrl, String& outLatestTag) {
     DeserializationError err = deserializeJson(doc, http.getStream());
     if (!err) {
       outLatestTag = String((const char*)doc["tag_name"]);
+      outChangelog = String((const char*)doc["body"]);
       // Construct stable latest-download URL with fixed asset name
       outUrl = String("https://github.com/") + owner + "/" + repo + "/releases/latest/download/" + asset;
     }

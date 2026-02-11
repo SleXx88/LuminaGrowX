@@ -60,7 +60,11 @@
             <div>Neueste Version: <b id="latest">-</b></div>
             <div>Update verfügbar: <b id="updflag">-</b></div>
           </div>
-          <div class="grid" style="grid-template-columns:1fr; gap:.5rem;">
+          <div id="changelog-area" style="display:none; margin-top:1rem;">
+            <small class="dim">Änderungen in dieser Version:</small>
+            <div id="changelog-text" style="background:rgba(255,255,255,0.03); border:1px solid var(--border); padding:.75rem; border-radius:12px; font-size:0.85rem; max-height:200px; overflow:auto; white-space: pre-wrap;"></div>
+          </div>
+          <div class="grid" style="grid-template-columns:1fr; gap:.5rem; margin-top:.5rem;">
             <div>
               <small class="dim">Fortschritt</small>
               <progress id="prog" max="100" value="0"></progress>
@@ -89,6 +93,8 @@
       const btnR = document.getElementById('btnRunRemote');
       const latest = document.getElementById('latest');
       const updflag = document.getElementById('updflag');
+      const changelogArea = document.getElementById('changelog-area');
+      const changelogText = document.getElementById('changelog-text');
       const prog = document.getElementById('prog');
       const progText = document.getElementById('progText');
 
@@ -154,6 +160,14 @@
           latest.textContent = j.latest || '-';
           updflag.textContent = j.hasUpdate ? 'Ja' : 'Nein';
           expectedFw = j.latest || null;
+          
+          if (j.changelog) {
+            changelogText.textContent = j.changelog;
+            changelogArea.style.display = 'block';
+          } else {
+            changelogArea.style.display = 'none';
+          }
+          
           add('Neueste Version: ' + (j.latest||'-') + ', Update verfügbar: ' + (j.hasUpdate?'Ja':'Nein'));
         }).catch(e=> add('Fehler beim Prüfen: ' + e));
       };
