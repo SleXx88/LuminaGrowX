@@ -9,3 +9,6 @@ backup/
 
 # Ignore build files
 .BackUp*
+
+# Ignore duplicate assets in data folder
+data/CHANGELOG.md

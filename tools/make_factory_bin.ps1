@@ -38,6 +38,10 @@ if (!(Test-Path $releaseDir)) {
     New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
 }
 
+# 1.5 CHANGELOG.md nach data/ kopieren (für buildfs)
+Write-Host "Kopiere CHANGELOG.md nach data/..." -ForegroundColor Gray
+Copy-Item "CHANGELOG.md" "data/CHANGELOG.md" -Force
+
 Write-Host "1. Baue Firmware..." -ForegroundColor Cyan
 & "$env:USERPROFILE\.platformio\penv\Scripts\pio.exe" run
 if ($LASTEXITCODE -ne 0) { Write-Error "Build failed"; exit 1 }
