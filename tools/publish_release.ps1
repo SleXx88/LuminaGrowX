@@ -24,12 +24,24 @@ Write-Host "==> Baue Factory-Image (.bin)..." -ForegroundColor Gray
 powershell -ExecutionPolicy Bypass -File tools\make_factory_bin.ps1
 if ($LASTEXITCODE -ne 0) { exit 1 }
 
-# 3. Changelog vorbereiten (nimmt den neuesten Teil der CHANGELOG.md bis zur nÃ¤chsten Version)
-$changelog = "LuminaGrowX LisaPro Stable Release $tag"
+# 3. Changelog vorbereiten
+$changelogFile = "release/notes.md"
+if (!(Test-Path "release")) { New-Item -ItemType Directory "release" | Out-Null }
+
 if (Test-Path "CHANGELOG.md") {
-    # Einfache Extraktion: Alles unter der aktuellen Version bis zur nÃ¤chsten Überschrift
-    # In diesem Fall senden wir einfach die ganze Datei oder einen festen Text
-    $changelog = Get-Content "CHANGELOG.md" -Raw
+    # Wir lesen die Datei explizit als UTF8
+    $content = Get-Content "CHANGELOG.md" -Raw -Encoding UTF8
+    
+    # Optional: Nur den neuesten Block extrahieren (zwischen ## [V...] und dem nächsten ##)
+    if ($content -match "(?s)(## \[$tag\].*?)(?=\r?\n## |$)") {
+        $notes = $matches[1]
+    } else {
+        $notes = $content
+    }
+    # Speichern als UTF8 ohne BOM (für gh CLI am besten)
+    [System.IO.File]::WriteAllLines((Resolve-Path ".").Path + "\$changelogFile", $notes)
+} else {
+    "LuminaGrowX LisaPro Stable Release $tag" | Out-File $changelogFile -Encoding UTF8
 }
 
 # 4. GitHub Release erstellen
@@ -43,8 +55,8 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # Release erstellen und Dateien hochladen
-# -d: Entwurf (Draft), falls du es erst noch checken willst. Entferne -d fÃ¼r direktes Live-gehen.
-& gh release create $tag "release/LuminaGrowX_Update.tar" "release/LuminaGrowX_Factory.bin" --title "LuminaGrowX $tag" --notes "$changelog"
+# Wir nutzen --notes-file statt --notes, um Encoding-Probleme bei der Argument-Übergabe zu vermeiden
+& gh release create $tag "release/LuminaGrowX_Update.tar" "release/LuminaGrowX_Factory.bin" --title "LuminaGrowX $tag" --notes-file $changelogFile
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "`nERFOLG! Release $tag wurde auf GitHub verÃ¶ffentlicht." -ForegroundColor Green
