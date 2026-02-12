@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lisa Pro – Inbetriebnahme</title>
+    <link rel="stylesheet" href="/pico.min.css" />
+    <style>
+      :root {
+        --accent: #ef4444;
+        --accent-2: #dc2626;
+        --bg-main: #080809;
+        --glass: rgba(255, 255, 255, 0.03);
+        --glass-strong: rgba(255, 255, 255, 0.05);
+        --muted: rgba(255, 255, 255, 0.06);
+        --border: rgba(255, 255, 255, 0.1);
+        --text: #e5e7eb;
+        --text-dim: #9ca3af;
+        --ok: #22c55e;
+        --warn: #f59e0b;
+        --err: #ef4444;
+        --radius: 12px;
+        --pico-background-color: var(--bg-main);
+        --pico-card-background-color: var(--glass);
+      }
+      html, body { 
+        height: 100%; 
+        background-color: var(--bg-main);
+      }
+      body {
+        position: relative;
+        color: var(--text);
+      }
+      /* Typography & Layout */
+      h1, h2, h3, h4 { color: #fff; margin-bottom: 0.5rem; }
+      small { color: var(--text-dim); }
+      
+      header.hero {
+        background: var(--glass);
+        border-bottom: 1px solid var(--border);
+        padding: 2rem 1rem;
+        margin-bottom: 2rem;
+        text-align: center;
+      }
+      header.hero h1 { margin: 0; font-weight: 800; letter-spacing: 0.05em; }
+      .brand-pro { color: var(--accent); font-size: 0.6em; vertical-align: super; }
+
+      /* Step Cards */
+      article {
+        background: var(--glass);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        margin-bottom: 1.5rem;
+        padding: 0;
+        overflow: hidden;
+        transition: transform 0.2s, border-color 0.2s;
+      }
+      article:hover {
+        border-color: rgba(255,255,255,0.3);
+      }
+      article > header {
+        background: var(--glass-strong);
+        border-bottom: 1px solid var(--border);
+        padding: 1.5rem 1.5rem; /* Further increased padding for better centering/spacing */
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      article > header h3 { 
+        margin: 0; 
+        font-size: 1.15rem; 
+        line-height: 1.3;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        color: #fff;
+      }
+      .content { padding: 1.25rem; display: grid; gap: 1rem; }
+
+      /* Components */
+      .badge {
+        font-size: 0.75rem; padding: 0.25rem 0.6rem; border-radius: 99px;
+        background: rgba(255,255,255,0.1); border: 1px solid var(--border);
+        font-weight: 600;
+        align-self: center; /* Center badge vertically */
+      }
+      .badge.ok { background: rgba(34, 197, 94, 0.2); border-color: var(--ok); color: var(--ok); }
+      .badge.err { background: rgba(239, 68, 68, 0.2); border-color: var(--err); color: var(--err); }
+      
+      .text-ok { color: var(--ok) !important; }
+      .text-err { color: var(--err) !important; }
+
+      button, .button {
+        background: var(--accent); border: 1px solid var(--accent);
+        color: #fff; border-radius: 6px; font-weight: 600; cursor: pointer;
+        padding: 0.6rem 1rem; transition: all 0.2s;
+      }
+      button:hover { background: var(--accent-2); border-color: var(--accent-2); color: #fff; }
+      
+      button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+      button.primary:hover { background: var(--accent-2); border-color: var(--accent-2); }
+      
+      button.secondary { 
+        background: rgba(239, 68, 68, 0.1); 
+        border-color: var(--accent); 
+        color: var(--accent); 
+      }
+      button.secondary:hover { 
+        background: var(--accent); 
+        color: #fff; 
+      }
+
+      button.success { background: var(--ok); border-color: var(--ok); color: white; }
+      button.success:hover { background: #16a34a; border-color: #16a34a; }
+      
+      button:disabled, button[disabled] {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      
+      input[type="checkbox"] { width: 1.2rem; height: 1.2rem; accent-color: var(--ok); margin-right: 0.5rem; }
+      label { cursor: pointer; display: flex; align-items: center; }
+
+      .btn-row { display: flex; gap: 0.5rem; }
+      .btn-row > * { flex: 1; }
+      
+      .grid-2 { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
+      @media(min-width: 768px) { .grid-2 { grid-template-columns: 1fr 1fr; } }
+
+      /* Instructions */
+      .instruction { 
+        background: rgba(255,255,255,0.03); 
+        padding: 0.75rem; 
+        border-radius: 8px; 
+        border-left: 3px solid var(--accent);
+        font-size: 0.9rem;
+        margin-bottom: 0.5rem;
+      }
+      .step-number {
+        flex-shrink: 0;
+        width: 1.75rem; height: 1.75rem; 
+        background: var(--text); color: #000; border-radius: 50%; 
+        text-align: center; line-height: 1.75rem; font-weight: bold;
+      }
+      
+      /* Checklist Box Style */
+      .checklist-box {
+        background: rgba(0,0,0,0.2); 
+        padding: 1rem; 
+        border-radius: 8px; 
+        display: grid; 
+        gap: 0.5rem; 
+        margin-top: 0.5rem;
+      }
+      .checklist-box strong {
+        display: block;
+        margin-bottom: 0.25rem;
+        font-size: 0.9rem;
+        opacity: 0.9;
+      }
+
+      /* Desktop-Optimierung */
+      @media (min-width: 1024px) {
+        main.container {
+          max-width: 98% !important;
+          width: 98% !important;
+          margin: 1rem auto !important;
+        }
+        html { font-size: 15px; }
+        header.hero { padding: 1rem !important; }
+        header.hero h1 { font-size: 2rem !important; }
+        article > header { padding: 0.75rem 1.25rem !important; }
+        article > header h3 { font-size: 1rem !important; }
+        .instruction { font-size: 0.85rem !important; padding: 0.5rem !important; }
+        button, .button { 
+          font-size: 0.85rem !important; 
+          padding: 0.4rem 0.8rem !important; 
+        }
+        .badge { font-size: 0.7rem !important; padding: 0.15rem 0.5rem !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="hero">
+      <h1>LISA<span class="brand-pro">PRO</span></h1>
+      <p style="opacity: 0.8;">Inbetriebnahme-Assistent</p>
+    </header>
+
+    <main class="container">
+      <p style="text-align: center; margin-bottom: 2rem;">
+        Willkommen! Bitte gehe die folgenden Schritte nacheinander durch, um sicherzustellen, dass Deine Box einwandfrei funktioniert.
+      </p>
+
+      <!-- SCHRITT 1: NAME -->
+      <article>
+        <header>
+          <h3><span class="step-number">1</span> <span>Gerätename</span></h3>
+        </header>
+        <div class="content">
+          <div class="instruction">
+            Gib Deiner LisaPro einen Namen (max. 10 Zeichen, keine Leerzeichen). Dies hilft Dir, mehrere Geräte im Netzwerk zu unterscheiden.
+          </div>
+          <div class="btn-row" style="display: flex; gap: 0.5rem; align-items: stretch;">
+            <input id="deviceName" type="text" maxlength="10" placeholder="z.B. LisaPro-1" style="flex: 1; margin: 0;" />
+            <button id="nameSave" type="button" class="primary" style="margin: 0;">Speichern</button>
+          </div>
+          <div id="nameState" style="text-align: center; font-weight: bold; margin: 0.5rem 0;">Status: -</div>
+          
+          <div class="checklist-box">
+            <strong>Checkliste:</strong>
+            <label><input type="checkbox" id="cb_name" /> Name wurde erfolgreich gespeichert</label>
+          </div>
+        </div>
+      </article>
+
+      <!-- SCHRITT 2: ZEIT -->
+      <article>
+        <header>
+          <h3><span class="step-number">2</span> <span>Systemzeit</span></h3>
+          <span class="badge" id="b_rtc_top">
+            <svg style="width:14px;height:14px;margin-right:4px;vertical-align:text-bottom;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Uhr
+          </span>
+        </header>
+        <div class="content">
+          <div class="instruction">
+            Damit der Tag/Nacht-Rhythmus für Deine Pflanzen stimmt, muss die interne Uhr einmalig gestellt werden.
+          </div>
+          <div class="btn-row">
+            <input id="rtcDt" type="datetime-local" aria-label="Datum und Zeit" />
+            <button id="rtcSet" type="button" class="primary">Zeit speichern</button>
+          </div>
+          <div id="rtcState" style="text-align: center; font-weight: bold; margin: 0.5rem 0;">Status: -</div>
+          
+          <div class="checklist-box">
+            <strong>Checkliste:</strong>
+            <label><input type="checkbox" id="cb_rtc" /> Uhrzeit wurde erfolgreich gespeichert</label>
+          </div>
+        </div>
+      </article>
+
+      <!-- SCHRITT 2: SENSOREN -->
+      <div class="grid-2">
+        <article>
+          <header>
+            <h3><span class="step-number">2</span> <span>Klima Außen</span></h3>
+            <span class="badge" id="b_sht_out">
+              <svg style="width:14px;height:14px;margin-right:4px;vertical-align:text-bottom;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+              Sensor Außen
+            </span>
+          </header>
+          <div class="content">
+            <div class="instruction">Hauche den Sensor (Klemme CH 2B) kurz an. Steigt die Feuchtigkeit oder ändert sich die Temperatur?</div>
+            <div style="text-align: center; font-weight: bold; margin: 0.5rem 0;" id="shtOut">-</div>
+            
+            <div class="checklist-box" style="margin-top: 0;">
+              <strong>Checkliste:</strong>
+              <label><input type="checkbox" id="cb_sht_out" /> Werte sind plausibel</label>
+            </div>
+          </div>
+        </article>
+
+        <article>
+          <header>
+            <h3><span class="step-number">3</span> <span>Klima Innen</span></h3>
+            <span class="badge" id="b_sht_in">
+              <svg style="width:14px;height:14px;margin-right:4px;vertical-align:text-bottom;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/></svg>
+              Sensor Innen
+            </span>
+          </header>
+          <div class="content">
+            <div class="instruction">Hauche den Sensor (Klemme CH 1A) kurz an. Steigt die Feuchtigkeit oder ändert sich die Temperatur?</div>
+            <div style="text-align: center; font-weight: bold; margin: 0.5rem 0;" id="shtIn">-</div>
+            
+            <div class="checklist-box" style="margin-top: 0;">
+              <strong>Checkliste:</strong>
+              <label><input type="checkbox" id="cb_sht" /> Werte sind plausibel</label>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <!-- SCHRITT 4: AKTTOREN (Lüfter & Licht) -->
+      <div class="grid-2">
+        <article>
+          <header>
+            <h3><span class="step-number">4</span> <span>Belüftung</span></h3>
+            <!-- Removed Badge here as requested -->
+          </header>
+          <div class="content">
+            <div class="instruction">Teste alle Lüfter. Lüfter 1 (Klemme FAN1) & 2 (Klemme FAN2) sollten hörbar anlaufen sowie ein fühlbarer Wind aus den Ablüftungskanälen kommen. Lüfter 3 (Klemme LOAD2) spürt man unter der Lampe.</div>
+            
+            <!-- Lüfter 1 -->
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <strong>Lüfter 1</strong>
+              <span class="badge" id="b_fan">
+                <svg style="width:14px;height:14px;margin-right:4px;vertical-align:text-bottom;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12V3"/><path d="M20 12h-8"/><path d="M18.36 5.64 12 12"/><path d="m5.64 18.36 6.36-6.36"/><path d="M5.64 5.64 12 12"/><path d="M12 12 5.64 5.64"/></svg>
+                Lüfter 1
+              </span>
+            </div>
+            <div class="btn-row">
+              <button id="fanOff" type="button" class="primary">Aus</button>
+              <button id="fanOn" type="button" class="secondary">An (Test)</button>
+            </div>
+            <div style="text-align: center;">Drehzahl: <strong id="fanRpm">0</strong> RPM</div>
+            
+            <hr style="opacity: 0.1; margin: 0.5rem 0;">
+            
+            <!-- Lüfter 2 -->
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <strong>Lüfter 2</strong>
+              <span class="badge" id="b_fan2">
+                <svg style="width:14px;height:14px;margin-right:4px;vertical-align:text-bottom;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12V3"/><path d="M20 12h-8"/><path d="M18.36 5.64 12 12"/><path d="m5.64 18.36 6.36-6.36"/><path d="M5.64 5.64 12 12"/><path d="M12 12 5.64 5.64"/></svg>
+                Lüfter 2
+              </span>
+            </div>
+            <div class="btn-row">
+              <button id="fan2Off" type="button" class="primary">Aus</button>
+              <button id="fan2On" type="button" class="secondary">An (Test)</button>
+            </div>
+            <div style="text-align: center;">Drehzahl: <strong id="fan2Rpm">0</strong> RPM</div>
+
+            <hr style="opacity: 0.1; margin: 0.5rem 0;">
+            
+            <!-- Lüfter 3 (LED) -->
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <strong>Lüfter 3 (LED)</strong>
+              <!-- No Tacho Badge for Fan 3 -->
+            </div>
+            <div class="btn-row">
+              <button id="fan3Off" type="button" class="primary">Aus</button>
+              <button id="fan3On" type="button" class="secondary">An (Test)</button>
+            </div>
+            <div style="text-align: center;"><small>(Kein Tacho-Signal)</small></div>
+
+            <div class="checklist-box">
+              <strong>Checkliste:</strong>
+              <label><input type="checkbox" id="cb_fan" /> Lüfter 1 dreht sich</label>
+              <label><input type="checkbox" id="cb_fan2" /> Lüfter 2 dreht sich</label>
+              <label><input type="checkbox" id="cb_fan3" /> Lüfter 3 dreht sich</label>
+            </div>
+          </div>
+        </article>
+
+        <article>
+          <header>
+            <h3><span class="step-number">5</span> <span>Beleuchtung</span></h3>
+            <span class="badge" id="b_dac">
+              <svg style="width:14px;height:14px;margin-right:4px;vertical-align:text-bottom;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+              LED
+            </span>
+          </header>
+          <div class="content">
+            <div class="instruction">
+              Du kannst die LED an Klemme CH 1B testen, indem Du sie probeweise an- und ausschaltest. Vorsicht: Das Licht ist sehr hell!
+            </div>
+            <div class="btn-row">
+              <button id="ledOff" type="button" class="primary">Aus</button>
+              <button id="ledOn" type="button" class="secondary">An (Test)</button>
+            </div>
+            
+            <div class="checklist-box">
+              <strong>Checkliste:</strong>
+              <label><input type="checkbox" id="cb_led" /> LED lässt sich ein- und ausschalten</label>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <!-- SCHRITT 6: ABSTAND (ToF) -->
+      <article>
+        <header>
+          <h3><span class="step-number">6</span> <span>Abstand (ToF)</span></h3>
+          <span class="badge" id="b_tof">
+            <svg style="width:14px;height:14px;margin-right:4px;vertical-align:text-bottom;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+            Sensor
+          </span>
+        </header>
+        <div class="content">
+          <div class="instruction">
+            Der Abstandssensor (Klemme CH 2A) misst die Distanz zur Pflanze. Bitte kalibriere den Sensor wie folgt:
+          </div>
+          
+          <label>
+            <input type="checkbox" id="cb_tof_1" /> 
+            1. Kalibrierwerkzeug (50mm) auf den Sensor setzen.
+          </label>
+          
+          <div style="text-align: center; margin: 0.6rem 0; white-space: nowrap;">
+            Abstand&nbsp;live:&nbsp;<strong id="tofLive">-</strong>&nbsp;mm
+          </div>
+          <div id="tofExisting" style="text-align: center; font-size: 0.85rem; opacity: 0.8; margin-top: -0.5rem; display: none;">
+            Bestehender Offset: <strong id="valTofOffExisting">-</strong> mm
+          </div>
+          
+          <button id="tofCal" type="button" class="primary" style="width: 100%;" disabled>2. Kalibrieren starten</button>
+          <div style="text-align: center; margin-top: -0.25rem;"><small id="tofMsg">–</small></div>
+
+          <label style="margin-top: 0.5rem;">
+            <input type="checkbox" id="cb_tof_2" disabled /> 
+            3. Kalibrierwerkzeug vom Sensor entfernen.
+          </label>
+
+          <div class="checklist-box">
+            <strong>Checkliste:</strong>
+            <label>
+              <input type="checkbox" id="cb_tof" disabled /> 
+              Kalibrierung OK?
+            </label>
+          </div>
+        </div>
+      </article>
+
+      <!-- SCHRITT 7: STEPPER -->
+      <article>
+        <header>
+          <h3><span class="step-number">7</span> <span>Höhenverstellung (LED-Plattform)</span></h3>
+          <span class="badge" id="b_step">
+            <svg style="width:14px;height:14px;margin-right:4px;vertical-align:text-bottom;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M5 10h14"/><path d="M5 14h14"/></svg>
+            Motor
+          </span>
+        </header>
+        <div class="content">
+          <div class="instruction">
+            Hier wird die LED-Plattform kalibriert. Sobald Du "Referenzfahrt starten" drückst, fährt die Plattform zuerst zum oberen Anschlag, dann zum unteren Anschlag und schließlich wieder nach oben in die Nullposition. So ermittelt das System automatisch den gesamten Fahrweg.
+            <br><strong>Hinweis:</strong> Sollte die Fahrt fälschlicherweise nach unten starten, ist wahrscheinlich die Polung des Motors an der Klemme "STEPPER (B2 B1 A1 A2)" vertauscht.
+          </div>
+          
+          <button id="stepHome" type="button" class="primary" style="width: 100%; padding: 1rem;">
+            Referenzfahrt starten (Kalibrierung)
+          </button>
+          <div id="stepExisting" style="text-align: center; font-size: 0.85rem; opacity: 0.8; margin-top: 0.2rem; display: none;">
+            Bestehender Fahrweg: <strong id="valStepMaxExisting">-</strong> mm
+          </div>
+          <div style="text-align: center; margin-top: 0.5rem;">
+            <small id="stepMsg" style="display: block; min-height: 1.2em;">–</small>
+            <div id="calibResult" style="font-size: 0.85rem; margin-top: 0.2rem; display: none;">
+              Physischer Fahrweg: <strong id="valMaxTravel">-</strong> mm
+            </div>
+          </div>
+
+          <hr style="opacity: 0.1;">
+
+          <div class="instruction">
+            Sobald die Referenzfahrt abgeschlossen ist, kannst Du die Plattform in 1-cm-Schritten testweise ab und auf bewegen.
+          </div>
+          <div class="btn-row">
+            <button id="stepDown" type="button" class="primary" disabled>▼ 1 cm Abwärts</button>
+            <button id="stepUp" type="button" class="primary" disabled>▲ 1 cm Aufwärts</button>
+          </div>
+
+          <div class="checklist-box">
+            <strong>Checkliste:</strong>
+            <label><input type="checkbox" id="cb_step_home" /> Plattformkalibrierung OK?</label>
+            <label><input type="checkbox" id="cb_step_down" /> Abwärts-Taste funktioniert?</label>
+            <label><input type="checkbox" id="cb_step_up" /> Aufwärts-Taste funktioniert?</label>
+          </div>
+        </div>
+      </article>
+
+      <!-- SCHRITT 8: ZUSTANDSERKENNUNG -->
+      <article>
+        <header>
+          <h3><span class="step-number">8</span> <span>Zustandserkennung</span></h3>
+        </header>
+        <div class="content">
+          <div class="instruction">Teste die Schalter an Klemme CON1 und Klemme CON2. Die Anzeige sollte reagieren, wenn Du die Tür öffnest oder den Schwimmer bewegst.</div>
+          
+          <div class="grid-2" style="gap: 1rem;">
+            <div>
+              <strong>Wasserpegel-Sensor (Klemme CON1)</strong>
+              <div style="margin: 0.5rem 0; font-size: 1.1em;">Status: <strong id="waterState" style="color: var(--accent);">Unbekannt</strong></div>
+            </div>
+            <div>
+              <strong>Tür-Kontakt (Klemme CON2)</strong>
+              <div style="margin: 0.5rem 0; font-size: 1.1em;">Status: <strong id="doorState" style="color: var(--accent);">Unbekannt</strong></div>
+            </div>
+          </div>
+          
+          <div class="checklist-box">
+            <strong>Checkliste:</strong>
+            <label><input type="checkbox" id="cb_water" /> Wasserpegel-Sensor funktioniert</label>
+            <label><input type="checkbox" id="cb_door" /> Tür-Erkennung funktioniert</label>
+          </div>
+        </div>
+      </article>
+
+      <!-- SCHRITT 9: PUMPE -->
+      <article>
+        <header>
+          <h3><span class="step-number">9</span> <span>Pumpe</span></h3>
+        </header>
+        <div class="content">
+          <div class="instruction">
+             Teste die Pumpe an Klemme LOAD2 ob sie ein oder aus geht. Achte darauf dass die geeignete Spannung 5V oder 12V mit den Jumpern gesteckt ist. Achte auf das Hersetllerdatenblatt der Pumpe.
+          </div>
+          <div class="btn-row">
+            <button id="pumpOff" type="button" class="primary">Aus</button>
+            <button id="pumpOn" type="button" class="secondary">An (Test)</button>
+          </div>
+          <div class="checklist-box">
+            <strong>Checkliste:</strong>
+            <label><input type="checkbox" id="cb_pump" /> Pumpe läuft an</label>
+          </div>
+        </div>
+      </article>
+
+      <!-- SCHRITT 10: WLAN -->
+      <article>
+        <header>
+          <h3><span class="step-number">10</span> <span>WLAN Verbindung</span></h3>
+          <span class="badge" id="b_wifi">
+            <svg style="width:14px;height:14px;margin-right:4px;vertical-align:text-bottom;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13a10 10 0 0 1 14 0"/><path d="M8.5 16.5a5 5 0 0 1 7 0"/><path d="M2 8a15 15 0 0 1 20 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+            WLAN
+          </span>
+        </header>
+        <div class="content">
+          <div class="instruction">
+            Verbinde die Box mit Deinem Heimnetzwerk, damit Zeit-Updates und Fernzugriff funktionieren.
+          </div>
+          
+          <div style="display:flex; gap:0.5rem; flex-wrap: wrap;">
+            <button id="btnScan" type="button" class="secondary" style="flex:1; min-width: 140px;">Netzwerke suchen</button>
+            <select id="wifiSSID" style="flex:2; min-width: 200px; padding: 0.6rem; border-radius: 6px; background: rgba(255,255,255,0.1); color: var(--text); border: 1px solid var(--border);">
+              <option value="" disabled selected>Wähle ein Netzwerk...</option>
+            </select>
+          </div>
+          
+          <div style="position: relative; margin-top: 0.5rem;">
+            <input type="password" id="wifiPass" placeholder="WLAN Passwort" style="width: 100%; padding: 0.6rem; padding-right: 2.5rem; background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--text); border-radius: 6px;" />
+            <button type="button" id="toggleWifiPass" style="position: absolute; right: 2px; top: 2px; bottom: 2px; background: transparent; border: none; color: var(--text-dim); cursor: pointer; font-size: 1.2rem;">👁</button>
+          </div>
+          
+          <div style="margin-top: 1rem;">
+            <label><input type="checkbox" id="cb_static_ip"> Statische IP verwenden</label>
+          </div>
+          
+          <div id="staticIPConfig" style="display:none; padding: 1rem; border-left: 2px solid var(--muted); background: rgba(0,0,0,0.2); margin-top: 0.5rem; border-radius: 0 8px 8px 0;">
+             <div style="display: grid; gap: 0.5rem;">
+               <label>IP Adresse <input type="text" id="ip_addr" placeholder="192.168.1.200" style="width:100%; padding:0.4rem;"></label>
+               <label>Subnetz <input type="text" id="ip_mask" placeholder="255.255.255.0" style="width:100%; padding:0.4rem;"></label>
+               <label>Gateway <input type="text" id="ip_gw" placeholder="192.168.1.1" style="width:100%; padding:0.4rem;"></label>
+               <label>DNS <input type="text" id="ip_dns" placeholder="1.1.1.1" style="width:100%; padding:0.4rem;"></label>
+             </div>
+          </div>
+
+          <button id="btnSaveWifi" type="button" class="primary" style="margin-top: 1rem; width: 100%;">Verbindung speichern</button>
+          <small style="display:block; text-align:center; margin-top:0.5rem; opacity:0.7;">(Einstellungen werden gespeichert, Verbindung erfolgt nach Neustart)</small>
+          
+          <div class="checklist-box">
+            <strong>Checkliste:</strong>
+            <label><input type="checkbox" id="cb_wifi_done" /> WLAN Zugangsdaten gespeichert</label>
+          </div>
+        </div>
+      </article>
+
+      <!-- ABSCHLUSS -->
+      <article style="border-color: var(--ok);">
+        <header style="background: rgba(34, 197, 94, 0.1);">
+          <h3><span class="step-number" style="background: var(--ok); color: white; display:inline-flex; align-items:center; justify-content:center;"><svg style="width:16px;height:16px;stroke-width:3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span> <span>Abschluss</span></h3>
+        </header>
+        <div class="content">
+          <p>
+             Hast Du alle Haken gesetzt? Dann ist Deine LisaPro bereit!
+             Mit dem Klick auf "Fertigstellen" wird das System neu gestartet und der Regelbetrieb beginnt.
+          </p>
+          <div class="btn-row">
+            <button id="btnAbort" type="button" class="secondary" style="display:none;">Zurück</button>
+            <button id="btnDone" type="button" class="success" disabled style="font-weight: 800;">
+              Fertigstellen & Neustart
+            </button>
+          </div>
+        </div>
+      </article>
+      
+      <!-- Hidden module msg for debugging -->
+      <small id="modulesMsg" class="hidden"></small>
+
+    </main>
+
+    <dialog id="toast" class="modal">
+      <article style="margin: 0; min-width: 300px;">
+        <header><strong>Hinweis</strong></header>
+        <div class="content" style="padding: 1rem">
+          <div id="toastMsg">-</div>
+        </div>
+        <footer id="toastFooter" style="padding: 1rem; text-align: right;">
+          <button onclick="document.getElementById('toast').close()" class="primary">OK</button>
+        </footer>
+      </article>
+    </dialog>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      function showToast(msg, hideBtn = false) {
+        $("toastMsg").innerHTML = msg;
+        $("toastFooter").style.display = hideBtn ? "none" : "block";
+        $("toast").showModal();
+      }
+      async function fetchJSON(url, options) {
+        const r = await fetch(
+          url,
+          Object.assign(
+            { headers: { "Content-Type": "application/json" } },
+            options || {}
+          )
+        );
+        if (!r.ok)
+          throw new Error(
+            await r.text().catch(() => r.status + " " + r.statusText)
+          );
+        return await r.json().catch(() => ({}));
+      }
+
+      function setBadge(elId, ok, hint) {
+        const el = $(elId);
+        if (!el) return;
+        el.classList.remove("ok", "err");
+        el.classList.add(ok ? "ok" : "err");
+        // Simplified tooltips
+        el.title = ok ? "OK" : hint || "Prüfung erforderlich";
+      }
+
+      let ws = null, wsTimer = null;
+      let stepHomed = false;
+      let stepHomingActive = false;
+      let stepDownEver = false;
+      let jogPending = false;
+
+      function connectWS() {
+        try {
+          const proto = location.protocol === "https:" ? "wss" : "ws";
+          ws = new WebSocket(proto + "://" + location.host + "/ws");
+          ws.addEventListener("message", (ev) => {
+            try {
+              const j = JSON.parse(ev.data);
+              if (j && j.health && j.health.modules) {
+                const m = j.health.modules;
+                setBadge("b_sht_in", m.sht_in);
+                setBadge("b_sht_out", m.sht_out);
+                setBadge("b_tof", m.tof);
+                setBadge("b_dac", m.dac);
+                setBadge("b_rtc_top", m.rtc);
+                // Fan badge logic moved to refreshStatus (RPM based)
+              }
+            } catch (_) {}
+          });
+          ws.addEventListener("close", () => {
+            ws = null;
+            wsTimer = setTimeout(connectWS, 2000);
+          });
+          ws.addEventListener("error", () => {
+            try { ws && ws.close(); } catch (_) {}
+          });
+        } catch (_) {}
+      }
+
+      // UI Helpers
+      function updateToggleBtns(offId, onId, isOn) {
+        const off = $(offId);
+        const on = $(onId);
+        if (off && on) {
+          if (isOn) {
+            on.classList.add("success"); on.classList.remove("secondary");
+            off.classList.remove("primary"); off.classList.add("secondary");
+          } else {
+            off.classList.add("primary"); off.classList.remove("secondary");
+            on.classList.remove("success"); on.classList.add("secondary");
+          }
+        }
+      }
+
+      function updateFanBadge(id, rpm, on) {
+        const el = $(id);
+        if (!el) return;
+        el.classList.remove("ok", "err");
+        if (on) {
+          if (rpm > 0) el.classList.add("ok");
+          else el.classList.add("err");
+        }
+      }
+
+      function setStepMsg(txt, type) {
+        const el = $("stepMsg");
+        if (!el) return;
+        el.textContent = txt;
+        el.classList.remove("text-ok", "text-err");
+        if (type === "ok") el.classList.add("text-ok");
+        if (type === "err") el.classList.add("text-err");
+      }
+
+      async function refreshStatus() {
+        let rtcOk = false;
+        // Setup specific status
+        try {
+          const st = await fetchJSON("/api/setup/status");
+          rtcOk = !!st.rtc_ok;
+          if (!rtcOk) $("rtcState").textContent = "Fehler: RTC fehlt";
+          
+          if (typeof st.tof_mm !== "undefined") {
+            const v = st.tof_mm;
+            $("tofLive").textContent = v >= 0 ? v : "Fehler";
+          }
+
+          // Show existing ToF offset if any
+          if (st.tof_offset != null) {
+            $("valTofOffExisting").textContent = st.tof_offset;
+            $("tofExisting").style.display = "block";
+          }
+
+          // Show existing Stepper travel if any
+          if (st.stepper && st.stepper.max_travel_mm > 0) {
+            $("valStepMaxExisting").textContent = st.stepper.max_travel_mm.toFixed(1);
+            $("stepExisting").style.display = "block";
+          }
+
+          // Show existing WiFi
+          if (st.wifi_ssid && st.wifi_ssid.length > 0) {
+            const wifiBadge = $("b_wifi");
+            wifiBadge.textContent = "WLAN: " + st.wifi_ssid;
+            wifiBadge.classList.add("ok");
+          }
+          
+          // "Zurück" button logic:
+          const btnBack = $("btnAbort");
+          if (btnBack) {
+             const canGoBack = !!st.initial_setup_done;
+             btnBack.dataset.configured = canGoBack ? "true" : "false";
+             btnBack.style.display = canGoBack ? "block" : "none";
+          }
+        } catch (e) {}
+
+        // Global status (live values)
+        try {
+          const live = await fetchJSON("/api/status");
+          
+          // Name prefill
+          if (live && live.device_name && !$("deviceName").value) {
+            $("deviceName").value = live.device_name;
+          }
+
+          // SHT
+          const tIn = live && live.temp_c, hIn = live && live.humi_rh;
+          const tOut = live && live.temp_out_c, hOut = live && live.humi_out_rh;
+          
+          if ($("shtIn")) {
+            $("shtIn").innerHTML = `<div>${Number.isFinite(tIn) ? tIn.toFixed(1) + "°C" : "-"}</div>` + 
+                                   `<div style="font-size:0.9em; opacity:0.8; font-weight:normal;">${Number.isFinite(hIn) ? hIn.toFixed(0) + "% rH" : "-"}</div>`;
+          }
+          if ($("shtOut")) {
+            $("shtOut").innerHTML = `<div>${Number.isFinite(tOut) ? tOut.toFixed(1) + "°C" : "-"}</div>` + 
+                                    `<div style="font-size:0.9em; opacity:0.8; font-weight:normal;">${Number.isFinite(hOut) ? hOut.toFixed(0) + "% rH" : "-"}</div>`;
+          }
+
+          // Fans
+          // Fan 1
+          const valFan1 = (live && live.fan_rpm !== undefined) ? live.fan_rpm : 0;
+          const fanRpm = parseInt(valFan1) || 0;
+          const fanOn = (live && !!live.fan_on); 
+          
+          updateToggleBtns("fanOff", "fanOn", fanOn);
+          $("fanRpm").textContent = fanRpm;
+          updateFanBadge("b_fan", fanRpm, fanOn);
+          
+          // Fan 2
+          const valFan2 = (live && live.fan2_rpm !== undefined) ? live.fan2_rpm : 0;
+          const fan2Rpm = parseInt(valFan2) || 0;
+          const fan2On = (live && !!live.fan2_on);
+          
+          updateToggleBtns("fan2Off", "fan2On", fan2On);
+          $("fan2Rpm").textContent = fan2Rpm;
+          updateFanBadge("b_fan2", fan2Rpm, fan2On);
+
+          // Fan 3
+          const fan3On = (live && !!live.fan3_on);
+          updateToggleBtns("fan3Off", "fan3On", fan3On);
+
+          // LED
+          updateToggleBtns("ledOff", "ledOn", !!live.light_on);
+
+          // Pump
+          updateToggleBtns("pumpOff", "pumpOn", !!live.pump_on);
+
+          // RTC Prefill if empty
+          if (live && live.ntp_time) {
+             if (rtcOk) $("rtcState").textContent = live.ntp_time;
+             if (!$("rtcDt").value) {
+                const m = live.ntp_time.match(/(\d{1,2})[\.\-](\d{1,2})[\.\-](\d{2,4})\s+(\d{1,2})[\:\-](\d{1,2})[\:\-](\d{1,2})/);
+                if (m) {
+                  let y = Number(m[3]); if(y<100) y+=2000;
+                  const iso = y+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[1]).padStart(2,'0')+'T'+String(m[4]).padStart(2,'0')+':'+String(m[5]).padStart(2,'0');
+                  $("rtcDt").value = iso;
+                }
+             }
+          }
+        } catch (e) {}
+      }
+
+      function fmtDT(dt) {
+        const dd = String(dt.getDate()).padStart(2, "0");
+        const mm = String(dt.getMonth() + 1).padStart(2, "0");
+        const yyyy = dt.getFullYear();
+        const HH = String(dt.getHours()).padStart(2, "0");
+        const MM = String(dt.getMinutes()).padStart(2, "0");
+        const SS = String(dt.getSeconds()).padStart(2, "0");
+        return `${dd}-${mm}-${yyyy} ${HH}-${MM}-${SS}`;
+      }
+
+      // --- EVENT LISTENERS ---
+
+      // 1. NAME
+      $("nameSave").addEventListener("click", async () => {
+        const name = $("deviceName").value.trim();
+        if (!name) return showToast("Bitte einen Namen eingeben");
+        if (name.includes(" ")) return showToast("Der Name darf keine Leerzeichen enthalten");
+        
+        try {
+          const r = await fetchJSON("/api/app", { method: "POST", body: JSON.stringify({ name }) });
+          if (r.ok) { 
+            $("cb_name").checked = true; 
+            $("nameState").textContent = "Status: Gespeichert (" + name + ")";
+            $("nameState").classList.add("text-ok");
+            showToast("Gerätename gespeichert"); 
+          } 
+          else showToast("Fehler beim Speichern");
+          updateDoneEnabled();
+        } catch (e) { showToast("Fehler: " + e.message); }
+      });
+
+      // 2. RTC
+      $("rtcSet").addEventListener("click", async () => {
+        const v = $("rtcDt").value;
+        if (!v) return showToast("Bitte Datum wählen");
+        try {
+          const r = await fetchJSON("/api/rtc/set", { method: "POST", body: JSON.stringify({ time: fmtDT(new Date(v)) }) });
+          if (r.ok) { $("cb_rtc").checked = true; showToast("Zeit gespeichert"); } 
+          else showToast("Fehler beim Speichern");
+          updateDoneEnabled();
+        } catch (e) { showToast("Fehler: " + e.message); }
+      });
+
+      // 4. Fans & 5. LED & 9. Pump
+      const simpleToggle = (id, api, on) => $(id).addEventListener("click", () => 
+        fetch(api, { method: "POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({on}) })
+      );
+      simpleToggle("fanOff", "/api/fan", false);
+      simpleToggle("fanOn", "/api/fan", true);
+      simpleToggle("fan2Off", "/api/fan2", false);
+      simpleToggle("fan2On", "/api/fan2", true);
+      simpleToggle("fan3Off", "/api/fan3", false);
+      simpleToggle("fan3On", "/api/fan3", true);
+      simpleToggle("ledOff", "/api/dac", false);
+      simpleToggle("ledOn", "/api/dac", true);
+      simpleToggle("pumpOff", "/api/pump", false);
+      simpleToggle("pumpOn", "/api/pump", true);
+
+      // 6. Stepper
+      $("stepHome").addEventListener("click", async () => {
+        const btn = $("stepHome");
+        btn.disabled = true; 
+        btn.classList.add("success"); btn.classList.remove("primary");
+        btn.textContent = "Fährt nach oben...";
+        
+        stepHomed = false; stepDownEver = false; stepHomingActive = true;
+        try {
+          const r = await fetchJSON("/api/stepper/home", { method: "POST" });
+          if (r.ok) setStepMsg("Kalibrierung läuft...", "");
+          else setStepMsg("Fehler beim Starten", "err");
+        } catch (e) {
+          setStepMsg("Info: " + e.message, "");
+        }
+      });
+
+      $("stepUp").addEventListener("click", async () => {
+        const b = $("stepUp");
+        b.textContent="Fährt..."; b.classList.add("success"); b.dataset.moving="up"; b.disabled=true;
+        jogPending = true;
+        try {
+          await fetchJSON("/api/stepper/jog", { method: "POST", body: JSON.stringify({ dir: "up", mm: 10 }) });
+          setStepMsg("Fährt hoch...", "");
+        } catch (e) {
+          setStepMsg("Fehler: " + e.message, "err");
+          b.textContent="▲ 1 cm Aufwärts"; b.classList.remove("success"); delete b.dataset.moving; b.disabled=false;
+        } finally {
+          setTimeout(() => { jogPending = false; }, 400);
+        }
+      });
+
+      $("stepDown").addEventListener("click", async () => {
+        const b = $("stepDown");
+        b.textContent="Fährt..."; b.classList.add("success"); b.dataset.moving="down"; b.disabled=true;
+        jogPending = true;
+        try {
+          await fetchJSON("/api/stepper/jog", { method: "POST", body: JSON.stringify({ dir: "down", mm: 10 }) });
+          setStepMsg("Fährt runter...", "");
+        } catch (e) {
+          setStepMsg("Fehler: " + e.message, "err");
+          b.textContent="▼ 1 cm Abwärts"; b.classList.remove("success"); delete b.dataset.moving; b.disabled=false;
+        } finally {
+          setTimeout(() => { jogPending = false; }, 400);
+        }
+      });
+
+      async function pollStepper() {
+        try {
+          const s = await fetchJSON("/api/stepper/status");
+          if (s && s.ok) {
+            const bad = !!s.diag;
+            const uartOk = !!s.uart_ok;
+            setBadge("b_step", !bad && uartOk, bad ? "Motor klemmt (DIAG)" : (uartOk ? "OK" : "Kabel prüfen"));
+
+            const btnH = $("stepHome");
+            if (!uartOk) {
+               // UART Error State
+               btnH.disabled = true;
+               btnH.classList.remove("primary", "success");
+               btnH.style.borderColor = "var(--err)";
+               btnH.style.color = "var(--err)";
+               btnH.textContent = "Fehler: Keine Verbindung zum Controller";
+               setStepMsg("TMC2209 nicht gefunden. Kabel/Strom prüfen!", "err");
+               // Disable jog buttons too
+               $("stepUp").disabled = true;
+               $("stepDown").disabled = true;
+               return; 
+            } else {
+               // UART OK - restore style if not currently homing/moving
+               if (btnH.textContent.startsWith("Fehler")) {
+                  btnH.style.borderColor = "";
+                  btnH.style.color = "";
+                  btnH.classList.add("primary");
+                  btnH.textContent = "Referenzfahrt starten (Kalibrierung)";
+                  btnH.disabled = false;
+                  setStepMsg("-", "");
+               }
+            }
+
+            if (s.homing && !stepHomingActive) {
+              stepHomingActive = true; stepHomed = false; stepDownEver = false;
+            }
+
+            if (stepHomingActive) {
+               const btnH = $("stepHome");
+               btnH.disabled = true;
+               btnH.classList.add("success"); btnH.classList.remove("primary");
+               
+               // Calibration stages:
+               // 1. Up to top (pos approaches 0 from unknown)
+               // 2. Down to bottom (pos increases)
+               // 3. Up to top (pos approaches 0)
+               if (s.pos_mm > 0.5) {
+                  // If we are significantly away from 0 and moving, we are likely in stage 2 or 3
+                  // We can't know stage 2 vs 3 easily without tracking direction, 
+                  // but we can at least show movement.
+                  if (s.moving) {
+                      // Note: pos_mm is 0 at the top.
+                      // Stage 2 (down): pos increases. Stage 3 (up): pos decreases to 0.
+                      // Since we don't have the direction here, we use a general "Kalibrierung läuft..."
+                      // unless we want to keep track of prev pos.
+                      btnH.textContent = "Kalibrierung läuft...";
+                  }
+               } else {
+                  btnH.textContent = "Fährt nach oben...";
+               }
+            }
+
+            if (stepHomingActive && !s.homing && s.lastDone) {
+              stepHomingActive = false; stepHomed = true;
+              // Reset Home Button
+              const btnH = $("stepHome");
+              btnH.classList.add("primary"); btnH.classList.remove("success");
+              btnH.textContent = "Referenzfahrt wiederholen";
+              btnH.disabled = false;
+              setStepMsg("Kalibrierung OK", "ok");
+              
+              if (s.max_travel_mm) {
+                  $("valMaxTravel").textContent = s.max_travel_mm.toFixed(1);
+                  $("calibResult").style.display = "block";
+              }
+            }
+
+            // Jog Logic
+            const canJog = stepHomed && s.lastDone && !s.homing && !s.moving;
+            const btnUp = $("stepUp");
+            const btnDown = $("stepDown");
+
+            if (btnUp) {
+               if (!btnUp.dataset.moving) {
+                   btnUp.disabled = !canJog || !stepDownEver;
+                   if (!s.moving) btnUp.classList.add("primary");
+               }
+               if (!s.moving && btnUp.dataset.moving && !jogPending) {
+                  btnUp.textContent = "▲ 1 cm Aufwärts";
+                  btnUp.classList.remove("success");
+                  btnUp.classList.add("primary");
+                  delete btnUp.dataset.moving;
+                  setStepMsg("OK", "ok");
+               }
+            }
+            if (btnDown) {
+               if (!btnDown.dataset.moving) {
+                   btnDown.disabled = !canJog;
+                   if (!s.moving) btnDown.classList.add("primary");
+               }
+               if (!s.moving && btnDown.dataset.moving && !jogPending) {
+                  btnDown.textContent = "▼ 1 cm Abwärts";
+                  btnDown.classList.remove("success");
+                  btnDown.classList.add("primary");
+                  if (btnDown.dataset.moving === "down") stepDownEver = true;
+                  delete btnDown.dataset.moving;
+                  setStepMsg("OK", "ok");
+               }
+            }
+            
+            // Always show max travel if it's already calibrated (e.g. on page refresh)
+            if (s.max_travel_mm && !stepHomingActive) {
+                $("valMaxTravel").textContent = s.max_travel_mm.toFixed(1);
+                $("calibResult").style.display = "block";
+            }
+          }
+        } catch (_) {}
+      }
+
+      // 7. ToF & Door
+      $("cb_tof_1").addEventListener("change", (e) => {
+        $("tofCal").disabled = !e.target.checked;
+      });
+
+      $("tofCal").addEventListener("click", async () => {
+        try {
+          const r = await fetchJSON("/api/tof/calibrate", { method: "POST", body: "{}" });
+          if (r.ok) {
+             $("tofMsg").textContent = "OK (Erkannt: " + r.measured + "mm)";
+             $("cb_tof_2").disabled = false;
+          } else {
+             $("tofMsg").textContent = "Fehler (Sensor verdeckt?)";
+          }
+        } catch (e) { $("tofMsg").textContent = "Fehler"; }
+      });
+
+      $("cb_tof_2").addEventListener("change", (e) => {
+        $("cb_tof").disabled = !e.target.checked;
+      });
+
+      async function pollDoor() {
+        try {
+          const d = await fetchJSON("/api/door/status");
+          
+          const ds = $("doorState");
+          ds.textContent = d.door_closed ? "Geschlossen" : "Offen";
+          ds.style.color = d.door_closed ? "var(--ok)" : "var(--accent)";
+
+          const ws = $("waterState");
+          ws.textContent = d.water_closed ? "Geschlossen (OK)" : "Offen (Alarm)";
+          ws.style.color = d.water_closed ? "var(--ok)" : "var(--accent)";
+        } catch (_) {}
+      }
+
+      // 8. Wi-Fi
+      $("cb_static_ip").addEventListener("change", (e) => {
+        $("staticIPConfig").style.display = e.target.checked ? "block" : "none";
+      });
+      
+      $("toggleWifiPass").addEventListener("click", () => {
+        const inp = $("wifiPass");
+        if (inp.type === "password") {
+          inp.type = "text";
+          $("toggleWifiPass").style.color = "var(--ok)";
+        } else {
+          inp.type = "password";
+          $("toggleWifiPass").style.color = "var(--text-dim)";
+        }
+      });
+
+      $("btnScan").addEventListener("click", async () => {
+        const btn = $("btnScan");
+        const sel = $("wifiSSID");
+        btn.disabled = true; btn.textContent = "Suche...";
+        sel.innerHTML = '<option disabled selected>Suche läuft...</option>';
+        try {
+          // Poll for results (handling async scan)
+          let nets = null;
+          for (let i = 0; i < 20; i++) {
+             const r = await fetch("/api/wifi/scan");
+             if (r.status === 200) {
+               nets = await r.json();
+               break;
+             } else if (r.status === 202) {
+               await new Promise(res => setTimeout(res, 1000));
+               continue;
+             } else {
+               throw new Error("Scan Status: " + r.status);
+             }
+          }
+          if (!nets) throw new Error("Zeitüberschreitung beim Scan");
+
+          sel.innerHTML = '<option value="" disabled selected>Netzwerk wählen...</option>';
+          if (Array.isArray(nets)) {
+            // Sort by signal strength
+            nets.sort((a,b) => b.rssi - a.rssi);
+            // Deduplicate by SSID
+            const seen = new Set();
+            nets.forEach(n => {
+              if (n.ssid && !seen.has(n.ssid)) {
+                seen.add(n.ssid);
+                const opt = document.createElement("option");
+                opt.value = n.ssid;
+                opt.textContent = `${n.ssid} (${n.rssi}dBm) ${n.secure?"🔒":""}`;
+                sel.appendChild(opt);
+              }
+            });
+            if (seen.size === 0) {
+               const opt = document.createElement("option");
+               opt.text = "Keine Netzwerke gefunden";
+               sel.appendChild(opt);
+            }
+          }
+        } catch (e) {
+          sel.innerHTML = '<option disabled>Fehler bei Suche</option>';
+          showToast("Scan Fehler: " + e.message);
+        } finally {
+          btn.disabled = false; btn.textContent = "Netzwerke suchen";
+        }
+      });
+
+      $("btnSaveWifi").addEventListener("click", async () => {
+        const ssid = $("wifiSSID").value;
+        const pass = $("wifiPass").value;
+        const useStatic = $("cb_static_ip").checked;
+        
+        if (!ssid) return showToast("Bitte ein Netzwerk auswählen");
+        
+        const payload = {
+          ssid: ssid,
+          pass: pass,
+          use_static: useStatic,
+          static: {},
+          reboot: false, // Erst am Ende
+          connect_now: false // Nicht sofort verbinden, nur speichern
+        };
+        
+        if (useStatic) {
+          payload.static = {
+            ip: $("ip_addr").value,
+            mask: $("ip_mask").value,
+            gw: $("ip_gw").value,
+            dns: $("ip_dns").value
+          };
+        }
+
+        const btn = $("btnSaveWifi");
+        btn.disabled = true; btn.textContent = "Speichere...";
+        
+        try {
+          const r = await fetch("/api/network", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+          if (r.ok) {
+            $("cb_wifi_done").checked = true;
+            updateDoneEnabled();
+            btn.classList.add("success");
+            btn.textContent = "Gespeichert ✓";
+          } else {
+            showToast("Fehler beim Speichern");
+            btn.textContent = "Verbindung speichern";
+          }
+        } catch (e) {
+          showToast("Fehler: " + e.message);
+          btn.textContent = "Verbindung speichern";
+        } finally {
+          btn.disabled = false;
+        }
+      });
+
+      // Global Check
+      function updateDoneEnabled() {
+        const need = [
+          "cb_name", "cb_rtc", "cb_sht", "cb_sht_out", "cb_fan", "cb_fan2", "cb_fan3",
+          "cb_led", "cb_step_home", "cb_step_down", "cb_step_up", 
+          "cb_tof_1", "cb_tof_2", "cb_tof", "cb_door", "cb_water", "cb_pump", "cb_wifi_done"
+        ];
+        const all = need.every((id) => $(id) && $(id).checked);
+        $("btnDone").disabled = !all;
+      }
+      // Add Listeners to all checkboxes
+      document.querySelectorAll('input[type="checkbox"]').forEach(el => el.addEventListener("change", updateDoneEnabled));
+
+      // Finish
+      $("btnDone").addEventListener("click", async () => {
+        try {
+          const r = await fetch("/api/setup/done", { method: "POST" });
+          if (r.ok) {
+            const host = "luminagrowx.local";
+            showToast(
+              `<strong>Einrichtung abgeschlossen!</strong><br><br>` +
+              `Das System startet jetzt neu und verbindet sich mit Deinem WLAN.<br><br>` +
+              `Du wirst normalerweise automatisch weitergeleitet. Falls nicht, klicke hier:<br>` +
+              `<a href="http://${host}" style="color:var(--ok); font-weight:bold; text-decoration:underline;">http://${host}</a>`,
+              true
+            );
+            setTimeout(() => {
+               window.location.href = `http://${host}`;
+            }, 8000);
+          } else showToast("Fehler beim Abschließen");
+        } catch (e) { showToast("Fehler: " + e.message); }
+      });
+
+      $("btnAbort").addEventListener("click", async () => {
+        const btn = $("btnAbort");
+        const isConfigured = btn.dataset.configured === "true";
+        
+        if (isConfigured) {
+           // Behavior: Back to Settings (Abort re-setup)
+           try {
+             await fetch("/api/setup/done?reboot=false", { method: "POST" });
+             window.location.href = "/settings";
+           } catch(e) {
+             showToast("Fehler: " + e.message);
+           }
+        } else {
+           // Fallback / Old behavior (Just stay on page, pause setup)
+           // Should technically not be reachable if button is hidden
+           fetch("/api/setup/abort", { method: "POST" });
+           showToast("Einrichtung pausiert.");
+        }
+      });
+
+      connectWS();
+      refreshStatus();
+      setInterval(refreshStatus, 1000);
+      setInterval(pollDoor, 800);
+      setInterval(pollStepper, 300); // Fast poll for stepper
+      updateDoneEnabled();
+    </script>
+  </body>
+</html>
