@@ -122,7 +122,7 @@ void MqttCtrl::publishDiscovery_(const char* component, const char* objectId, co
     doc["stat_t"] = getBaseTopic_() + "/state";
     
     if (strcmp(component, "binary_sensor") == 0) {
-        doc["val_tpl"] = "{{ 'ON' if value_json." + String(objectId) + " else 'OFF' }}";
+        doc["val_tpl"] = "{{ 'ON' if value_json." + String(objectId) + " == true else 'OFF' }}";
     } else {
         doc["val_tpl"] = "{{ value_json." + String(objectId) + " }}";
     }
@@ -188,6 +188,7 @@ void MqttCtrl::sendDiscovery() {
 
     // System Diagnostic
     publishDiscovery_("sensor", "health.state", "System Status", nullptr, nullptr, nullptr, "mdi:heart-pulse");
+    publishDiscovery_("sensor", "esp_temp", "Chip Temperatur", "°C", "temperature", "measurement", "mdi:cpu-64-bit");
     publishDiscovery_("sensor", "rssi", "WLAN Signal", "dBm", "signal_strength", "measurement");
     publishDiscovery_("sensor", "uptime_s", "Laufzeit", "s", "duration", "total_increasing");
     publishDiscovery_("sensor", "ip", "IP Adresse", nullptr, nullptr, nullptr, "mdi:ip-network");

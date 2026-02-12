@@ -226,6 +226,10 @@
                 <div class="tech-val mono" id="valUptime">-</div>
               </div>
               <div class="tech-card">
+                <div class="tech-label">Chip Temperatur (ESP32)</div>
+                <div class="tech-val mono" id="valEspTemp">- °C</div>
+              </div>
+              <div class="tech-card">
                 <div class="tech-label">Firmware Version</div>
                 <div class="tech-val mono" id="valFw">-</div>
               </div>
@@ -290,6 +294,7 @@
         $("valSsid").textContent = s.ssid || (s.wifi_connected ? "Verbunden" : "Nicht verbunden");
         $("valRssi").textContent = (s.rssi != null ? s.rssi : "-") + " dBm";
         $("valUptime").textContent = formatUptime(s.uptime_s || s.uptime);
+        $("valEspTemp").textContent = (s.esp_temp != null ? s.esp_temp.toFixed(1) : "-") + " °C";
         $("valFw").textContent = s.fw || "-";
         $("valBuild").textContent = s.build || "-";
 

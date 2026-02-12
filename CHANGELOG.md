@@ -2,6 +2,25 @@
 
 Alle wichtigen Änderungen und Features der automatisierten Growbox-Steuerung.
 
+## [V1.0.2] - 2026-02-12
+### System-Monitoring & Update-Fixes
+
+Dieses Release behebt Probleme beim Update-Vorgang und erweitert das System-Monitoring um interne Chip-Diagnosen.
+
+#### 🔧 Update-System & Stabilität
+*   **Update-UI Refresh Fix:** Die Update-Seite erkennt nun zuverlässig den Neustart des Geräts (via Uptime-Check), auch wenn die Firmware-Version nach einem fehlerhaften Flash-Versuch gleich geblieben ist.
+*   **Log-Filterung:** Doppelte Einträge im Update-Log ("Spam") werden nun unterdrückt.
+*   **Robustes Firmware-Handling:** Der Update-Prozess im Backend prüft nun strikt die Integrität der geschriebenen Daten (`Update.end()` Prüfung).
+*   **Build-Automation:** Das Skript `make_tar.ps1` erzwingt nun immer einen Neu-Build der Firmware, um sicherzustellen, dass Versionsänderungen garantiert im Paket landen.
+
+#### 📊 Monitoring & MQTT
+*   **Interne Chip-Temperatur:** Integration des internen ESP32-S3 Temperatursensors zur Überwachung der System-Gesundheit.
+*   **Info-Seite:** Anzeige der Chip-Temperatur auf der `/info` Seite hinzugefügt.
+*   **MQTT-Fix:** Der Binär-Sensor für verfügbare Updates in Home Assistant (`update_verfugbar`) wurde repariert und zeigt nun korrekt den Status an.
+*   **MQTT-Erweiterung:** Neuer Sensor für die Chip-Temperatur via MQTT hinzugefügt.
+
+---
+
 ## [V1.0.1] - 2026-02-12
 ### Web-UI Redesign & Stabilitäts-Updates
 

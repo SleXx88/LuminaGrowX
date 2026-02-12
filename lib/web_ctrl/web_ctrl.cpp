@@ -7,6 +7,7 @@
 #include <WiFiClientSecure.h>
 #include <Update.h>
 #include <Preferences.h>
+#include "driver/temp_sensor.h"
 #include "../../include/version.h"
 #include "../../include/lumina_config.h"
 #include "../../include/setup_flag.h"
@@ -322,11 +323,15 @@ void WebCtrl::begin(plant_ctrl::PlantCtrl* ctrl, RTC_Ctrl* rtc, NetCtrl* net) {
       mqtt_->begin(mqtt_cfg_, app_.name);
   }
 
-  // Initialen Grow/Drying-Status an PlantCtrl weiterleiten
   if (ctrl_) {
     ctrl_->setGrowActive(grow_.started);
     ctrl_->setDryingMode(drying_.active);
   }
+
+  // Internen Temp-Sensor initialisieren
+  temp_sensor_config_t temp_sensor = TSENS_CONFIG_DEFAULT();
+  temp_sensor_init(&temp_sensor);
+  temp_sensor_start();
 
   ws_.onEvent([this](AsyncWebSocket* wss, AsyncWebSocketClient* c, AwsEventType t, void* arg, uint8_t* data, size_t len) {
     if (t == WS_EVT_CONNECT) { c->text(makeStatusJson_()); }
@@ -1330,6 +1335,11 @@ String WebCtrl::makeStatusJson_() {
   doc["build"] = String(__DATE__) + String(" ") + String(__TIME__);
   doc["ts"] = (uint64_t)millis();
 
+  // Interne Chip-Temperatur
+  float chipTemp = NAN;
+  temp_sensor_read_celsius(&chipTemp);
+  doc["esp_temp"] = isnan(chipTemp) ? 0.0f : (float)roundf(chipTemp * 10.0f) / 10.0f;
+
   // Append last known update info (from background daily check)
   JsonObject upd = doc["update"].to<JsonObject>();
   upd["has_update"] = latestKnownHasUpdate_;
@@ -1380,6 +1390,10 @@ String WebCtrl::makeInfoJson_() {
   ntf["phone"] = notify_.phone;
   ntf["apikey"] = notify_.apikey; // Klartext, nur bei /api/info
   
+  float chipTemp = NAN;
+  temp_sensor_read_celsius(&chipTemp);
+  doc["esp_temp"] = isnan(chipTemp) ? 0.0f : (float)roundf(chipTemp * 10.0f) / 10.0f;
+
   doc["tof_offset"] = tof_cfg_.offset_mm;
   
   String out; serializeJson(doc, out); return out;
