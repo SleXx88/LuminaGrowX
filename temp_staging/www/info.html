@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lisa Pro - Info</title>
+    <link rel="stylesheet" href="/pico.min.css" />
+    <style>
+      :root {
+        --accent: #ef4444;
+        --accent-2: #dc2626;
+        --glass: rgba(20, 20, 22, 0.42);
+        --glass-strong: rgba(20, 20, 22, 0.62);
+        --muted: rgba(255, 255, 255, 0.06);
+        --border: rgba(255, 255, 255, 0.18);
+        --text: #e5e7eb;
+        --text-dim: #cbd5e1;
+        --ok: #22c55e;
+        --warn: #f59e0b;
+        --err: #ef4444;
+        --radius: 18px;
+        --pico-background-color: transparent;
+        --pico-card-background-color: transparent;
+      }
+      html, body { height: 100%; }
+      body {
+        position: relative;
+        color: var(--text);
+        background: transparent;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background: #0b0b0c;
+        z-index: -1;
+      }
+      header.hero, article, footer.site {
+        background: var(--glass);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        backdrop-filter: blur(3px);
+      }
+      article > header {
+        background: var(--glass-strong);
+        border-bottom: 1px solid var(--border);
+        border-radius: var(--radius) var(--radius) 0 0;
+        padding: 0.75rem 1rem;
+      }
+      a, h1, h2, h3 { color: var(--text); }
+      .mono { font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+      .grid { gap: 1rem; }
+      header.hero h1.brand {
+        font-size: clamp(2.2rem, 6vw, 3.3rem);
+        letter-spacing: 0.04em;
+        margin: 0.25rem 0 0;
+        position: relative;
+        display: inline-flex;
+        align-items: flex-start;
+        gap: 0.25rem;
+      }
+      .brand-word { color: #ffffff; font-weight: 800; }
+      .brand-pro { color: var(--accent); font-weight: 800; font-size: 0.55em; line-height: 1; vertical-align: super; position: relative; top: -0.25em; }
+      header.hero p.subtitle { margin: 0.25rem 0 0; opacity: 0.85; color: var(--text-dim); }
+      button, [role="button"], .button { 
+        background: rgba(20, 20, 22, 0.42); 
+        color: var(--text); 
+        border: 1px solid var(--border); 
+        font-weight: 700; 
+        padding: 0.55rem 0.9rem; 
+        border-radius: var(--radius) !important;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .dot { width: 0.55rem; height: 0.55rem; border-radius: 50%; background: #9ca3af; display: inline-block; }
+      .dot.ok { background: var(--ok); }
+      .dot.warn { background: var(--warn); }
+      .dot.err { background: var(--err); }
+      .tech-card {
+        padding: 0.75rem;
+        background: var(--muted);
+        border: 1px solid var(--border);
+        border-radius: calc(var(--radius) * 0.7);
+        display: grid;
+        gap: 0.4rem;
+      }
+      .tech-label { font-size: 0.7rem; color: var(--text-dim); }
+      .tech-val { font-size: 1rem; font-weight: 600; color: var(--text); }
+      .section-title {
+        font-size: 0.75rem; 
+        font-weight: 600; 
+        color: var(--accent); 
+        margin-bottom: 0.4rem; 
+        display: flex; 
+        align-items: center; 
+        gap: 0.3rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      /* Desktop-Optimierung */
+      @media (min-width: 1024px) {
+        main.container {
+          max-width: 98% !important;
+          width: 98% !important;
+          margin: 1rem auto !important;
+        }
+        html { font-size: 15px; }
+        header.hero h1.brand { font-size: 2.2rem !important; }
+        h2 { font-size: 1.25rem !important; }
+        .tech-card { padding: 0.4rem !important; }
+        .tech-val { font-size: 0.9rem !important; }
+        .tech-label { font-size: 0.65rem !important; }
+        button, [role="button"], .button { 
+          font-size: 0.85rem !important; 
+          padding: 0.4rem 0.8rem !important; 
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="container" style="margin-top: 1rem; flex: 1; display: flex; flex-direction: column; gap: 1rem;">
+      <header class="hero" style="display: flex; flex-direction: column; align-items: center; text-align: center; padding: 1.5rem 1rem;">
+        <h1 class="brand" style="margin: 0;"><span class="brand-word">LISA</span><span class="brand-pro">PRO</span></h1>
+        <p class="subtitle" style="margin: 0;">Automatisierte Growbox</p>
+      </header>
+
+      <article style="margin: 0;">
+        <header><h2>System-Status</h2></header>
+        <div class="content" style="padding: 1rem; display: grid; gap: 1.5rem;">
+          
+          <!-- Sensoren -->
+          <div>
+            <div class="section-title">
+              <svg style="width:16px;height:16px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/></svg>
+              <span>Sensoren & Klima</span>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem;">
+              <div class="tech-card">
+                <div class="tech-label">Temperatur (In)</div>
+                <div class="tech-val mono" id="valTIn">- °C</div>
+              </div>
+              <div class="tech-card">
+                <div class="tech-label">Luftfeuchte (In)</div>
+                <div class="tech-val mono" id="valHIn">- %</div>
+              </div>
+              <div class="tech-card">
+                <div class="tech-label">Temperatur (Out)</div>
+                <div class="tech-val mono" id="valTOut">- °C</div>
+              </div>
+              <div class="tech-card">
+                <div class="tech-label">Luftfeuchte (Out)</div>
+                <div class="tech-val mono" id="valHOut">- %</div>
+              </div>
+              <div class="tech-card">
+                <div class="tech-label">VPD / Taupunkt</div>
+                <div class="tech-val mono"><span id="valVpd">-</span> / <span id="valDew">-</span></div>
+              </div>
+              <div class="tech-card">
+                <div class="tech-label">ToF Abstand (Roh)</div>
+                <div class="tech-val mono" id="valTof">- mm</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Stepper & LED -->
+          <div>
+            <div class="section-title" style="color: #60a5fa;">
+              <svg style="width:16px;height:16px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M5 10h14"/><path d="M5 14h14"/></svg>
+              <span>Aktorik & Mechanik</span>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem;">
+              <div class="tech-card">
+                <div class="tech-label">LED Dimmer</div>
+                <div class="tech-val mono" id="valLed">- %</div>
+              </div>
+              <div class="tech-card">
+                <div class="tech-label">Lüfter Speed (1/2/3)</div>
+                <div class="tech-val mono" id="valFans">- / - / -</div>
+              </div>
+              <div class="tech-card">
+                <div class="tech-label">Stepper Position</div>
+                <div class="tech-val mono" id="valStepPos">- mm</div>
+              </div>
+              <div class="tech-card">
+                <div class="tech-label">Max. Fahrweg</div>
+                <div class="tech-val mono" id="valStepMax">- mm</div>
+              </div>
+              <div class="tech-card">
+                <div class="tech-label">Stepper Status</div>
+                <div class="tech-val" id="valStepStatus">-</div>
+              </div>
+              <div class="tech-card">
+                <div class="tech-label">ToF Offset</div>
+                <div class="tech-val mono" id="valTofOff">- mm</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Netzwerk & System -->
+          <div>
+            <div class="section-title" style="color: #9ca3af;">
+              <svg style="width:16px;height:16px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg>
+              <span>Netzwerk & System</span>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem;">
+              <div class="tech-card">
+                <div class="tech-label">IP Adresse</div>
+                <div class="tech-val mono" id="valIp">-</div>
+              </div>
+              <div class="tech-card">
+                <div class="tech-label">WLAN SSID</div>
+                <div class="tech-val mono" id="valSsid">-</div>
+              </div>
+              <div class="tech-card">
+                <div class="tech-label">Signalstärke (RSSI)</div>
+                <div class="tech-val mono" id="valRssi">- dBm</div>
+              </div>
+              <div class="tech-card">
+                <div class="tech-label">Uptime</div>
+                <div class="tech-val mono" id="valUptime">-</div>
+              </div>
+              <div class="tech-card">
+                <div class="tech-label">Firmware Version</div>
+                <div class="tech-val mono" id="valFw">-</div>
+              </div>
+              <div class="tech-card">
+                <div class="tech-label">Build Datum</div>
+                <div class="tech-val mono" id="valBuild">-</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Health Modules -->
+          <div id="healthSection" style="display: none;">
+            <div class="section-title" style="color: var(--err);">
+              <svg style="width:16px;height:16px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+              <span>Hardware-Diagnose</span>
+            </div>
+            <div id="healthList" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.5rem;">
+              <!-- Dynamic content -->
+            </div>
+          </div>
+
+        </div>
+        <footer style="display: flex; gap: 0.5rem; padding: 1rem;">
+          <a href="/" class="button" role="button">
+            <svg style="width:18px;height:18px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            Zurück
+          </a>
+        </footer>
+      </article>
+
+      <footer class="site" style="padding: 0.9rem 1.1rem; margin-top: auto; margin-bottom: 1rem;">
+        <small style="display:block">&copy; 2025 Martin Teske – LisaPro Growbox</small>
+      </footer>
+    </main>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      
+      function formatUptime(sec) {
+        if (sec == null || isNaN(sec)) return "-";
+        sec = Math.floor(+sec);
+        const d = Math.floor(sec / 86400); sec -= d*86400;
+        const h = Math.floor(sec / 3600);  sec -= h*3600;
+        const m = Math.floor(sec / 60);    const s = sec - m*60;
+        if (d > 0) return `${d}d ${h}h ${m}m`;
+        if (h > 0) return `${h}h ${m}m ${s}s`;
+        return `${m}m ${s}s`;
+      }
+
+      function updateUI(s) {
+        $("valTIn").textContent = (s.temp_c != null ? s.temp_c.toFixed(1) : "-") + " °C";
+        $("valHIn").textContent = (s.humi_rh != null ? s.humi_rh.toFixed(1) : "-") + " %";
+        $("valTOut").textContent = (s.temp_out_c != null ? s.temp_out_c.toFixed(1) : "-") + " °C";
+        $("valHOut").textContent = (s.humi_out_rh != null ? s.humi_out_rh.toFixed(1) : "-") + " %";
+        $("valVpd").textContent = (s.vpd_kpa != null ? s.vpd_kpa.toFixed(2) : "-") + " kPa";
+        $("valDew").textContent = (s.dew_c != null ? s.dew_c.toFixed(1) : "-") + " °C";
+        
+        $("valLed").textContent = (s.light_pct != null ? s.light_pct.toFixed(1) : "0.0") + " % (" + (s.light_on ? "AN" : "AUS") + ")";
+        $("valFans").textContent = (s.fan_pct || 0).toFixed(0) + " / " + (s.fan2_pct || 0).toFixed(0) + " / " + (s.fan3_pct || 0).toFixed(0) + " %";
+        
+        $("valIp").textContent = s.ip || "-";
+        $("valSsid").textContent = s.ssid || (s.wifi_connected ? "Verbunden" : "Nicht verbunden");
+        $("valRssi").textContent = (s.rssi != null ? s.rssi : "-") + " dBm";
+        $("valUptime").textContent = formatUptime(s.uptime_s || s.uptime);
+        $("valFw").textContent = s.fw || "-";
+        $("valBuild").textContent = s.build || "-";
+
+        // ToF & Stepper (some data might need /api/setup/status if missing from /api/status)
+        if (s.stepper) {
+           $("valStepPos").textContent = s.stepper.pos_mm != null ? s.stepper.pos_mm.toFixed(1) + " mm" : "-";
+           $("valStepMax").textContent = s.stepper.max_travel_mm != null ? s.stepper.max_travel_mm.toFixed(1) + " mm" : "-";
+           let st = "Bereit";
+           if (s.stepper.homing) st = "Homing...";
+           else if (s.stepper.moving) st = "Fährt...";
+           if (!s.stepper.uart_ok) st += " (UART Fehler!)";
+           $("valStepStatus").textContent = st;
+        }
+
+        // Health Modules
+        if (s.health && s.health.modules) {
+          const m = s.health.modules;
+          const list = $("healthList");
+          list.innerHTML = "";
+          let hasErr = false;
+          
+          const names = {
+            sht_in: "SHT41 Innen",
+            sht_out: "SHT41 Außen",
+            dac: "LED DAC (GP8211)",
+            fan: "Lüfter-Steuerung",
+            rtc: "RTC (Echtzeituhr)",
+            tof: "ToF (Abstand)",
+            i2c0: "I2C Bus 0",
+            i2c1: "I2C Bus 1",
+            fs: "Dateisystem"
+          };
+
+          for (const key in m) {
+            const ok = m[key];
+            if (!ok) hasErr = true;
+            const div = document.createElement("div");
+            div.className = "tech-card";
+            div.style.flexDirection = "row";
+            div.style.alignItems = "center";
+            div.style.gap = "0.5rem";
+            div.innerHTML = `<span class="dot ${ok ? 'ok' : 'err'}"></span><span style="font-size:0.8rem">${names[key] || key}</span>`;
+            list.appendChild(div);
+          }
+          $("healthSection").style.display = "block";
+        }
+      }
+
+      async function fetchExtra() {
+        try {
+          const r = await fetch("/api/setup/status");
+          if (r.ok) {
+            const extra = await r.json();
+            if (extra.tof_mm != null) $("valTof").textContent = extra.tof_mm + " mm";
+            if (extra.tof_offset != null) $("valTofOff").textContent = extra.tof_offset + " mm";
+            if (extra.stepper && !liveStatusHasStepper) {
+               $("valStepPos").textContent = extra.stepper.pos_mm.toFixed(1) + " mm";
+               $("valStepMax").textContent = extra.stepper.max_travel_mm.toFixed(1) + " mm";
+               let st = extra.stepper.homing ? "Homing..." : (extra.stepper.moving ? "Fährt..." : "Bereit");
+               if (!extra.stepper.uart_ok) st += " (UART Error)";
+               $("valStepStatus").textContent = st;
+            }
+          }
+        } catch(e) {}
+      }
+
+      let liveStatusHasStepper = false;
+      async function refresh() {
+        try {
+          const r = await fetch("/api/status");
+          if (r.ok) {
+            const s = await r.json();
+            if (s.stepper) liveStatusHasStepper = true;
+            updateUI(s);
+          }
+          await fetchExtra();
+        } catch(e) {}
+      }
+
+      setInterval(refresh, 2000);
+      refresh();
+    </script>
+  </body>
+</html>
