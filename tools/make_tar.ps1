@@ -71,15 +71,16 @@ if (-not $NoFirmware) {
 
 # Create TAR
 $outTar = Join-Path $releaseDir 'LuminaGrowX_Update.tar'
-if (Test-Path $outTar) { Remove-Item $outTar -Force }
+if (Test-Path $outTar) { Remove-Item $outTar -Force -ErrorAction SilentlyContinue }
 
 Write-Host "==> Creating TAR: $outTar" -ForegroundColor Cyan
 $tarCmd = Get-Command tar -ErrorAction SilentlyContinue
 if ($tarCmd) {
+  # Wir entfernen Out-Null, um Fehler besser zu sehen
   if ($fwIncluded) {
-    & tar -cvf $outTar -C $stagingDir firmware.bin www | Out-Null
+    & tar -cvf $outTar -C $stagingDir firmware.bin www
   } else {
-    & tar -cvf $outTar -C $stagingDir www | Out-Null
+    & tar -cvf $outTar -C $stagingDir www
   }
 } else {
   $seven = Get-Command 7z -ErrorAction SilentlyContinue
@@ -87,15 +88,16 @@ if ($tarCmd) {
   Push-Location $stagingDir
   try {
     if ($fwIncluded) {
-      & 7z a -ttar $outTar firmware.bin www | Out-Null
+      & 7z a -ttar $outTar firmware.bin www
     } else {
-      & 7z a -ttar $outTar www | Out-Null
+      & 7z a -ttar $outTar www
     }
   } finally { Pop-Location }
 }
 
-# Cleanup staging
-Remove-Item -Recurse -Force $stagingDir
+# Cleanup staging (mit kurzer Verzögerung und Fehlertoleranz)
+Start-Sleep -Milliseconds 500
+Remove-Item -Recurse -Force $stagingDir -ErrorAction SilentlyContinue
 
 if (-not (Test-Path $outTar)) { throw "TAR not created: $outTar" }
 $size = (Get-Item $outTar).Length
