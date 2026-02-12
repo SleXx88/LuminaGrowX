@@ -71,9 +71,9 @@ namespace lumina
   namespace startup
   {
     // Standardmäßig aus; zum Aktivieren in true ändern
-    constexpr bool DO_STEPPER_HOME_ON_BOOT       = false; // Homing beim Booten durchführen
+    constexpr bool DO_STEPPER_HOME_ON_BOOT       = true; // Homing beim Booten durchführen
     constexpr bool DO_TOF_CALIBRATE_ON_BOOT      = false; // ToF-Offset laden/kalibrieren
-    constexpr bool DO_APPROACH_MIN_DISTANCE_BOOT = false; // Nach Homing: blockierende Annäherung
+    constexpr bool DO_APPROACH_MIN_DISTANCE_BOOT = true; // Nach Homing: blockierende Annäherung
   }
 
   // --- Phasen & Modi ---
@@ -154,7 +154,7 @@ namespace lumina
     // Keimling=50mm, Vegetativ=80mm, Blüte=120mm
     constexpr float MIN_DIST_MM[3] = {100.0f, 100.0f, 140.0f};
 
-    // ToF-Sensor sitzt 10 mm unter der LED -> diesen Offset zur ToF-Messung hinzurechnen
+    // ToF-Sensor sitzt 10 mm unter der LED -> diesen Offset zur ToF-Messung hinzurechnen um den Abstand zwischen LED und Pflanze zu erhalten
     constexpr int TOF_LED_OFFSET_MM = 10;
 
     // ToF-Leseintervall und Mittelung

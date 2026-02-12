@@ -24,7 +24,7 @@ struct StepperPins {
 
 struct StepperKinematics {
   uint16_t steps_per_rev = 200;
-  uint8_t  microsteps    = 16;
+  uint8_t  microsteps    = 8;
   float    lead_mm       = 8.0f; // TR8x8
 };
 
