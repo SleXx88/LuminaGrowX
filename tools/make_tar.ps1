@@ -56,7 +56,9 @@ if (-not $NoFirmware) {
   $fwPath = Join-Path $root (".pio/build/{0}/firmware.bin" -f $Env)
   if ($true) {
     Write-Host "==> Building firmware for '$Env' (pio run)" -ForegroundColor Cyan
-    Exec 'pio' "run -e $Env"
+    $pioExe = "$env:USERPROFILE\.platformio\penv\Scripts\pio.exe"
+    if (!(Test-Path $pioExe)) { $pioExe = "pio" }
+    Exec $pioExe "run -e $Env"
   }
   if (Test-Path $fwPath) {
     Write-Host "==> Include firmware.bin" -ForegroundColor Cyan
