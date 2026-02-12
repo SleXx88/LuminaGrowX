@@ -1619,7 +1619,7 @@ void WebCtrl::updateTaskRun_(bool useRemote, const String& localTarPath) {
   updateJobRunning_ = false;
   // Regelung wieder freigeben, wenn kein Reboot folgt
   if (!(ok && fwUpd)) { health::state().control_paused = false; }
-  if (ok && fwUpd) { rebootAt_ = millis() + 750; }
+  if (ok && fwUpd) { rebootAt_ = millis() + 1000; }
 }
 
 void WebCtrl::updateCheckTaskTrampoline_(void* arg) {
@@ -1801,11 +1801,27 @@ bool WebCtrl::applyPackageFromFile_(const char* tarPath, bool& fwUpdated, int& f
       if (name=="firmware.bin") {
         if (size==0) { err="empty firmware"; f.close(); return false; }
         updateMsg_ = "apply firmware";
+        Serial.printf("[UPDATE] Applying firmware (%u bytes)...\n", (unsigned)size);
         if (!Update.begin((size_t)size, U_FLASH)) { err=String("Update.begin ")+Update.errorString(); f.close(); return false; }
         const size_t CH=2048; uint8_t buf[CH]; uint32_t left=toRead;
-        while (left>0) { size_t n = left>CH?CH:left; int nr=f.read(buf,n); if (nr<=0){ Update.abort(); err="firmware read"; f.close(); return false; } size_t nw=Update.write(buf,nr); if (nw!=(size_t)nr){ Update.abort(); err=String("Update.write ")+Update.errorString(); f.close(); return false; } left-=nr; updateApplySoFar_ += nr; yield(); }
-        if (!Update.end(true)) { err=String("Update.end ")+Update.errorString(); f.close(); return false; }
-        fwUpdated=true; if (pad) f.seek(pad, SeekCur);
+        while (left>0) { 
+          size_t n = left>CH?CH:left; 
+          int nr=f.read(buf,n); 
+          if (nr<=0){ Update.abort(); err="firmware read"; f.close(); return false; } 
+          size_t nw=Update.write(buf,nr); 
+          if (nw!=(size_t)nr){ Update.abort(); err=String("Update.write ")+Update.errorString(); f.close(); return false; } 
+          left-=nr; 
+          updateApplySoFar_ += nr; 
+          if (left % 32768 == 0) yield(); 
+        }
+        if (!Update.end()) { // changed from true to false to ensure size match
+          err=String("Update.end ")+Update.errorString(); 
+          Serial.printf("[UPDATE] Firmware error: %s\n", err.c_str());
+          f.close(); return false; 
+        }
+        Serial.println(F("[UPDATE] Firmware update SUCCESS"));
+        fwUpdated=true; 
+        if (pad) f.seek(pad, SeekCur);
       } else if (name.startsWith("www/") && isSafeAssetPath_(name.substring(4))) {
         String rel=name.substring(4); String dest=String("/")+rel; String tmp=String("/.u_tmp_")+rel; ensureDir_(dest); int lastSlash=tmp.lastIndexOf('/'); if (lastSlash>0) { LittleFS.mkdir(tmp.substring(0,lastSlash)); }
         File wf=LittleFS.open(tmp, FILE_WRITE); if (!wf) { err=String("open fail ")+tmp; f.close(); return false; }

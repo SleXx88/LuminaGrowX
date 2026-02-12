@@ -54,7 +54,7 @@ if (Test-Path $changelogPath) {
 $fwIncluded = $false
 if (-not $NoFirmware) {
   $fwPath = Join-Path $root (".pio/build/{0}/firmware.bin" -f $Env)
-  if (-not (Test-Path $fwPath)) {
+  if ($true) {
     Write-Host "==> Building firmware for '$Env' (pio run)" -ForegroundColor Cyan
     Exec 'pio' "run -e $Env"
   }

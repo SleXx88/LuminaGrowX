@@ -197,7 +197,10 @@
       let currentFwVer = null;
       let preBuild = null, expectedFw = null;
 
+      let lastLogMsg = '';
       function addLog(m) {
+        if (m === lastLogMsg) return;
+        lastLogMsg = m;
         const entry = document.createElement('div');
         entry.textContent = `[${new Date().toLocaleTimeString()}] ${m}`;
         log.appendChild(entry);
@@ -270,14 +273,20 @@
       }
 
       function waitForReboot(expectFw) {
+        let attempts = 0;
         const ping = () => {
+          attempts++;
           fetch('/api/status', {cache:'no-store'}).then(r => r.json()).then(j => {
-            if (j.build !== preBuild) {
+            // Wenn Build anders ODER Uptime sehr klein ODER wir schon oft genug gepinnt haben und das Geraet da ist
+            if (j.build !== preBuild || (j.uptime_s && j.uptime_s < 30) || attempts > 5) {
               location.href = '/';
             } else { setTimeout(ping, 2000); }
-          }).catch(() => setTimeout(ping, 2000));
+          }).catch(() => {
+            // Geraet ist offline (rebootet gerade)
+            setTimeout(ping, 2000);
+          });
         };
-        setTimeout(ping, 3000);
+        setTimeout(ping, 5000); // Warte 5s bis zum ersten Ping
       }
 
       $('btnCheck').onclick = async () => {
