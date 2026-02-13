@@ -757,40 +757,63 @@ void PlantCtrl::runStartupApproachBlocking() {
   const float target = targetDistanceMm_();
   const float offset = (float)lumina::plant::TOF_LED_OFFSET_MM;
   const float hyst   = lumina::plant::ADJUST_HYST_MM;
-  const uint8_t spd  = lumina::plant::SPEED_LEVEL;
-
+  
+  Serial.printf("[STARTUP] Starte sanfte Annaeherung. Ziel: %.1f mm (ToF-Offset: %.1f)\n", target, offset);
+  
+  // Kontinuierliche Fahrt nach unten starten (Down ist logical +1)
+  step_->jogDown(lumina::plant::SPEED_LEVEL);
+  
   uint32_t lastRead = 0;
+  uint32_t lastPrint = 0;
+  bool reached = false;
+
   for (;;) {
     uint32_t now = millis();
+    step_->tick(); // WICHTIG: Stepper-Logik am Laufen halten
+
     if (now - lastRead >= lumina::plant::TOF_READ_INTERVAL_MS) {
       lastRead = now;
       int v = tof_->readAvgMm(lumina::plant::TOF_AVG_SAMPLES);
-      if (v >= 0) lastTofMm_ = v;
-    }
-    if (lastTofMm_ >= 0) {
-      float ledPlantMm = (float)lastTofMm_ + offset;
-      if (ledPlantMm > (target + hyst)) {
+      if (v >= 0) {
+        lastTofMm_ = v;
+        float ledPlantMm = (float)lastTofMm_ + offset;
         float err = ledPlantMm - target;
-        // dynamische Schrittweite
-        float stepMm = 1.0f;
-        if (err > 50.0f) stepMm = 10.0f;
-        else if (err > 20.0f) stepMm = 5.0f;
-        else if (err > 10.0f) stepMm = 3.0f;
-        else stepMm = 1.0f;
-        float delta = fminf(stepMm, err);
-        step_->moveDown(delta, spd);
-        // auf Bewegungsende warten
-        for (;;) { step_->tick(); auto s = step_->status(); if (!s.isMoving || s.lastOpDone) break; delay(1); }
-        continue;
+
+        if (err <= hyst) {
+          step_->stop();
+          reached = true;
+          Serial.printf("[STARTUP] Ziel erreicht! Abstand: %.1f mm (Target: %.1f)\n", ledPlantMm, target);
+        } else {
+          // Proportionale Geschwindigkeitsregelung
+          float targetHz = err * lumina::plant::APPROACH_P_FACTOR;
+          targetHz = clamp(targetHz, lumina::plant::APPROACH_MIN_HZ, lumina::plant::APPROACH_MAX_HZ);
+          step_->setTargetSpeedHz(targetHz);
+
+          if (now - lastPrint >= 500) {
+            lastPrint = now;
+            Serial.printf("[STARTUP] Dist: %.1f mm, Err: %.1f mm, Speed: %.0f Hz, Pos: %.1f mm\n", 
+                          ledPlantMm, err, targetHz, step_->getPositionMm());
+          }
+        }
       }
-      break; // innerhalb Bandbreite
     }
-    // noch kein gültiger Messwert
-    step_->tick();
+
+    if (reached) {
+      if (!step_->status().isMoving) break;
+    }
+    
+    // Timeout-Schutz: Wenn nach 30s nichts passiert, abbrechen
+    if (now > 30000 && !reached && lastTofMm_ < 0) {
+       Serial.println(F("[STARTUP] ERROR: Kein ToF-Signal nach 30s!"));
+       step_->stop();
+       break;
+    }
+
     delay(5);
   }
+
   initialApproachDone_ = true;
-  // Nach der Annäherung noch kurz ticken lassen, damit die Auto-Disable Logik (500ms) greifen kann
+  // Nach der Annäherung noch kurz ticken lassen, damit die Auto-Disable Logik greifen kann
   uint32_t startWait = millis();
   while (millis() - startWait < 600) {
     step_->tick();

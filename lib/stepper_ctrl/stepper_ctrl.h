@@ -103,6 +103,7 @@ public:
   void  setMicrosteps(uint8_t microsteps);
   void  setAxisUpDir(int axis_up_dir);
   void  setMaxTravelMm(float max_travel_mm);
+  void  setTargetSpeedHz(float hz);
 
   // Legacy/Technical API
   std::pair<float,bool> goToEnd(int logicalDir, uint8_t speedLevel);

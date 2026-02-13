@@ -165,6 +165,9 @@ namespace lumina
     constexpr float    ADJUST_HYST_MM = 2.0f;       // Totband um Ziel
     constexpr float    ADJUST_STEP_MM = 1.0f;       // pro Anpassungsschritt
     constexpr uint8_t  SPEED_LEVEL    = 5;          // Index in der Steppertabelle
+    constexpr float    APPROACH_MIN_HZ = 150.0f;    // Mindestgeschwindigkeit bei Annaeherung
+    constexpr float    APPROACH_MAX_HZ = 2500.0f;   // Maximalgeschwindigkeit bei Annaeherung
+    constexpr float    APPROACH_P_FACTOR = 20.0f;   // P-Faktor für Geschwindigkeitsreduzierung (Hz pro mm) | (Ein höherer Wert bedeutet, die Lampe bleibt länger schnell; ein niedrigerer Wert lässt sie früher und sanfter langsamer werden)
     // Zeitfenster für Nachregelung nach Events (ms)
     constexpr uint32_t ADJUST_WINDOW_MS = 30000;
     constexpr float    STARTUP_STEP_MM = 5.0f;      // größere Schritte beim ersten Heranfahren

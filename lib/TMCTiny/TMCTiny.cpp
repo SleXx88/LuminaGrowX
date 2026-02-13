@@ -377,12 +377,13 @@ void IRAM_ATTR TMCTinyStepper::_isrHandler() {
     // (If continuous, we always accel up to max)
     
     if (_isContinuous) {
+        float dt = (float)_stepIntervalUs / 1000000.0f;
         if (_rampSpeed < _maxSpeed) {
-            // Speed += a * t
-            // t is _stepIntervalUs.
-            float dt = (float)_stepIntervalUs / 1000000.0f;
             _rampSpeed += _accel * dt;
             if (_rampSpeed > _maxSpeed) _rampSpeed = _maxSpeed;
+        } else if (_rampSpeed > _maxSpeed) {
+            _rampSpeed -= _accel * dt;
+            if (_rampSpeed < _maxSpeed) _rampSpeed = _maxSpeed;
         }
     } else {
         // Discrete Move

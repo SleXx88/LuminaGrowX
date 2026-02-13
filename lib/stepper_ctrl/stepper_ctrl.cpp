@@ -448,6 +448,13 @@ void StepperCtrl::setMaxTravelMm(float max_travel_mm)
   if (mutex_) xSemaphoreGive(mutex_);
 }
 
+void StepperCtrl::setTargetSpeedHz(float hz)
+{
+  if (mutex_) xSemaphoreTake(mutex_, portMAX_DELAY);
+  stepper_.setMaxSpeed(fabsf(hz));
+  if (mutex_) xSemaphoreGive(mutex_);
+}
+
 /* ---------- Interna ---------- */
 inline long StepperCtrl::mmToSteps(float mm) const
 {
@@ -461,7 +468,11 @@ inline float StepperCtrl::stepsToMm(long st) const
 }
 inline int StepperCtrl::logicalToMotorDir(int logicalDir) const
 {
-  return (logicalDir >= 0) ? AXIS_UP_DIR_ : -AXIS_UP_DIR_;
+  // logicalDir: -1 = Up (Negative mm), +1 = Down (Positive mm)
+  // Da 0 = Oben und Max = Unten, ist Down immer die positive Schrittrichtung.
+  // Wir muessen also die logische Richtung mit der Achsinvertierung multiplizieren.
+  const int axisSign = (AXIS_UP_DIR_ >= 0) ? +1 : -1;
+  return logicalDir * (-axisSign);
 }
 inline float StepperCtrl::stepsToLogicalMm(long deltaSteps) const
 {
