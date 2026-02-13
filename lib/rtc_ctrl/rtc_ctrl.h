@@ -53,6 +53,10 @@ public:
   bool readComponents(uint16_t& year, uint8_t& month, uint8_t& day,
                       uint8_t& hour, uint8_t& minute, uint8_t& second);
 
+  // Komponenten gesammelt (UTC) - nützlich für Systemzeit-Sync
+  bool readUTCComponents(uint16_t& year, uint8_t& month, uint8_t& day,
+                         uint8_t& hour, uint8_t& minute, uint8_t& second);
+
   // Zeit setzen aus lokalem String "DD-MM-YYYY HH-MM-SS" -> schreibt UTC in die RTC
   bool writeTimeFromString(const String& s);
 

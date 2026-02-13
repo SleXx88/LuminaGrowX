@@ -15,7 +15,7 @@ bool RTC_Ctrl::begin(TwoWire& w, uint8_t i2cAddr) {
 }
 
 bool RTC_Ctrl::isConnected() {
-  if (_error && (millis() - _lastErrorMs < 10000)) return false; // 10s Backoff
+  if (_error && (millis() - _lastErrorMs < 2000)) return false; // 2s Backoff
   wire_->beginTransmission(addr_);
   if (wire_->endTransmission() == 0) {
     _error = false;
@@ -29,7 +29,7 @@ bool RTC_Ctrl::isConnected() {
 // DS3231 Register (ab 0x00): Sekunden, Minuten, Stunden, Wochentag, Datum, Monat, Jahr
 // Wir ignorieren Wochentag, nutzen 24h-Format (Bit6=0).
 bool RTC_Ctrl::readRTC_UTC(DateTime& dt) {
-  if (_error && (millis() - _lastErrorMs < 10000)) return false; // 10s Backoff
+  if (_error && (millis() - _lastErrorMs < 2000)) return false; // 2s Backoff
 
   wire_->beginTransmission(addr_);
   wire_->write(0x00); // ab Sekunden
@@ -259,6 +259,21 @@ bool RTC_Ctrl::readComponents(uint16_t& year, uint8_t& month, uint8_t& day,
   hour   = (uint8_t)lastLocal_.hour;
   minute = (uint8_t)lastLocal_.minute;
   second = (uint8_t)lastLocal_.second;
+  return true;
+}
+
+bool RTC_Ctrl::readUTCComponents(uint16_t& year, uint8_t& month, uint8_t& day,
+                                 uint8_t& hour, uint8_t& minute, uint8_t& second) {
+  DateTime utc;
+  if (!readRTC_UTC(utc)) {
+    return false;
+  }
+  year   = utc.year;
+  month  = (uint8_t)utc.month;
+  day    = (uint8_t)utc.day;
+  hour   = (uint8_t)utc.hour;
+  minute = (uint8_t)utc.minute;
+  second = (uint8_t)utc.second;
   return true;
 }
 

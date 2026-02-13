@@ -10,6 +10,7 @@
 #include <ESPmDNS.h>
 #include <HTTPClient.h>
 #include <time.h>
+#include <sys/time.h>
 
 #include <Wire.h>
 #include "sht41_ctrl.h"
@@ -158,6 +159,7 @@ void setup()
   // ===== 1) Basis: I2C-Busse =====
   // Vor Wire.begin() versuchen, den Bus freizumachen
   recoverI2C(I2C_SDA_1, I2C_SCL_1);
+  recoverI2C(I2C_SDA_2, I2C_SCL_2);
 
   // Frequenz auf 100kHz reduziert für höhere Stabilität mit VL53L0X
   Wire.begin(I2C_SDA_1, I2C_SCL_1, 100000);
@@ -282,6 +284,27 @@ void setup()
   } else {
     Serial.println("[RTC] Init OK (DS3231 gefunden).");
     health::set_rtc(true);
+
+    // Systemzeit aus RTC initialisieren (für den Fall, dass kein NTP verfügbar ist)
+    uint16_t y; uint8_t mo, d, hh, mi, ss;
+    if (rtc.readUTCComponents(y, mo, d, hh, mi, ss)) {
+      // Manuelle Konvertierung von UTC nach time_t (Unix-Timestamp)
+      // Ersetzt timegm(), das nicht auf allen Systemen verfügbar ist.
+      auto is_leap = [](int year) { return (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)); };
+      time_t t_now = 0;
+      for (int i = 1970; i < y; ++i) t_now += is_leap(i) ? 366 : 365;
+      static const int mdays[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+      for (int i = 0; i < mo - 1; ++i) {
+        t_now += mdays[i];
+        if (i == 1 && is_leap(y)) t_now++;
+      }
+      t_now += d - 1;
+      t_now = (((t_now * 24) + hh) * 60 + mi) * 60 + ss;
+
+      struct timeval tv = { .tv_sec = t_now, .tv_usec = 0 };
+      settimeofday(&tv, NULL);
+      Serial.printf("[RTC] Systemzeit (UTC) synchronisiert: %04d-%02d-%02d %02d:%02d\n", y, mo, d, hh, mi);
+    }
   }
 
   // Türeffner-Pin konfigurieren (nur für Setup-Tests relevant)

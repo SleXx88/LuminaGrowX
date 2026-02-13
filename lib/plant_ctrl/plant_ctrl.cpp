@@ -5,6 +5,7 @@
 #include "plant_ctrl.h"
 #include "../../include/lumina_config.h" // zentrale Defaults/Parameter
 #include <math.h>
+#include <time.h>
 
 using namespace plant_ctrl;
 using vpd_calc::computeVpd;
@@ -349,13 +350,32 @@ bool PlantCtrl::update() {
   detectDoorOrTransient(tIn_, rhIn_, now);
 
   // 4) Tageszeit + Sunrise/Sunset-Rampen => LED-Ziel + Moduswahl (Day/Night/NightSilent)
-  float ledTarget = 0.0f;
+  float ledTarget = ledOut_; // Standard: letzten Wert beibehalten (gegen Toggling bei RTC-Fehlern)
   {
-    bool haveRtc = (rtc_ != nullptr);
     const LightSchedule* sch = &schedules_[idxStage(stage_)];
-    if (haveRtc && sch) {
+    if (sch) {
       uint16_t y; uint8_t mo, d, hh, mi, ss;
-      if (rtc_->readComponents(y, mo, d, hh, mi, ss)) {
+      bool timeOk = false;
+
+      // 1. Versuch: Systemzeit nutzen (wird von NTP oder RTC synchronisiert)
+      time_t now_ts = time(nullptr);
+      struct tm tmL;
+      localtime_r(&now_ts, &tmL);
+      if (tmL.tm_year >= 120) { // Jahr >= 2020 (1900 + 120)
+        y = tmL.tm_year + 1900;
+        mo = tmL.tm_mon + 1;
+        d = tmL.tm_mday;
+        hh = tmL.tm_hour;
+        mi = tmL.tm_min;
+        ss = tmL.tm_sec;
+        timeOk = true;
+      } 
+      // 2. Versuch: Direkte Abfrage der RTC (Fallback bei fehlendem NTP/Systemzeit)
+      else if (rtc_ && rtc_->readComponents(y, mo, d, hh, mi, ss)) {
+        timeOk = true;
+      }
+
+      if (timeOk) {
         auto toSec = [](uint8_t H, uint8_t M, uint8_t S) -> int { return ((int)H * 60 + (int)M) * 60 + (int)S; };
         const int nowSec = toSec(hh, mi, ss);
         const int onSec  = toSec(sch->on.hour, sch->on.minute, 0);
@@ -392,12 +412,10 @@ bool PlantCtrl::update() {
             ledTarget = dayLedBase;
           }
         }
-      } else {
-        // RTC-Leseproblem -> fallback auf aktuellen Moduswert
-        ledTarget = clamp01(cur().ledPercent);
       }
+      // Falls timeOk false ist, bleibt ledTarget = ledOut_, was Sprünge verhindert.
     } else {
-      // Ohne RTC: Modus bleibt unverändert -> statischer LED-Wert des Modus
+      // Ohne Zeitplan: statischer LED-Wert des aktuellen Modus
       ledTarget = clamp01(cur().ledPercent);
     }
   }
@@ -746,7 +764,8 @@ void PlantCtrl::distanceTick_(uint32_t now) {
   }
 
   // ToF lesen
-  if (now - lastTofReadMs_ >= lumina::plant::TOF_READ_INTERVAL_MS) {
+  uint32_t interval = adjustActive_ ? lumina::plant::TOF_READ_INTERVAL_MS : 10000;
+  if (now - lastTofReadMs_ >= interval) {
     lastTofReadMs_ = now;
     int v = tof_->readAvgMm(lumina::plant::TOF_AVG_SAMPLES);
     if (v >= 0) lastTofMm_ = v;
@@ -763,6 +782,7 @@ void PlantCtrl::distanceTick_(uint32_t now) {
   if (canAdjust) { 
     adjustActive_ = true; 
     adjustUntilMs_ = now + lumina::plant::AUTO_APPROACH_TIMEOUT_MS; 
+    lastTofReadMs_ = 0; // Mess-Intervall zurücksetzen -> sofortige Messung erzwingen
     Serial.printf("[CTRL] Starte sanfte Abstands-Anpassung. Dist: %.1f mm, Ziel: %.1f mm\n", ledPlantMm, target);
   }
 

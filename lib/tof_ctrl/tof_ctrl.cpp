@@ -472,8 +472,8 @@ int ToFCtrl::readRawMm() {
     return -1;
   }
 
-  // Recovery-Logik: Falls zu viele I2C-Fehler oder Sensor-Timeout (> 3s)
-  if (_errorCount > 10 || (millis() - _lastSuccessMs > 3000 && _lastSuccessMs > 0)) {
+  // Recovery-Logik: Falls zu viele I2C-Fehler oder Sensor-Timeout (> 15s)
+  if (_errorCount > 10 || (millis() - _lastSuccessMs > 15000 && _lastSuccessMs > 0)) {
     if (_debug) Serial.printf("[ToF] Recovery! Errors: %d, LastSuccess: %lu ms ago\n", _errorCount, millis() - _lastSuccessMs);
     _errorCount = 0;
     _lastSuccessMs = millis(); // Reset Timer für nächsten Versuch
