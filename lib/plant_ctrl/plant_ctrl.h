@@ -255,6 +255,7 @@ private:
   // Zeitplan-Auslöser (einmal pro Ereignis/Tag) – 64-bit, um Überläufe zu vermeiden
   unsigned long long lastSunriseToken_ = 0ULL; // yyyymmddHHMM
   unsigned long long lastSunsetToken_  = 0ULL;
+  int                lastApproachHour_ = -1;
 
   // Nachregel-Fenster nach Events (Tür zu / Sunrise / Sunset)
   bool     adjustActive_ = false;

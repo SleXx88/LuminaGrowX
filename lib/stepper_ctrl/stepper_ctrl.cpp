@@ -742,14 +742,18 @@ void StepperCtrl::enforceSoftLimits_()
   if (pos < softMinSteps_)
   {
     stepper_.forceStopAndNewPosition(softMinSteps_);
-    mode_ = Mode::IDLE;
-    lastOpDone_ = true;
+    if (mode_ == Mode::CONTINUOUS || mode_ == Mode::GOTO) {
+      mode_ = Mode::IDLE;
+      lastOpDone_ = true;
+    }
   }
   else if (pos > softMaxSteps_)
   {
     stepper_.forceStopAndNewPosition(softMaxSteps_);
-    mode_ = Mode::IDLE;
-    lastOpDone_ = true;
+    if (mode_ == Mode::CONTINUOUS || mode_ == Mode::GOTO) {
+      mode_ = Mode::IDLE;
+      lastOpDone_ = true;
+    }
   }
 }
 

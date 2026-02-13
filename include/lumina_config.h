@@ -165,12 +165,22 @@ namespace lumina
     constexpr float    ADJUST_HYST_MM = 2.0f;       // Totband um Ziel
     constexpr float    ADJUST_STEP_MM = 1.0f;       // pro Anpassungsschritt
     constexpr uint8_t  SPEED_LEVEL    = 5;          // Index in der Steppertabelle
-    constexpr float    APPROACH_MIN_HZ = 150.0f;    // Mindestgeschwindigkeit bei Annaeherung
-    constexpr float    APPROACH_MAX_HZ = 2500.0f;   // Maximalgeschwindigkeit bei Annaeherung
-    constexpr float    APPROACH_P_FACTOR = 20.0f;   // P-Faktor für Geschwindigkeitsreduzierung (Hz pro mm) | (Ein höherer Wert bedeutet, die Lampe bleibt länger schnell; ein niedrigerer Wert lässt sie früher und sanfter langsamer werden)
+    constexpr float    APPROACH_MIN_HZ = 500.0f;    // Mindestgeschwindigkeit bei Annaeherung
+    constexpr float    APPROACH_MAX_HZ = 3000.0f;   // Maximalgeschwindigkeit bei Annaeherung
+    constexpr float    APPROACH_P_FACTOR = 50.0f;   // P-Faktor für Geschwindigkeitsreduzierung (Hz pro mm) | (Ein höherer Wert bedeutet, die Lampe bleibt länger schnell; ein niedrigerer Wert lässt sie früher und sanfter langsamer werden)
     // Zeitfenster für Nachregelung nach Events (ms)
-    constexpr uint32_t ADJUST_WINDOW_MS = 30000;
     constexpr float    STARTUP_STEP_MM = 5.0f;      // größere Schritte beim ersten Heranfahren
+
+    // Zeitplan für automatische Annäherung (Stunden 0-23)
+    constexpr int      APPROACH_HOURS[] = {0, 4, 8, 12, 16, 20};
+    constexpr int      APPROACH_HOURS_COUNT = sizeof(APPROACH_HOURS) / sizeof(APPROACH_HOURS[0]);
+
+    // Automatisches Nachfahren (Sanfte Annäherung)
+    constexpr bool     AUTO_APPROACH_SUNRISE  = true; // Bei Licht-An
+    constexpr bool     AUTO_APPROACH_SUNSET   = true; // Bei Licht-Aus
+    constexpr bool     AUTO_APPROACH_PERIODIC = true; // Im Stunden-Rhythmus (siehe oben)
+    constexpr bool     AUTO_APPROACH_DOOR     = true; // Nach Schließen der Tür
+    constexpr uint32_t AUTO_APPROACH_TIMEOUT_MS = 45000; // Max. Zeitfenster für eine Korrekturfahrt
   }
 
   // --- Zentrale Regelparameter (hier veränderst du ALLES) ---

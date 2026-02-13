@@ -260,21 +260,6 @@ bool PlantCtrl::update() {
     return true; 
   }
 
-
-  // Tür-Status aktualisieren (unabhängig vom Modus)
-  if (doorPin_ >= 0) {
-    bool closed = (digitalRead(doorPin_) == LOW);
-    if (closed != lastDoorClosed_) {
-      lastDoorClosed_ = closed;
-      doorLastChangeMs_ = now;
-      if (closed) {
-        Serial.println(F("[DOOR] geschlossen"));
-      } else {
-        Serial.println(F("[DOOR] offen"));
-      }
-    }
-  }
-
   // Wenn weder Grow noch Trocknung aktiv: Alle Hardware deaktivieren
   if (!growActive_ && !dryingMode_) {
     vpdIn_ = computeVpd(tIn_, rhIn_);
@@ -655,7 +640,7 @@ bool PlantCtrl::update() {
     }
   }
 
-  // Distanzverwaltung (Tür/Schedule/Eventfenster + 1 mm Schritte)
+  // Distanzverwaltung (Tür/Schedule/Eventfenster + fließende P-Regelung)
   distanceTick_(now);
 
   return true;
@@ -679,26 +664,60 @@ static inline unsigned long long makeTokenYMDHM(int y, int m, int d, int hh, int
 bool PlantCtrl::allowDownAdjustNow_(uint32_t now) {
   bool closed = isDoorClosed_();
   if (closed != lastDoorClosed_) {
-    lastDoorClosed_ = closed;
-    doorLastChangeMs_ = now;
-    if (closed) {
-      Serial.println(F("[DOOR] geschlossen"));
-      return true; // Kante: offen->geschlossen
-    } else {
-      Serial.println(F("[DOOR] offen"));
-      adjustActive_ = false; // Sicherheits-Abbruch
+    // Entprellung: Nur reagieren, wenn der Zustand sich geändert hat UND 
+    // seit dem letzten Wechsel mindestens 50ms vergangen sind.
+    if (now - doorLastChangeMs_ > 50) {
+      lastDoorClosed_ = closed;
+      doorLastChangeMs_ = now;
+      
+      if (closed) {
+        Serial.println(F("[DOOR] geschlossen (stabil)"));
+        if (lumina::plant::AUTO_APPROACH_DOOR) return true; 
+      } else {
+        Serial.println(F("[DOOR] offen"));
+        adjustActive_ = false; // Sicherheits-Abbruch bei Öffnen
+      }
     }
   }
 
   if (rtc_) {
     uint16_t y; uint8_t mo, d, hh, mi, ss;
     if (rtc_->readComponents(y, mo, d, hh, mi, ss)) {
-      // Zeitplan je nach Phase
+      // 1) Zeitplan-Events (Sunrise/Sunset)
       const LightSchedule* sch = &schedules_[idxStage(stage_)];
       if (sch) {
         unsigned long long token = makeTokenYMDHM(y, mo, d, hh, mi);
-        if (hh == sch->on.hour  && mi == sch->on.minute  && token != lastSunriseToken_) { lastSunriseToken_ = token; Serial.println(F("[SCHEDULE] Sunrise adjust")); return true; }
-        if (hh == sch->off.hour && mi == sch->off.minute && token != lastSunsetToken_)  { lastSunsetToken_  = token; Serial.println(F("[SCHEDULE] Sunset adjust"));  return true; }
+        if (hh == sch->on.hour  && mi == sch->on.minute  && token != lastSunriseToken_) { 
+          lastSunriseToken_ = token; 
+          if (lumina::plant::AUTO_APPROACH_SUNRISE) {
+            Serial.println(F("[SCHEDULE] Sunrise smooth adjust")); 
+            return true; 
+          }
+        }
+        if (hh == sch->off.hour && mi == sch->off.minute && token != lastSunsetToken_)  { 
+          lastSunsetToken_  = token; 
+          if (lumina::plant::AUTO_APPROACH_SUNSET) {
+            Serial.println(F("[SCHEDULE] Sunset smooth adjust"));  
+            return true; 
+          }
+        }
+      }
+
+      // 2) Periodische Annäherung (z.B. alle 4h)
+      if (hh != lastApproachHour_) {
+        bool isTargetHour = false;
+        for (int i = 0; i < lumina::plant::APPROACH_HOURS_COUNT; i++) {
+          if (hh == lumina::plant::APPROACH_HOURS[i]) {
+            isTargetHour = true;
+            break;
+          }
+        }
+        
+        lastApproachHour_ = hh;
+        if (isTargetHour && lumina::plant::AUTO_APPROACH_PERIODIC) {
+          Serial.printf("[SCHEDULE] Periodic smooth adjust at %02d:00\n", hh);
+          return true;
+        }
       }
     }
   }
@@ -713,11 +732,21 @@ float PlantCtrl::targetDistanceMm_() const {
 
 void PlantCtrl::distanceTick_(uint32_t now) {
   if (!step_ || !tof_) return;
+
+  // Tür-Status immer prüfen für Edge-Detection (Sunrise/Sunset/Door)
+  bool canAdjust = allowDownAdjustNow_(now);
+
   // Tür offen? Keine Bewegung zulassen
-  if (!isDoorClosed_()) { adjustActive_ = false; return; }
+  if (!isDoorClosed_()) { 
+    if (adjustActive_) {
+      step_->stop();
+      adjustActive_ = false;
+    }
+    return; 
+  }
 
   // ToF lesen
-  if (now - lastTofReadMs_ >= lumina::plant::TOF_READ_INTERVAL_MS) { // Nicht in jedem Loop lesen
+  if (now - lastTofReadMs_ >= lumina::plant::TOF_READ_INTERVAL_MS) {
     lastTofReadMs_ = now;
     int v = tof_->readAvgMm(lumina::plant::TOF_AVG_SAMPLES);
     if (v >= 0) lastTofMm_ = v;
@@ -728,25 +757,66 @@ void PlantCtrl::distanceTick_(uint32_t now) {
   const float ledPlantMm = (float)lastTofMm_ + offset;
   const float target = targetDistanceMm_();
   const float hyst = lumina::plant::ADJUST_HYST_MM;
-  const float stepMm = lumina::plant::ADJUST_STEP_MM; // 1 mm Schritte im Normalbetrieb
-  const uint8_t spd = lumina::plant::SPEED_LEVEL;
+  const float err = ledPlantMm - target;
 
-  // Ereignisfenster (T?r-zu / Sunrise / Sunset) aktivieren
-  if (allowDownAdjustNow_(now)) { adjustActive_ = true; adjustUntilMs_ = now + lumina::plant::ADJUST_WINDOW_MS; }
+  // Ereignisfenster aktivieren
+  if (canAdjust) { 
+    adjustActive_ = true; 
+    adjustUntilMs_ = now + lumina::plant::AUTO_APPROACH_TIMEOUT_MS; 
+    Serial.printf("[CTRL] Starte sanfte Abstands-Anpassung. Dist: %.1f mm, Ziel: %.1f mm\n", ledPlantMm, target);
+  }
+
   if (!adjustActive_) return;
-  if (now > adjustUntilMs_) { adjustActive_ = false; return; }
 
-  // Nur bewegen, wenn Stepper frei
-  if (step_->status().isMoving) return;
+  // Timeout-Schutz oder Ziel erreicht
+  if (now > adjustUntilMs_) { 
+    step_->stop();
+    adjustActive_ = false; 
+    return; 
+  }
 
-  if (ledPlantMm < (target - hyst)) {
-    float delta = fminf(stepMm, (target - ledPlantMm));
-    step_->moveUp(delta, spd);
-  } else if (ledPlantMm > (target + hyst)) {
-    float delta = fminf(stepMm, (ledPlantMm - target));
-    step_->moveDown(delta, spd);
+  // Physikalische Grenzen prüfen: Nur stoppen, wenn wir in die Richtung der Grenze fahren wollen
+  float curPos = step_->getPositionMm();
+  if (!step_->status().isMoving && fabsf(err) > hyst) {
+    bool wantUp = (err < 0);   // Zu nah -> muss nach oben
+    bool wantDown = (err > 0); // Zu weit weg -> muss nach unten
+    
+    if ((wantUp && curPos <= 0.5f) || (wantDown && curPos >= (step_->getMaxTravelMm() - 0.5f))) {
+      Serial.println(F("[CTRL] Physikalische Grenze erreicht - Keine Fahrt in diese Richtung möglich."));
+      adjustActive_ = false;
+      return;
+    }
+  }
+
+  // Ziel erreicht?
+  if (fabsf(err) <= hyst) {
+    step_->stop();
+    adjustActive_ = false;
+    Serial.printf("[CTRL] Anpassung beendet. Abstand: %.1f mm\n", ledPlantMm);
+    return;
+  }
+
+  // Proportionale Geschwindigkeitsregelung (wie in runStartupApproachBlocking)
+  float targetHz = fabsf(err) * lumina::plant::APPROACH_P_FACTOR;
+  targetHz = clamp(targetHz, lumina::plant::APPROACH_MIN_HZ, lumina::plant::APPROACH_MAX_HZ);
+  
+  // Fahrtrichtung bestimmen und Jog starten/anpassen
+  if (err > 0) {
+    // Zu weit weg -> nach unten
+    if (step_->status().isMoving) {
+      step_->setTargetSpeedHz(targetHz);
+    } else {
+      step_->jogDown(lumina::plant::SPEED_LEVEL);
+      step_->setTargetSpeedHz(targetHz);
+    }
   } else {
-    adjustActive_ = false; // Ziel erreicht
+    // Zu nah -> nach oben
+    if (step_->status().isMoving) {
+      step_->setTargetSpeedHz(targetHz);
+    } else {
+      step_->jogUp(lumina::plant::SPEED_LEVEL);
+      step_->setTargetSpeedHz(targetHz);
+    }
   }
 }
 
