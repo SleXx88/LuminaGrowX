@@ -14,7 +14,7 @@ void MqttCtrl::begin(const MqttConfig& config, const String& deviceName) {
     deviceName_ = deviceName;
     if (config_.enabled && config_.server.length() > 0) {
         client_.setServer(config_.server.c_str(), config_.port);
-        client_.setBufferSize(2048); // Status JSON is large
+        client_.setBufferSize(3072); // Status JSON is large
     }
 }
 
@@ -24,7 +24,7 @@ void MqttCtrl::setConfig(const MqttConfig& config) {
     if (!config_.enabled) {
         client_.disconnect();
     } else {
-        client_.setBufferSize(2048);
+        client_.setBufferSize(3072);
         if (serverChanged) {
             client_.disconnect();
             client_.setServer(config_.server.c_str(), config_.port);
@@ -122,7 +122,7 @@ void MqttCtrl::publishDiscovery_(const char* component, const char* objectId, co
     doc["stat_t"] = getBaseTopic_() + "/state";
     
     if (strcmp(component, "binary_sensor") == 0) {
-        doc["val_tpl"] = "{{ 'ON' if value_json." + String(objectId) + " == true else 'OFF' }}";
+        doc["val_tpl"] = "{{ 'ON' if value_json." + String(objectId) + " else 'OFF' }}";
     } else {
         doc["val_tpl"] = "{{ value_json." + String(objectId) + " }}";
     }
@@ -195,5 +195,5 @@ void MqttCtrl::sendDiscovery() {
     publishDiscovery_("sensor", "ssid", "WLAN SSID", nullptr, nullptr, nullptr, "mdi:wifi");
     publishDiscovery_("binary_sensor", "wifi_connected", "WLAN verbunden", nullptr, "connectivity", nullptr);
     publishDiscovery_("binary_sensor", "internet_ok", "Internet OK", nullptr, "connectivity", nullptr);
-    publishDiscovery_("binary_sensor", "update.has_update", "Update verfügbar", nullptr, "update", nullptr);
+    publishDiscovery_("binary_sensor", "update_available", "Update verfügbar", nullptr, "update", nullptr);
 }

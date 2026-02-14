@@ -2,6 +2,26 @@
 
 Alle wichtigen Änderungen und Features der automatisierten Growbox-Steuerung.
 
+## [V1.0.3] - 2026-02-14
+### Optimierte Abstandsregelung & Sicherheit (ToF)
+
+Dieses Release verbessert die Zuverlässigkeit der LED-Positionierung und schützt die Hardware vor Fehlfunktionen des Distanzsensors.
+
+#### 🛡 Sicherheit & ToF-Sensorik
+*   **Sicherheits-Stopp bei Sensorfehlern:** Die LED-Fahrt zur Pflanze wird nun sofort unterbrochen, wenn der ToF-Sensor ungültige Werte (z. B. -1 für "Out of Range") liefert. Dies verhindert unkontrollierte Bewegungen bei Sensorausfall.
+*   **Fehler-Diagnose:** Tritt während einer aktiven Anpassung oder beim Startup ein Sensorfehler auf, wird dies nun explizit als ERROR in der seriellen Konsole ausgegeben.
+*   **Erweitertes Startup-Zeitfenster:** Das Timeout für die sanfte Annäherung beim Systemstart wurde von 30 auf **40 Sekunden** erhöht, um auch bei großen Distanzen oder langsameren P-Regelungs-Geschwindigkeiten sicher das Ziel zu erreichen.
+
+#### 🔧 Sensorik & Hardware
+*   **Tür-Entprellung:** Die Erkennung des Türzustands wurde durch eine 50ms Software-Entprellung stabilisiert, was Fehlauslösungen durch mechanische Schwingungen oder elektrische Störungen verhindert.
+
+#### 🌐 MQTT & Update-System
+*   **MQTT-Stabilität:** Der MQTT-Sendepuffer wurde auf 3072 Bytes erhöht, um auch bei umfangreichen Status-JSONs Datenverlust zu vermeiden.
+*   **Update-Status Fix:** Der binäre Update-Sensor in Home Assistant wurde repariert (Key-Flattener & Template-Optimierung).
+*   **Automatischer Update-Check:** Die LisaPro prüft nun alle **6 Stunden** (statt täglich) auf neue Firmware-Versionen, sobald eine Internetverbindung besteht.
+
+---
+
 ## [V1.0.2] - 2026-02-12
 ### System-Monitoring & Update-Fixes
 

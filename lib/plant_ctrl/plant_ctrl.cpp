@@ -768,7 +768,14 @@ void PlantCtrl::distanceTick_(uint32_t now) {
   if (now - lastTofReadMs_ >= interval) {
     lastTofReadMs_ = now;
     int v = tof_->readAvgMm(lumina::plant::TOF_AVG_SAMPLES);
-    if (v >= 0) lastTofMm_ = v;
+    if (v >= 0) {
+      lastTofMm_ = v;
+    } else if (adjustActive_) {
+      // Wenn wir aktiv regeln und der Sensor ausfaellt oder Out-of-Range meldet -> Abbruch
+      Serial.println(F("[CTRL] ERROR: Ungueltiger ToF-Abstand waehrend Fahrt. Abgebrochen!"));
+      step_->stop();
+      adjustActive_ = false;
+    }
   }
   if (lastTofMm_ < 0) return;
 
@@ -885,6 +892,11 @@ void PlantCtrl::runStartupApproachBlocking() {
                           ledPlantMm, err, targetHz, step_->getPositionMm());
           }
         }
+      } else {
+        // Fehler oder Out-of-Range während der blockierenden Annäherung
+        Serial.println(F("[STARTUP] ERROR: Ungueltiger ToF-Abstand! Fahrt zur Pflanze unterbrochen."));
+        step_->stop();
+        break;
       }
     }
 
@@ -892,9 +904,9 @@ void PlantCtrl::runStartupApproachBlocking() {
       if (!step_->status().isMoving) break;
     }
     
-    // Timeout-Schutz: Wenn nach 30s nichts passiert, abbrechen
-    if (now > 30000 && !reached && lastTofMm_ < 0) {
-       Serial.println(F("[STARTUP] ERROR: Kein ToF-Signal nach 30s!"));
+    // Timeout-Schutz: Wenn nach 40s nichts passiert, abbrechen
+    if (now > 40000 && !reached && lastTofMm_ < 0) {
+       Serial.println(F("[STARTUP] ERROR: Kein ToF-Signal nach 40s (Timeout)!"));
        step_->stop();
        break;
     }

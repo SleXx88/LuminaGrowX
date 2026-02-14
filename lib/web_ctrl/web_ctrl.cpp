@@ -444,6 +444,28 @@ void WebCtrl::loop() {
     delay(100);
     ESP.restart();
   }
+
+  // Hintergrund-Update-Check: 
+  // 1) Einmalig beim Start (sobald Internet da ist)
+  // 2) Danach alle 6 Stunden
+  if (!updateCheckJobRunning_ && net_ && net_->internetOK()) {
+    const uint32_t SIX_HOURS_MS = 6 * 3600 * 1000;
+    bool shouldCheck = false;
+    
+    if (!firstUpdateCheckDone_) {
+      shouldCheck = true;
+    } else if (now - lastUpdateCheckMs_ >= SIX_HOURS_MS) {
+      shouldCheck = true;
+    }
+
+    if (shouldCheck) {
+      firstUpdateCheckDone_ = true;
+      lastUpdateCheckMs_ = now;
+      updateCheckJobRunning_ = true;
+      Serial.println(F("[WEB] Starte Hintergrund-Update-Check..."));
+      xTaskCreatePinnedToCore(&WebCtrl::updateCheckTaskTrampoline_, "upd_check", 6144, this, 1, nullptr, 0);
+    }
+  }
 }
 
 void WebCtrl::setupRoutes_() {
@@ -1337,28 +1359,14 @@ String WebCtrl::makeStatusJson_() {
   JsonObject upd = doc["update"].to<JsonObject>();
   upd["has_update"] = latestKnownHasUpdate_;
   upd["latest"] = latestKnownTag_;
+  
+  // MQTT-spezifisches Flat-Flag
+  doc["update_available"] = latestKnownHasUpdate_;
 
   // MQTT status
   JsonObject mqttObj = doc["mqtt"].to<JsonObject>();
   mqttObj["enabled"] = mqtt_cfg_.enabled;
   mqttObj["connected"] = mqtt_ ? mqtt_->isConnected() : false;
-
-  // Schedule background update check: once after first NTP sync (boot) and then daily ~03:00 if internet is OK
-  if (!updateCheckJobRunning_ && net_ && net_->internetOK()) {
-    time_t now = time(nullptr);
-    if (now > 0) {
-      struct tm tmL; localtime_r(&now, &tmL);
-      uint32_t ymd = (uint32_t)((tmL.tm_year+1900)*10000 + (tmL.tm_mon+1)*100 + tmL.tm_mday);
-      if (!firstUpdateCheckDone_) {
-        firstUpdateCheckDone_ = true;
-        updateCheckJobRunning_ = true;
-        xTaskCreatePinnedToCore(&WebCtrl::updateCheckTaskTrampoline_, "upd_check", 6144, this, 1, nullptr, 0);
-      } else if (tmL.tm_hour >= 3 && lastUpdateCheckYMD_ != ymd) {
-        updateCheckJobRunning_ = true;
-        xTaskCreatePinnedToCore(&WebCtrl::updateCheckTaskTrampoline_, "upd_check", 6144, this, 1, nullptr, 0);
-      }
-    }
-  }
 
   String out; serializeJson(doc, out); return out;
 }

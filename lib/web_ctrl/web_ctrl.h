@@ -161,7 +161,8 @@ private:
   bool latestKnownHasUpdate_ = false;
   String latestKnownTag_;
   uint32_t lastUpdateCheckYMD_ = 0; // YYYYMMDD of last successful/attempted check
-  bool firstUpdateCheckDone_ = false;
+  uint32_t lastUpdateCheckMs_ = 0;  // Millis of last check
+    bool firstUpdateCheckDone_ = false;
   static void updateCheckTaskTrampoline_(void* arg);
   void updateCheckTaskRun_();
 
