@@ -7,6 +7,7 @@ backup/
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
+.gemini
 
 # Ignore build files
 .BackUp*
