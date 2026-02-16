@@ -1249,6 +1249,11 @@ String WebCtrl::makeSetupStatusJson_() {
     doc["wifi_ssid"] = net_->cfg().ssid;
   }
   doc["initial_setup_done"] = setup_flag::is_done();
+  // Silent block
+  JsonObject sil = doc["silent"].to<JsonObject>();
+  sil["enabled"] = silent_.enabled;
+  sil["active"]  = ctrl_ ? ctrl_->isGlobalSilentActive() : false;
+
   String out; serializeJson(doc, out); return out;
 }
 
@@ -1491,6 +1496,11 @@ String WebCtrl::makeStatusJson_() {
   JsonObject mqttObj = doc["mqtt"].to<JsonObject>();
   mqttObj["enabled"] = mqtt_cfg_.enabled;
   mqttObj["connected"] = mqtt_ ? mqtt_->isConnected() : false;
+
+  // Silent block
+  JsonObject sil = doc["silent"].to<JsonObject>();
+  sil["enabled"] = silent_.enabled;
+  sil["active"]  = ctrl_ ? ctrl_->isGlobalSilentActive() : false;
 
   String out; serializeJson(doc, out); return out;
 }

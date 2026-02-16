@@ -170,7 +170,7 @@ void MqttCtrl::sendDiscovery() {
     
     // Binary Status
     publishDiscovery_("binary_sensor", "door_open", "Tür", nullptr, "door", nullptr);
-    publishDiscovery_("binary_sensor", "pump_on", "Pumpe", nullptr, "running", nullptr);
+    publishDiscovery_("binary_sensor", "pump_on", "Pumpe (Luft)", nullptr, "running", nullptr);
     publishDiscovery_("binary_sensor", "light_on", "Licht Status", nullptr, "light", nullptr);
     publishDiscovery_("binary_sensor", "fan_on", "Lüfter Status", nullptr, "running", nullptr);
 

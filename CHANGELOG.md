@@ -2,6 +2,29 @@
 
 Alle wichtigen Änderungen und Features der automatisierten Growbox-Steuerung.
 
+## [V1.0.4] - 2026-02-17
+### Erweiterte Pumpen- & Lüftersteuerung
+
+Dieses Release führt phasenabhängige Einstellungen für die Luftpumpe und den LED-Umluftlüfter ein und optimiert die Stabilität der Web-Oberfläche.
+
+#### 🚀 Kernfunktionen & Features
+*   **Pumpensteuerung (Luft):** Die Luftpumpe kann nun individuell pro Phase (Keimling, Wachstum, Blüte) im Zeitplan aktiviert oder deaktiviert werden.
+*   **Umluft-Lüfter (LED) implementiert:** Der Lüfter an Klemme LOAD1 (`fan3`) kann nun phasenweit geregelt werden. 
+    *   *⚠️ ACHTUNG:* Der Betrieb an Klemme LOAD1 erfordert zwingend einen passenden LC-Filter.
+*   **Optimierter Silent-Modus:** Der Silent-Modus wurde um dedizierte Einstellungen für den Umluft-Lüfter sowie eine Freigabe-Option für die Pumpe erweitert.
+
+#### 🎨 Web-Interface (UI/UX)
+*   **Live Status Redesign:** Vollständig überarbeitete Startseite mit logischer Gruppierung (Klima, Aktoren, Raum, System).
+*   **Verbesserte Statusanzeigen:** Neue Live-Anzeige für Umluft-Lüfter und detaillierter Status für den Silent-Modus (Aktiv, Standby, Deaktiviert).
+*   **Eingabevalidierung:** Absicherung aller Einstellungsfelder gegen ungültige Werte (0-100%, Min <= Max).
+*   **Stabilitäts-Fix:** Behebung von Fehlern beim Speichern großer Konfigurations-JSONs durch optimiertes Buffering im Backend.
+
+#### 🔧 Fehlerbehebungen & Optimierungen
+*   **Fan 2 Parallelregelung:** Lüfter 2 wird nun korrekt angesteuert und läuft in der VPD-Regelung parallel zu Lüfter 1.
+*   **Begriffsanpassung:** Konsistente Umbenennung von "Bewässerung" in **"Pumpe (Luft)"** im gesamten System.
+
+---
+
 ## [V1.0.3] - 2026-02-14
 ### Optimierte Abstandsregelung & Sicherheit (ToF)
 

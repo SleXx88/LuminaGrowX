@@ -323,13 +323,13 @@
                       <strong class="mode-label">Lüfter-Limits (Silent)</strong>
                       <div class="mode-inputs-list">
                         <div class="input-row"><label>Abluft-Lüfter (1 & 2)</label>
-                          <input type="number" id="silentFExhMin" placeholder="Min">
-                          <input type="number" id="silentFExhMax" placeholder="Max">
+                          <input type="number" id="silentFExhMin" placeholder="Min" min="0" max="100">
+                          <input type="number" id="silentFExhMax" placeholder="Max" min="0" max="100">
                           <span class="unit">%</span>
                         </div>
                         <div class="input-row"><label>Umluft-Lüfter (LED)</label>
-                          <input type="number" id="silentFCircMin" placeholder="Min">
-                          <input type="number" id="silentFCircMax" placeholder="Max">
+                          <input type="number" id="silentFCircMin" placeholder="Min" min="0" max="100">
+                          <input type="number" id="silentFCircMax" placeholder="Max" min="0" max="100">
                           <span class="unit">%</span>
                         </div>
                       </div>
@@ -339,7 +339,7 @@
                       <strong class="mode-label">Optionen (Silent)</strong>
                       <div class="mode-inputs-list">
                         <div class="input-row">
-                          <label>Pumpe während Silent-Phase erlaubt</label>
+                          <label>Pumpe (Luft) während Silent-Phase erlaubt</label>
                           <input type="checkbox" id="silentPump">
                         </div>
                       </div>
@@ -378,8 +378,8 @@
                     <div class="mode-inputs-list">
                       <div class="input-row">
                         <label>Leistung (Min / Max)</label>
-                        <input type="number" id="phFCircMin" placeholder="Min">
-                        <input type="number" id="phFCircMax" placeholder="Max">
+                        <input type="number" id="phFCircMin" placeholder="Min" min="0" max="100">
+                        <input type="number" id="phFCircMax" placeholder="Max" min="0" max="100">
                         <span class="unit">%</span>
                       </div>
                     </div>
@@ -389,7 +389,7 @@
                     <strong class="mode-label">Optionen</strong>
                     <div class="mode-inputs-list">
                       <div class="input-row">
-                        <label>Pumpe für diese Phase aktiviert</label>
+                        <label>Pumpe (Luft) für diese Phase aktiviert</label>
                         <input type="checkbox" id="phPump">
                       </div>
                     </div>
@@ -404,8 +404,8 @@
                   <div class="mode-settings-block" style="margin-bottom: 0.75rem;">
                     <strong class="mode-label">Sonnen-Simulation</strong>
                     <div class="mode-inputs-list">
-                      <div class="input-row"><label>Sonnenaufgang</label><input type="number" id="phRise"><span class="unit">min</span></div>
-                      <div class="input-row"><label>Sonnenuntergang</label><input type="number" id="phSet"><span class="unit">min</span></div>
+                      <div class="input-row"><label>Sonnenaufgang</label><input type="number" id="phRise" min="0"><span class="unit">min</span></div>
+                      <div class="input-row"><label>Sonnenuntergang</label><input type="number" id="phSet" min="0"><span class="unit">min</span></div>
                     </div>
                   </div>
                   <h5 style="margin-top:1rem">Werte je Tageszeit</h5>
@@ -445,126 +445,128 @@
         <article id="artLive">
           <header><h2>Live Status</h2></header>
           <div class="content" style="padding: 0.75rem; display: grid; gap: 0.75rem;">
-            <!-- Growbox -->
+            
+            <!-- KLIMA INNEN -->
             <div style="padding: 0.5rem; background: rgba(239, 68, 68, 0.08); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
               <div style="font-size: 0.75rem; font-weight: 600; color: var(--accent); margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.3rem;">
-                <span style="display: inline-flex; width: 0.9rem; height: 0.9rem; color: var(--accent);" id="iconGrowbox"></span>
-                <span>Growbox</span>
+                <span style="display: inline-flex; width: 0.9rem; height: 0.9rem; color: var(--accent);" id="iconKlimaIn"></span>
+                <span>Klima Growbox</span>
               </div>
-
-              <!-- Umgebungsdaten -->
-              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0.5rem; margin-bottom: 0.5rem;">
+              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem;">
                 <div style="padding: 0.5rem; background: var(--muted); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
-                  <div style="font-size: 0.7rem; color: var(--text-dim); margin-bottom: 0.15rem;">Temperatur</div>
-                  <div style="font-size: 1.1rem; font-weight: 700; color: var(--text);" class="mono" id="stT">-</div>
-                  <div style="font-size: 0.65rem; color: var(--text-dim);">°C</div>
+                  <div style="font-size: 0.65rem; color: var(--text-dim);">Temperatur</div>
+                  <div style="font-size: 1.1rem; font-weight: 700;" class="mono"><span id="stT">-</span> <small style="font-size: 0.65rem; font-weight: normal; color: var(--text-dim);">°C</small></div>
                 </div>
                 <div style="padding: 0.5rem; background: var(--muted); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
-                  <div style="font-size: 0.7rem; color: var(--text-dim); margin-bottom: 0.15rem;">Luftfeuchte</div>
-                  <div style="font-size: 1.1rem; font-weight: 700; color: var(--text);" class="mono" id="stH">-</div>
-                  <div style="font-size: 0.65rem; color: var(--text-dim);">% rF</div>
+                  <div style="font-size: 0.65rem; color: var(--text-dim);">Luftfeuchte</div>
+                  <div style="font-size: 1.1rem; font-weight: 700;" class="mono"><span id="stH">-</span> <small style="font-size: 0.65rem; font-weight: normal; color: var(--text-dim);">%</small></div>
                 </div>
                 <div style="padding: 0.5rem; background: var(--muted); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
-                  <div style="font-size: 0.7rem; color: var(--text-dim); margin-bottom: 0.15rem;">VPD</div>
-                  <div style="font-size: 1.1rem; font-weight: 700; color: var(--text);" class="mono" id="stVpd">-</div>
-                  <div style="font-size: 0.65rem; color: var(--text-dim);">kPa</div>
+                  <div style="font-size: 0.65rem; color: var(--text-dim);">VPD</div>
+                  <div style="font-size: 1.1rem; font-weight: 700;" class="mono"><span id="stVpd">-</span> <small style="font-size: 0.65rem; font-weight: normal; color: var(--text-dim);">kPa</small></div>
                 </div>
                 <div style="padding: 0.5rem; background: var(--muted); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
-                  <div style="font-size: 0.7rem; color: var(--text-dim); margin-bottom: 0.15rem;">Taupunkt</div>
-                  <div style="font-size: 1.1rem; font-weight: 700; color: var(--text);" class="mono" id="stDew">-</div>
-                  <div style="font-size: 0.65rem; color: var(--text-dim);">°C</div>
+                  <div style="font-size: 0.65rem; color: var(--text-dim);">Taupunkt</div>
+                  <div style="font-size: 1.1rem; font-weight: 700;" class="mono"><span id="stDew">-</span> <small style="font-size: 0.65rem; font-weight: normal; color: var(--text-dim);">°C</small></div>
                 </div>
               </div>
+            </div>
 
-              <!-- Aktoren -->
-              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0.5rem;">
+            <!-- AKTOREN -->
+            <div style="padding: 0.5rem; background: rgba(34, 197, 94, 0.08); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
+              <div style="font-size: 0.75rem; font-weight: 600; color: var(--ok); margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.3rem;">
+                <span style="display: inline-flex; width: 0.9rem; height: 0.9rem; color: var(--ok);" id="iconAktoren"></span>
+                <span>Aktoren & Status</span>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem;">
                 <div style="padding: 0.5rem; background: var(--muted); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
                   <div style="display: flex; align-items: center; gap: 0.3rem; margin-bottom: 0.2rem;">
                     <span class="dot" id="dotLight"></span>
-                    <div style="font-size: 0.7rem; color: var(--text-dim);">LED</div>
+                    <div style="font-size: 0.65rem; color: var(--text-dim);">LED (Beleuchtung)</div>
                   </div>
-                  <div style="font-size: 1rem; font-weight: 700; color: var(--text);" class="mono" id="stLightPct">-</div>
-                  <div style="font-size: 0.65rem; color: var(--text-dim);" id="stLightState">-</div>
+                  <div style="font-size: 1rem; font-weight: 700;" class="mono" id="stLightPct">-</div>
                 </div>
                 <div style="padding: 0.5rem; background: var(--muted); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
                   <div style="display: flex; align-items: center; gap: 0.3rem; margin-bottom: 0.2rem;">
                     <span class="dot" id="dotFan"></span>
-                    <div style="font-size: 0.7rem; color: var(--text-dim);">Lüfter</div>
+                    <div style="font-size: 0.65rem; color: var(--text-dim);">Abluft (Lüfter)</div>
                   </div>
-                  <div style="font-size: 1rem; font-weight: 700; color: var(--text);" class="mono" id="stFanPct">-</div>
-                  <div style="font-size: 0.65rem; color: var(--text-dim);" id="stFanState">-</div>
+                  <div style="font-size: 1rem; font-weight: 700;" class="mono" id="stFanPct">-</div>
+                </div>
+                <div style="padding: 0.5rem; background: var(--muted); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
+                  <div style="display: flex; align-items: center; gap: 0.3rem; margin-bottom: 0.2rem;">
+                    <span class="dot" id="dotFan3"></span>
+                    <div style="font-size: 0.65rem; color: var(--text-dim);">Umluft (LED)</div>
+                  </div>
+                  <div style="font-size: 1rem; font-weight: 700;" class="mono" id="stFan3Pct">-</div>
+                </div>
+                <div style="padding: 0.5rem; background: var(--muted); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
+                  <div style="display: flex; align-items: center; gap: 0.3rem; margin-bottom: 0.2rem;">
+                    <span class="dot" id="dotSilent"></span>
+                    <div style="font-size: 0.65rem; color: var(--text-dim);">Silent-Modus</div>
+                  </div>
+                  <div style="font-size: 0.9rem; font-weight: 700;" class="mono" id="stSilentState">AUS</div>
                 </div>
                 <div style="padding: 0.5rem; background: var(--muted); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
                   <div style="display: flex; align-items: center; gap: 0.3rem; margin-bottom: 0.2rem;">
                     <span class="dot" id="dotPump"></span>
-                    <div style="font-size: 0.7rem; color: var(--text-dim);">Pumpe</div>
+                    <div style="font-size: 0.65rem; color: var(--text-dim);">Pumpe (Luft)</div>
                   </div>
-                  <div style="font-size: 1rem; font-weight: 700; color: var(--text);" class="mono" id="stPumpState">AUS</div>
+                  <div style="font-size: 1rem; font-weight: 700;" class="mono" id="stPumpState">AUS</div>
                 </div>
                 <div style="padding: 0.5rem; background: var(--muted); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
                   <div style="display: flex; align-items: center; gap: 0.3rem; margin-bottom: 0.2rem;">
                     <span class="dot" id="dotDoor"></span>
-                    <div style="font-size: 0.7rem; color: var(--text-dim);">Tür</div>
+                    <div style="font-size: 0.65rem; color: var(--text-dim);">Tür-Status</div>
                   </div>
-                  <div style="font-size: 1rem; font-weight: 700; color: var(--text);" class="mono" id="stDoor">-</div>
-                  <div style="font-size: 0.65rem; color: var(--text-dim);">Status</div>
+                  <div style="font-size: 1rem; font-weight: 700;" class="mono" id="stDoor">-</div>
                 </div>
               </div>
             </div>
 
-            <!-- Umgebungsdaten AUSSEN -->
+            <!-- RAUMKLIMA -->
             <div style="padding: 0.5rem; background: rgba(59, 130, 246, 0.08); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
               <div style="font-size: 0.75rem; font-weight: 600; color: #60a5fa; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.3rem;">
-                <span style="display: inline-flex; width: 0.9rem; height: 0.9rem; color: #60a5fa;" id="iconAussen"></span>
-                <span>Raumklima</span>
+                <span style="display: inline-flex; width: 0.9rem; height: 0.9rem; color: #60a5fa;" id="iconRaum"></span>
+                <span>Raumklima (Außen)</span>
               </div>
-              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0.5rem;">
+              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem;">
                 <div style="padding: 0.5rem; background: var(--muted); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
-                  <div style="font-size: 0.7rem; color: var(--text-dim); margin-bottom: 0.15rem;">Temperatur</div>
-                  <div style="font-size: 1.1rem; font-weight: 700; color: var(--text);" class="mono" id="stTOut">-</div>
-                  <div style="font-size: 0.65rem; color: var(--text-dim);">°C</div>
+                  <div style="font-size: 0.65rem; color: var(--text-dim);">Temperatur</div>
+                  <div style="font-size: 1.1rem; font-weight: 700;" class="mono"><span id="stTOut">-</span> <small style="font-size: 0.65rem; font-weight: normal; color: var(--text-dim);">°C</small></div>
                 </div>
                 <div style="padding: 0.5rem; background: var(--muted); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
-                  <div style="font-size: 0.7rem; color: var(--text-dim); margin-bottom: 0.15rem;">Luftfeuchte</div>
-                  <div style="font-size: 1.1rem; font-weight: 700; color: var(--text);" class="mono" id="stHOut">-</div>
-                  <div style="font-size: 0.65rem; color: var(--text-dim);">% rF</div>
+                  <div style="font-size: 0.65rem; color: var(--text-dim);">Luftfeuchte</div>
+                  <div style="font-size: 1.1rem; font-weight: 700;" class="mono"><span id="stHOut">-</span> <small style="font-size: 0.65rem; font-weight: normal; color: var(--text-dim);">%</small></div>
                 </div>
               </div>
             </div>
 
-            <!-- System -->
+            <!-- SYSTEM -->
             <div style="padding: 0.5rem; background: rgba(156, 163, 175, 0.08); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
-              <div style="font-size: 0.75rem; font-weight: 600; color: #9ca3af; margin-bottom: 0.4rem;">System</div>
+              <div style="font-size: 0.75rem; font-weight: 600; color: #9ca3af; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.3rem;">
+                <span style="display: inline-flex; width: 0.9rem; height: 0.9rem; color: #9ca3af;" id="iconSystem"></span>
+                <span>System</span>
+              </div>
               <div style="display: grid; gap: 0.5rem;">
                 <div style="padding: 0.5rem; background: var(--muted); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
-                  <div style="font-size: 0.7rem; color: var(--text-dim); margin-bottom: 0.15rem; display: flex; align-items: center; gap: 0.3rem;">
-                    <span style="display: inline-flex; width: 0.7rem; height: 0.7rem; color: var(--text-dim);" id="iconUptime"></span>
-                    <span>Uptime</span>
-                  </div>
-                  <div style="font-size: 1rem; font-weight: 600; color: var(--text);" class="mono" id="stUp">-</div>
+                  <div style="font-size: 0.65rem; color: var(--text-dim);">Uptime</div>
+                  <div style="font-size: 1rem; font-weight: 600;" class="mono" id="stUp">-</div>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
                   <div style="padding: 0.5rem; background: var(--muted); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
-                    <div style="font-size: 0.7rem; color: var(--text-dim); margin-bottom: 0.15rem; display: flex; align-items: center; gap: 0.3rem;">
-                      <span style="display: inline-flex; width: 0.7rem; height: 0.7rem; color: var(--text-dim);" id="iconIp"></span>
-                      <span>IP-Adresse</span>
-                    </div>
-                    <div style="font-size: 0.9rem; font-weight: 600; color: var(--text);" class="mono" id="stIp">-</div>
-                    <div style="font-size: 0.65rem; color: var(--text-dim); margin-top: 0.15rem;" id="stNet">-</div>
+                    <div style="font-size: 0.65rem; color: var(--text-dim);">IP-Adresse</div>
+                    <div style="font-size: 0.9rem; font-weight: 600;" class="mono" id="stIp">-</div>
                   </div>
                   <div style="padding: 0.5rem; background: var(--muted); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
-                    <div style="font-size: 0.7rem; color: var(--text-dim); margin-bottom: 0.15rem; display: flex; align-items: center; gap: 0.3rem;">
-                      <span style="display: inline-flex; width: 0.7rem; height: 0.7rem; color: var(--text-dim);" id="iconRssi"></span>
-                      <span>RSSI</span>
-                    </div>
-                    <div style="font-size: 0.9rem; font-weight: 600; color: var(--text);" class="mono" id="stRssi">-</div>
-                    <div style="font-size: 0.65rem; color: var(--text-dim); margin-top: 0.15rem;">dBm</div>
+                    <div style="font-size: 0.65rem; color: var(--text-dim);">Signal (RSSI)</div>
+                    <div style="font-size: 0.9rem; font-weight: 600;" class="mono"><span id="stRssi">-</span> <small style="font-size: 0.65rem; font-weight: normal; color: var(--text-dim);">dBm</small></div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        </article>
 
         <div id="mainFooter" style="display: flex; flex-direction: column; gap: 1rem;">
           <div style="display: flex; gap: 0.5rem; padding: 0;">
@@ -658,6 +660,8 @@
         network: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg>',
         signal: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 20h.01"/><path d="M7 20v-4"/><path d="M12 20v-8"/><path d="M17 20V8"/><path d="M22 20V4"/></svg>',
         mqtt: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="18" r="3"/><line x1="12" y1="9" x2="12" y2="12"/><line x1="12" y1="12" x2="6" y2="15"/><line x1="12" y1="12" x2="18" y2="15"/></svg>',
+        bolt: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>',
+        cpu: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/><path d="M15 2v2"/><path d="M9 2v2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M15 20v2"/><path d="M9 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/></svg>',
       };
       const live = { ws: null, timer: null, lastStatus: null };
       let netDialogOpen = false;
@@ -832,7 +836,6 @@
         const lightOn = !!s.light_on;
         const lightPct = s.light_pct != null ? s.light_pct : 0;
         if ($("stLightPct")) $("stLightPct").textContent = format1(lightPct) + " %";
-        if ($("stLightState")) $("stLightState").textContent = lightOn ? "AN" : "AUS";
         const dotLight = $("dotLight");
         if (dotLight) {
           dotLight.classList.remove("ok", "warn", "err");
@@ -844,7 +847,6 @@
         const fanOn = !!s.fan_on;
         const fanPct = s.fan_pct != null ? s.fan_pct : 0;
         if ($("stFanPct")) $("stFanPct").textContent = format0(fanPct) + " %";
-        if ($("stFanState")) $("stFanState").textContent = fanOn ? "AN" : "AUS";
         const dotFan = $("dotFan");
         if (dotFan) {
           dotFan.classList.remove("ok", "warn", "err");
@@ -852,7 +854,36 @@
           else dotFan.classList.add("err");
         }
 
-        // Aktoren - Pumpe
+        // Aktoren - Umluft Lüfter (LED)
+        const fan3On = !!s.fan3_on;
+        const fan3Pct = s.fan3_pct != null ? s.fan3_pct : 0;
+        if ($("stFan3Pct")) $("stFan3Pct").textContent = format0(fan3Pct) + " %";
+        const dotFan3 = $("dotFan3");
+        if (dotFan3) {
+          dotFan3.classList.remove("ok", "warn", "err");
+          if (fan3On) dotFan3.classList.add("ok");
+          else dotFan3.classList.add("err");
+        }
+
+        // Silent-Modus
+        const silent = s.silent || {};
+        const stSilent = $("stSilentState");
+        const dotSilent = $("dotSilent");
+        if (stSilent && dotSilent) {
+          dotSilent.classList.remove("ok", "warn", "err");
+          if (!silent.enabled) {
+            stSilent.textContent = "DEAKTIVIERT";
+            dotSilent.classList.add("err");
+          } else if (silent.active) {
+            stSilent.textContent = "AKTIV";
+            dotSilent.classList.add("ok");
+          } else {
+            stSilent.textContent = "STANDBY";
+            dotSilent.classList.add("warn");
+          }
+        }
+
+        // Aktoren - Pumpe (Luft)
         const pumpOn = !!s.pump_on;
         if ($("stPumpState")) $("stPumpState").textContent = pumpOn ? "AN" : "AUS";
         const dotPump = $("dotPump");
@@ -1059,7 +1090,24 @@
 
       $("silentEnabled").addEventListener("change", () => $("silentContent").classList.toggle("hidden", !$("silentEnabled").checked));
       
+      function validateMinMax(minId, maxId, label) {
+        const minVal = parseFloat($(minId).value);
+        const maxVal = parseFloat($(maxId).value);
+        if (minVal < 0 || maxVal < 0 || minVal > 100 || maxVal > 100) {
+          showToast(`Werte für ${label} müssen zwischen 0% und 100% liegen.`);
+          return false;
+        }
+        if (minVal > maxVal) {
+          showToast(`Das Minimum für ${label} darf nicht größer als das Maximum sein.`);
+          return false;
+        }
+        return true;
+      }
+
       $("btnSilentSaveMain").addEventListener("click", async () => {
+        if (!validateMinMax("silentFExhMin", "silentFExhMax", "Abluft-Lüfter")) return;
+        if (!validateMinMax("silentFCircMin", "silentFCircMax", "Umluft-Lüfter")) return;
+
         try {
           const startArr = $("silentStart").value.split(":");
           const endArr = $("silentEnd").value.split(":");
@@ -1082,11 +1130,10 @@
 
       // Icons initialisieren
       function initIcons() {
-        const iconGrowbox = $("iconGrowbox"); if (iconGrowbox) iconGrowbox.innerHTML = icons.plant;
-        const iconAussen = $("iconAussen"); if (iconAussen) iconAussen.innerHTML = icons.home;
-        const iconUptime = $("iconUptime"); if (iconUptime) iconUptime.innerHTML = icons.clock;
-        const iconIp = $("iconIp"); if (iconIp) iconIp.innerHTML = icons.network;
-        const iconRssi = $("iconRssi"); if (iconRssi) iconRssi.innerHTML = icons.signal;
+        const iconKlimaIn = $("iconKlimaIn"); if (iconKlimaIn) iconKlimaIn.innerHTML = icons.plant;
+        const iconAktoren = $("iconAktoren"); if (iconAktoren) iconAktoren.innerHTML = icons.bolt;
+        const iconRaum = $("iconRaum"); if (iconRaum) iconRaum.innerHTML = icons.home;
+        const iconSystem = $("iconSystem"); if (iconSystem) iconSystem.innerHTML = icons.cpu;
       }
       initIcons();
       let phasesData = [];
@@ -1104,11 +1151,11 @@
           <div class="mode-settings-block">
             <strong class="mode-label">${label}</strong>
             <div class="mode-inputs-list">
-              <div class="input-row"><label>LED</label><input type="number" step="1" data-mode="${modeKey}" data-field="led"><span class="unit">%</span></div>
-              <div class="input-row"><label>Lüfter Min</label><input type="number" step="1" data-mode="${modeKey}" data-field="fan_min"><span class="unit">%</span></div>
-              <div class="input-row"><label>Lüfter Max</label><input type="number" step="1" data-mode="${modeKey}" data-field="fan_max"><span class="unit">%</span></div>
-              <div class="input-row"><label>VPD Min</label><input type="number" step="0.01" data-mode="${modeKey}" data-field="vpd_min"><span class="unit">kPa</span></div>
-              <div class="input-row"><label>VPD Max</label><input type="number" step="0.01" data-mode="${modeKey}" data-field="vpd_max"><span class="unit">kPa</span></div>
+              <div class="input-row"><label>LED</label><input type="number" step="1" min="0" max="100" data-mode="${modeKey}" data-field="led"><span class="unit">%</span></div>
+              <div class="input-row"><label>Lüfter Min</label><input type="number" step="1" min="0" max="100" data-mode="${modeKey}" data-field="fan_min"><span class="unit">%</span></div>
+              <div class="input-row"><label>Lüfter Max</label><input type="number" step="1" min="0" max="100" data-mode="${modeKey}" data-field="fan_max"><span class="unit">%</span></div>
+              <div class="input-row"><label>VPD Min</label><input type="number" step="0.01" min="0" data-mode="${modeKey}" data-field="vpd_min"><span class="unit">kPa</span></div>
+              <div class="input-row"><label>VPD Max</label><input type="number" step="0.01" min="0" data-mode="${modeKey}" data-field="vpd_max"><span class="unit">kPa</span></div>
             </div>
           </div>
         `;
@@ -1207,6 +1254,32 @@
       $("btnSavePhases").addEventListener("click", async () => {
         // Ensure current UI state is captured in phasesData array
         collectCurrentPhaseData(currentPhaseIdx);
+
+        // Validation
+        const fCircMin = parseFloat($("phFCircMin").value);
+        const fCircMax = parseFloat($("phFCircMax").value);
+        if (fCircMin < 0 || fCircMax < 0 || fCircMin > 100 || fCircMax > 100) {
+          showToast("LED-Lüfter Werte müssen zwischen 0% und 100% liegen.");
+          return;
+        }
+        if (fCircMin > fCircMax) {
+          showToast("LED-Lüfter: Minimum darf nicht größer als das Maximum sein.");
+          return;
+        }
+
+        for (const p of phasesData) {
+          const modes = ["day", "night", "night_silent"];
+          for (const m of modes) {
+            const s = p.settings[m];
+            if (s.led < 0 || s.led > 100) { showToast(`Phase ${p.name}: LED % muss 0-100 sein.`); return; }
+            if (s.fan_min < 0 || s.fan_min > 100) { showToast(`Phase ${p.name}: Lüfter Min % muss 0-100 sein.`); return; }
+            if (s.fan_max < 0 || s.fan_max > 100) { showToast(`Phase ${p.name}: Lüfter Max % muss 0-100 sein.`); return; }
+            if (s.fan_min > s.fan_max) { showToast(`Phase ${p.name}: Lüfter Min darf nicht größer als Max sein.`); return; }
+            if (s.vpd_min < 0 || s.vpd_max < 0) { showToast(`Phase ${p.name}: VPD muss positiv sein.`); return; }
+            if (s.vpd_min > s.vpd_max) { showToast(`Phase ${p.name}: VPD Min darf nicht größer als Max sein.`); return; }
+          }
+        }
+
         try {
           const resp = await fetch("/api/settings/phases", {
             method: "POST",
