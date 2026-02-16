@@ -216,6 +216,11 @@
         width: 25px;
         text-align: left;
       }
+      .input-row input[type="checkbox"] {
+        width: 1.2rem !important;
+        height: 1.2rem !important;
+        margin: 0 !important;
+      }
 
       @media (min-width: 1024px) {
         #modesGrid {
@@ -305,12 +310,15 @@
                 <label><input type="checkbox" id="silentEnabled" role="switch"> Silent-Modus aktivieren</label>
                 
                 <div id="silentContent" class="hidden">
-                  <div class="grid">
-                    <label>Startzeit <input type="time" id="silentStart"></label>
-                    <label>Endzeit <input type="time" id="silentEnd"></label>
-                  </div>
-                  
-                  <div style="display: grid; gap: 0.75rem; margin-top: 0.5rem;">
+                  <div style="display: grid; gap: 0.75rem;">
+                    <div class="mode-settings-block">
+                      <strong class="mode-label">Zeitplan (Silent)</strong>
+                      <div class="mode-inputs-list">
+                        <div class="input-row"><label>Startzeit</label><input type="time" id="silentStart" style="width: 100px !important;"></div>
+                        <div class="input-row"><label>Endzeit</label><input type="time" id="silentEnd" style="width: 100px !important;"></div>
+                      </div>
+                    </div>
+
                     <div class="mode-settings-block">
                       <strong class="mode-label">Lüfter-Limits (Silent)</strong>
                       <div class="mode-inputs-list">
@@ -326,10 +334,16 @@
                         </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div style="margin-top: 0.5rem;">
-                    <label><input type="checkbox" id="silentPump"> Pumpe während Silent-Phase erlaubt</label>
+                    <div class="mode-settings-block">
+                      <strong class="mode-label">Optionen (Silent)</strong>
+                      <div class="mode-inputs-list">
+                        <div class="input-row">
+                          <label>Pumpe während Silent-Phase erlaubt</label>
+                          <input type="checkbox" id="silentPump">
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -350,9 +364,36 @@
                   </select>
                 </label>
 
-                <div class="grid">
-                  <label>Licht AN <input type="time" id="phOn"></label>
-                  <label>Licht AUS <input type="time" id="phOff"></label>
+                <div style="display: grid; gap: 0.75rem;">
+                  <div class="mode-settings-block">
+                    <strong class="mode-label">Licht-Zeitplan</strong>
+                    <div class="mode-inputs-list">
+                      <div class="input-row"><label>Licht AN</label><input type="time" id="phOn" style="width: 100px !important;"></div>
+                      <div class="input-row"><label>Licht AUS</label><input type="time" id="phOff" style="width: 100px !important;"></div>
+                    </div>
+                  </div>
+
+                  <div class="mode-settings-block">
+                    <strong class="mode-label">Umluft-Lüfter (LED)</strong>
+                    <div class="mode-inputs-list">
+                      <div class="input-row">
+                        <label>Leistung (Min / Max)</label>
+                        <input type="number" id="phFCircMin" placeholder="Min">
+                        <input type="number" id="phFCircMax" placeholder="Max">
+                        <span class="unit">%</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="mode-settings-block">
+                    <strong class="mode-label">Optionen</strong>
+                    <div class="mode-inputs-list">
+                      <div class="input-row">
+                        <label>Pumpe für diese Phase aktiviert</label>
+                        <input type="checkbox" id="phPump">
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div style="margin-top:0.5rem">
@@ -360,9 +401,12 @@
                 </div>
 
                 <div id="profiBlock" class="hidden" style="border-left: 2px solid var(--accent); padding-left: 1rem; margin-left: 0.2rem;">
-                  <div class="grid">
-                    <label>Sonnenaufgang (min) <input type="number" id="phRise"></label>
-                    <label>Sonnenuntergang (min) <input type="number" id="phSet"></label>
+                  <div class="mode-settings-block" style="margin-bottom: 0.75rem;">
+                    <strong class="mode-label">Sonnen-Simulation</strong>
+                    <div class="mode-inputs-list">
+                      <div class="input-row"><label>Sonnenaufgang</label><input type="number" id="phRise"><span class="unit">min</span></div>
+                      <div class="input-row"><label>Sonnenuntergang</label><input type="number" id="phSet"><span class="unit">min</span></div>
+                    </div>
                   </div>
                   <h5 style="margin-top:1rem">Werte je Tageszeit</h5>
                   <div id="modesGrid" style="display:grid; gap:1rem;"></div>
@@ -1079,6 +1123,9 @@
         $("phOff").value = s.off || "00:00";
         $("phRise").value = s.sunrise_min || 0;
         $("phSet").value = s.sunset_min || 0;
+        $("phFCircMin").value = p.settings.day.fan_circ_min;
+        $("phFCircMax").value = p.settings.day.fan_circ_max;
+        $("phPump").checked = !!s.pump;
 
         const modesDiv = $("modesGrid");
         modesDiv.innerHTML = 
@@ -1090,7 +1137,8 @@
           const m = inp.dataset.mode;
           const f = inp.dataset.field;
           if (p.settings[m] && p.settings[m][f] !== undefined) {
-            inp.value = p.settings[m][f];
+            if (inp.type === "checkbox") inp.checked = !!p.settings[m][f];
+            else inp.value = p.settings[m][f];
           }
         });
         currentPhaseIdx = idx;
@@ -1098,14 +1146,24 @@
 
       function collectCurrentPhaseData(idx) {
         if (idx === undefined) idx = currentPhaseIdx;
+        if (!phasesData || !phasesData[idx]) return;
         const p = phasesData[idx];
-        if (!p) return;
+        if (!p.schedule) p.schedule = {};
+        if (!p.settings) p.settings = {};
         
         // Save global schedule fields to current phase slot
         p.schedule.on = $("phOn").value;
         p.schedule.off = $("phOff").value;
         p.schedule.sunrise_min = parseInt($("phRise").value) || 0;
         p.schedule.sunset_min = parseInt($("phSet").value) || 0;
+        p.schedule.pump = $("phPump").checked;
+
+        const fCircMin = parseFloat($("phFCircMin").value) || 0;
+        const fCircMax = parseFloat($("phFCircMax").value) || 0;
+        ["day", "night", "night_silent"].forEach(m => {
+          p.settings[m].fan_circ_min = fCircMin;
+          p.settings[m].fan_circ_max = fCircMax;
+        });
 
         // Save mode-specific fields from the grid
         const modesDiv = $("modesGrid");
@@ -1113,10 +1171,14 @@
         inputs.forEach(inp => {
           const m = inp.dataset.mode;
           const f = inp.dataset.field;
-          let val = parseFloat(inp.value);
-          if (isNaN(val)) return;
-          if (f === "led" || f.startsWith("fan")) val = Math.round(val);
-          p.settings[m][f] = val;
+          if (inp.type === "checkbox") {
+            p.settings[m][f] = inp.checked;
+          } else {
+            let val = parseFloat(inp.value);
+            if (isNaN(val)) return;
+            if (f === "led" || f.startsWith("fan")) val = Math.round(val);
+            p.settings[m][f] = val;
+          }
         });
       }
 

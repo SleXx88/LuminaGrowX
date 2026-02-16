@@ -37,6 +37,7 @@ struct LightSchedule {
   uint16_t sunrise_minutes; // Ramp-up Dauer
   uint16_t sunset_minutes;  // Ramp-down Dauer
   bool use_night_silent;    // Nutze NightSilent-Modus statt Night
+  bool pumpEnabled;         // Pumpe an/aus in dieser Phase
 };
 
 // Konfiguration pro Phase & Modus
@@ -46,6 +47,8 @@ struct PhaseModeSettings {
   float fanMax;       // Lüfter Höchstprozentsatz
   float vpdMin;       // VPD-Zielbereich untere Grenze (kPa)
   float vpdMax;       // VPD-Zielbereich obere Grenze (kPa)
+  float fanCircMin;   // Umluft-Lüfter (LED) Mindestprozentsatz
+  float fanCircMax;   // Umluft-Lüfter (LED) Höchstprozentsatz
 };
 
 // Globaler Silent-Modus (Nachts leiser)
@@ -84,7 +87,8 @@ public:
   // Überschreiben pro Phase/Modus
   void setStageModeSettings(vpd_calc::GrowthStage st, DayMode md,
                             float ledPercent, float fanMin, float fanMax,
-                            float vpdMin, float vpdMax);
+                            float vpdMin, float vpdMax,
+                            float fanCircMin, float fanCircMax);
   PhaseModeSettings getStageModeSettings(vpd_calc::GrowthStage st, DayMode md) const;
 
   // Zeitpläne

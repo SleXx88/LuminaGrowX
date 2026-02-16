@@ -94,35 +94,36 @@ namespace lumina
   namespace schedule
   {
     // Hinweis: Beispiel – identisch für alle Phasen
-    constexpr LightSchedule SEEDLING{{6, 0}, {0, 0}, 20, 20, false};
-    constexpr LightSchedule VEGETATIVE{{6, 0}, {22, 0}, 20, 20, false};
-    constexpr LightSchedule FLOWERING{{6, 0}, {18, 0}, 20, 20, false};
+    // { {onH, onM}, {offH, offM}, sunrise, sunset, useNightSilent, pumpEnabled }
+    constexpr LightSchedule SEEDLING{{6, 0}, {0, 0}, 20, 20, false, false};
+    constexpr LightSchedule VEGETATIVE{{6, 0}, {22, 0}, 20, 20, false, false};
+    constexpr LightSchedule FLOWERING{{6, 0}, {18, 0}, 20, 20, false, false};
   }
 
   // --- Default-Parameter je Phase & Modus ---
   namespace defaults
   {
-    // { LED%, FanMin%, FanMax%, VPDmin[kPa], VPDmax[kPa] }
+    // { LED%, FanMin%, FanMax%, VPDmin[kPa], VPDmax[kPa], FanCircMin%, FanCircMax% }
     constexpr plant_ctrl::PhaseModeSettings PHASE_MODE[3][3] = {
         // SEEDLING
         {
-            {40.0f, 20.0f, 80.0f, 0.40f, 0.80f}, // Day (VPD 0.40–0.80)
-            {0.0f, 20.0f, 60.0f, 0.40f, 0.80f},  // Night
-            {0.0f, 10.0f, 40.0f, 0.40f, 0.80f}   // NightSilent
+            {40.0f, 20.0f, 80.0f, 0.40f, 0.80f, 25.0f, 40.0f}, // Day (VPD 0.40–0.80)
+            {0.0f, 20.0f, 60.0f, 0.40f, 0.80f, 25.0f, 40.0f},  // Night
+            {0.0f, 10.0f, 40.0f, 0.40f, 0.80f, 10.0f, 25.0f}   // NightSilent
         },
         // VEGETATIVE
         {
-            {65.0f, 20.0f, 100.0f, 0.80f, 1.10f}, // Day (VPD 0.80–1.10)
-            {0.0f, 20.0f, 60.0f, 0.80f, 1.10f},   // Night
-            {0.0f, 10.0f, 40.0f, 0.80f, 1.10f}    // NightSilent
+            {65.0f, 20.0f, 100.0f, 0.80f, 1.10f, 40.0f, 60.0f}, // Day (VPD 0.80–1.10)
+            {0.0f, 20.0f, 60.0f, 0.80f, 1.10f, 30.0f, 50.0f},   // Night
+            {0.0f, 10.0f, 40.0f, 0.80f, 1.10f, 20.0f, 40.0f}    // NightSilent
         },
         // FLOWERING (Ziel 1.2–1.4 kPa, passive Feuchtequellen)
         // FanMax erhöht für bessere Entfeuchtung bei passivem Einlass
         // VPD-Range angepasst für realistischere Regelung bei Temp-Schwankungen
         {
-            {90.0f, 20.0f, 90.0f, 1.15f, 1.45f}, // Day - FanMax 90% (war 70), VPD 1.15-1.45
-            {0.0f, 20.0f, 80.0f, 1.15f, 1.45f},  // Night - FanMax 80% (war 70)
-            {0.0f, 10.0f, 60.0f, 1.15f, 1.45f}   // NightSilent - FanMax 60% (war 50)
+            {90.0f, 20.0f, 90.0f, 1.15f, 1.45f, 60.0f, 100.0f}, // Day - FanMax 90% (war 70), VPD 1.15-1.45
+            {0.0f, 20.0f, 80.0f, 1.15f, 1.45f, 40.0f, 80.0f},  // Night - FanMax 80% (war 70)
+            {0.0f, 10.0f, 60.0f, 1.15f, 1.45f, 20.0f, 60.0f}   // NightSilent - FanMax 60% (war 50)
         }};
   }
 

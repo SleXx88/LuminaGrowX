@@ -73,13 +73,16 @@ void PlantCtrl::setMode(DayMode m) {
 
 void PlantCtrl::setStageModeSettings(vpd_calc::GrowthStage st, DayMode md,
                                      float ledPercent, float fanMin, float fanMax,
-                                     float vpdMin, float vpdMax) {
+                                     float vpdMin, float vpdMax,
+                                     float fanCircMin, float fanCircMax) {
   int si = idxStage(st), mi = idxMode(md);
   if (ledPercent < 0) ledPercent = 0; if (ledPercent > 100) ledPercent = 100;
   if (fanMin < 0) fanMin = 0; if (fanMax > 100) fanMax = 100;
   if (fanMax < fanMin) fanMax = fanMin;
   if (vpdMin < 0) vpdMin = 0; if (vpdMax < vpdMin) vpdMax = vpdMin;
-  settings_[si][mi] = { ledPercent, fanMin, fanMax, vpdMin, vpdMax };
+  if (fanCircMin < 0) fanCircMin = 0; if (fanCircMax > 100) fanCircMax = 100;
+  if (fanCircMax < fanCircMin) fanCircMax = fanCircMin;
+  settings_[si][mi] = { ledPercent, fanMin, fanMax, vpdMin, vpdMax, fanCircMin, fanCircMax };
 }
 
 PhaseModeSettings PlantCtrl::getStageModeSettings(vpd_calc::GrowthStage st, DayMode md) const {
@@ -464,9 +467,13 @@ bool PlantCtrl::update() {
       fan3_->setPercent(f3);
     }
   } else {
+    // Normal logic
+    const LightSchedule& sch = schedules_[idxStage(stage_)];
+    if (lumina::pins::PUMP_EN >= 0) {
+      digitalWrite(lumina::pins::PUMP_EN, sch.pumpEnabled ? HIGH : LOW);
+    }
     if (fan3_) {
-      float f3 = ledOut_;
-      if (ledOut_ > 0.5f && f3 < 25.0f) f3 = 25.0f;
+      float f3 = (ledOut_ > 1.0f) ? ps.fanCircMax : ps.fanCircMin;
       fan3_->setPercent(f3);
     }
   }

@@ -287,11 +287,14 @@ bool WebCtrl::loadPhases(plant_ctrl::PlantCtrl* ctrl) {
         auto stage = (vpd_calc::GrowthStage)(i + 1); // 0->1(Seedling), 1->2(Veg), 2->3(Flow)
         ctrl->setSchedule(stage, blob.schedule);
         ctrl->setStageModeSettings(stage, plant_ctrl::DayMode::Day, 
-          blob.modes[0].ledPercent, blob.modes[0].fanMin, blob.modes[0].fanMax, blob.modes[0].vpdMin, blob.modes[0].vpdMax);
+          blob.modes[0].ledPercent, blob.modes[0].fanMin, blob.modes[0].fanMax, blob.modes[0].vpdMin, blob.modes[0].vpdMax,
+          blob.modes[0].fanCircMin, blob.modes[0].fanCircMax);
         ctrl->setStageModeSettings(stage, plant_ctrl::DayMode::Night, 
-          blob.modes[1].ledPercent, blob.modes[1].fanMin, blob.modes[1].fanMax, blob.modes[1].vpdMin, blob.modes[1].vpdMax);
+          blob.modes[1].ledPercent, blob.modes[1].fanMin, blob.modes[1].fanMax, blob.modes[1].vpdMin, blob.modes[1].vpdMax,
+          blob.modes[1].fanCircMin, blob.modes[1].fanCircMax);
         ctrl->setStageModeSettings(stage, plant_ctrl::DayMode::NightSilent, 
-          blob.modes[2].ledPercent, blob.modes[2].fanMin, blob.modes[2].fanMax, blob.modes[2].vpdMin, blob.modes[2].vpdMax);
+          blob.modes[2].ledPercent, blob.modes[2].fanMin, blob.modes[2].fanMax, blob.modes[2].vpdMin, blob.modes[2].vpdMax,
+          blob.modes[2].fanCircMin, blob.modes[2].fanCircMax);
         any = true;
         Serial.printf("[WEB] loadPhases: loaded %s (st=%d), On=%02d:%02d, Off=%02d:%02d, Silent=%s, Rise=%d, Set=%d\n", 
           key, (int)stage, blob.schedule.on.hour, blob.schedule.on.minute, blob.schedule.off.hour, blob.schedule.off.minute,
@@ -655,6 +658,7 @@ void WebCtrl::setupRoutes_() {
       s["sunrise_min"] = sch.sunrise_minutes;
       s["sunset_min"] = sch.sunset_minutes;
       s["use_silent"] = sch.use_night_silent;
+      s["pump"] = sch.pumpEnabled;
       
       JsonObject modes = p["settings"].to<JsonObject>();
       const char* mnames[] = {"day", "night", "night_silent"};
@@ -666,6 +670,8 @@ void WebCtrl::setupRoutes_() {
         mo["fan_max"] = sett.fanMax;
         mo["vpd_min"] = sett.vpdMin;
         mo["vpd_max"] = sett.vpdMax;
+        mo["fan_circ_min"] = sett.fanCircMin;
+        mo["fan_circ_max"] = sett.fanCircMax;
       }
     }
     String out; serializeJson(doc, out); req->send(200, "application/json", out);
@@ -690,18 +696,36 @@ void WebCtrl::setupRoutes_() {
       for (int m=0; m<3; ++m) {
         auto& d = lumina::defaults::PHASE_MODE[i][m];
         ctrl_->setStageModeSettings(stages[i], (plant_ctrl::DayMode)m, 
-                                    d.ledPercent, d.fanMin, d.fanMax, d.vpdMin, d.vpdMax);
+                                    d.ledPercent, d.fanMin, d.fanMax, d.vpdMin, d.vpdMax,
+                                    d.fanCircMin, d.fanCircMax);
       }
     }
     savePhases(ctrl_);
     req->send(200, "application/json", "{\"ok\":true}");
   });
   
-  http_.on("/api/settings/phases", HTTP_POST, [](AsyncWebServerRequest*){}, NULL,
-           [this](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t, size_t){
+  http_.on("/api/settings/phases", HTTP_POST, [](AsyncWebServerRequest* req){}, NULL,
+           [this](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t index, size_t total){
              if (!ctrl_) { req->send(500, "application/json", "{\"error\":\"no ctrl\"}"); return; }
-             JsonDocument doc; DeserializationError err = deserializeJson(doc, data, len);
-             if (err) { req->send(400, "application/json", "{\"error\":\"bad json\"}"); return; }
+             
+             if (index == 0) {
+               req->_tempObject = new String("");
+             }
+             String* body = (String*)req->_tempObject;
+             if (body) {
+               body->concat((const char*)data, len);
+             }
+
+             if (index + len < total) return; // Wait for more data
+
+             JsonDocument doc; DeserializationError err = deserializeJson(doc, *body);
+             if (body) { delete body; req->_tempObject = nullptr; }
+
+             if (err) { 
+               Serial.printf("[WEB] JSON Error: %s\n", err.c_str());
+               req->send(400, "application/json", "{\"error\":\"bad json\"}"); 
+               return; 
+             }
              
              JsonArray phases = doc["phases"];
              if (phases.isNull()) { req->send(400, "application/json", "{\"error\":\"missing phases array\"}"); return; }
@@ -725,10 +749,12 @@ void WebCtrl::setupRoutes_() {
                  if (!s["sunrise_min"].isNull()) sch.sunrise_minutes = s["sunrise_min"];
                  if (!s["sunset_min"].isNull()) sch.sunset_minutes = s["sunset_min"];
                  if (!s["use_silent"].isNull()) sch.use_night_silent = s["use_silent"];
+                 if (!s["pump"].isNull()) sch.pumpEnabled = s["pump"];
                  ctrl_->setSchedule(stage, sch);
-                 Serial.printf("[WEB] Update Phase %d Schedule: On=%02d:%02d, Off=%02d:%02d, Silent=%s, Rise=%d, Set=%d\n", 
+                 Serial.printf("[WEB] Update Phase %d Schedule: On=%02d:%02d, Off=%02d:%02d, Silent=%s, Rise=%d, Set=%d, Pump=%s\n", 
                                id, sch.on.hour, sch.on.minute, sch.off.hour, sch.off.minute, 
-                               sch.use_night_silent ? "YES" : "NO", sch.sunrise_minutes, sch.sunset_minutes);
+                               sch.use_night_silent ? "YES" : "NO", sch.sunrise_minutes, sch.sunset_minutes,
+                               sch.pumpEnabled ? "ON" : "OFF");
                }
                
                // Settings
@@ -745,11 +771,16 @@ void WebCtrl::setupRoutes_() {
                      if (!mo["fan_max"].isNull()) { sett.fanMax = mo["fan_max"]; changed = true; }
                      if (!mo["vpd_min"].isNull()) { sett.vpdMin = mo["vpd_min"]; changed = true; }
                      if (!mo["vpd_max"].isNull()) { sett.vpdMax = mo["vpd_max"]; changed = true; }
+                     if (!mo["fan_circ_min"].isNull()) { sett.fanCircMin = mo["fan_circ_min"]; changed = true; }
+                     if (!mo["fan_circ_max"].isNull()) { sett.fanCircMax = mo["fan_circ_max"]; changed = true; }
                      
                      if (changed) {
-                       ctrl_->setStageModeSettings(stage, (plant_ctrl::DayMode)m, sett.ledPercent, sett.fanMin, sett.fanMax, sett.vpdMin, sett.vpdMax);
-                       Serial.printf("[WEB] Update Phase %d Mode %s: LED=%d%%, Fan=%d-%d%%, VPD=%.2f-%.2f\n", 
-                                     id, mnames[m], (int)sett.ledPercent, (int)sett.fanMin, (int)sett.fanMax, sett.vpdMin, sett.vpdMax);
+                       ctrl_->setStageModeSettings(stage, (plant_ctrl::DayMode)m, 
+                                                   sett.ledPercent, sett.fanMin, sett.fanMax, sett.vpdMin, sett.vpdMax,
+                                                   sett.fanCircMin, sett.fanCircMax);
+                       Serial.printf("[WEB] Update Phase %d Mode %s: LED=%d%%, Fan=%d-%d%%, VPD=%.2f-%.2f, FanCirc=%d-%d%%\n", 
+                                     id, mnames[m], (int)sett.ledPercent, (int)sett.fanMin, (int)sett.fanMax, sett.vpdMin, sett.vpdMax,
+                                     (int)sett.fanCircMin, (int)sett.fanCircMax);
                      }
                    }
                  }
