@@ -15,7 +15,7 @@ Die Konfiguration stammt aus `include/lumina_config.h`.
 | **4** | `CO2_MQ_VAL` | Analog Input | CO2 Analoger Messwert über Spannungsteiler |
 | **5** | `DOOR_SWITCH_PIN` | Input (Pullup) | Türschalter (LOW = Tür geschlossen, HIGH = offen). |
 | **6** | `AP_RESET_PIN` | Input (Pullup) | Taster für AP-Modus Reset (bei Boot gedrückt halten). |
-| **7** | `FAN2_PWM` | PWM Output | PWM-Steuersignal für Lüfter 2 (2. Hauptlüfter).  |
+| **7** | `FAN2_PWM` | PWM Output | PWM-Steuersignal für Lüfter 2 (2. Hauptlüfter). |
 | **8** | `I2C1_SDA` | I2C Data | SDA für I2C Bus 0 (`Wire`). |
 | **9** | `I2C1_SCL` | I2C Clock | SCL für I2C Bus 0 (`Wire`). |
 | **10** | `Stepper::EN` | Output | Enable Pin für TMC2209 Stepper Driver (LOW = aktiv). |

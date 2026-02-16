@@ -57,6 +57,7 @@ public:
              SHT41Ctrl& sensorOutdoor,
              GP8211Ctrl& led,
              FanCtrl& fan,
+             FanCtrl* fan2,
              StepperCtrl& stepper,
              ToFCtrl& tof,
              RTC_Ctrl* rtc = nullptr,
@@ -227,6 +228,7 @@ private:
   SHT41Ctrl*  sensorOut_ = nullptr;
   GP8211Ctrl* led_       = nullptr;
   FanCtrl*    fan_       = nullptr;
+  FanCtrl*    fan2_      = nullptr;
   StepperCtrl* step_     = nullptr;
   ToFCtrl*     tof_      = nullptr;
   RTC_Ctrl*    rtc_      = nullptr;

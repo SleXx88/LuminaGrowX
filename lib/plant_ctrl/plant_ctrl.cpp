@@ -30,6 +30,7 @@ void PlantCtrl::begin(SHT41Ctrl& sensorIndoor,
                       SHT41Ctrl& sensorOutdoor,
                       GP8211Ctrl& led,
                       FanCtrl& fan,
+                      FanCtrl* fan2,
                       StepperCtrl& stepper,
                       ToFCtrl& tof,
                       RTC_Ctrl* rtc,
@@ -38,6 +39,7 @@ void PlantCtrl::begin(SHT41Ctrl& sensorIndoor,
   sensorOut_ = &sensorOutdoor;
   led_       = &led;
   fan_       = &fan;
+  fan2_      = fan2;
   step_      = &stepper;
   tof_       = &tof;
   rtc_       = rtc;
@@ -252,6 +254,7 @@ bool PlantCtrl::update() {
     // Aber: return true, damit der Rest (WLAN, Webserver) weiterlaufen kann!
     // Alle Aktoren sicherheitshalber aus.
     if (fan_) fan_->setPercent(0.0f);
+    if (fan2_) fan2_->setPercent(0.0f);
     if (led_) led_->setPercent(0.0f);
     
     // VPD auf NAN setzen, damit UI Fehler anzeigt
@@ -278,6 +281,7 @@ bool PlantCtrl::update() {
 
       fanOut_ = 0.0f;
       fan_->setPercent(0.0f);
+      if (fan2_) fan2_->setPercent(0.0f);
       lastFanOut_ = 0.0f;
 
       Serial.println(F("[CTRL] Kein Grow/Trocknung aktiv - Hardware deaktiviert"));
@@ -327,6 +331,7 @@ bool PlantCtrl::update() {
     fanCmd = limitRate(fanCmd, lastFanOut_, dt_s);
     lastFanOut_ = fanOut_ = fanCmd;
     fan_->setPercent(fanOut_);
+    if (fan2_) fan2_->setPercent(fanOut_);
 
     // Während Trocknung: Stepper/LED-Abstandsregelung DEAKTIVIERT
     // Motor bleibt aus, egal ob Tür offen/zu
@@ -505,6 +510,7 @@ bool PlantCtrl::update() {
     fanCmd = limitRate(fanCmd, lastFanOut_, dt_s);
     lastFanOut_ = fanOut_ = fanCmd;
     fan_->setPercent(fanOut_);
+    if (fan2_) fan2_->setPercent(fanOut_);
     // Decay the integrator a bit so that it doesn't wind up during the block.
     iTermFan_ *= 0.98f;
     // Still tick the distance controller while the fan is blocked
@@ -640,6 +646,7 @@ bool PlantCtrl::update() {
   }
   lastFanOut_ = fanOut_ = fanCmd;
   fan_->setPercent(fanOut_);
+  if (fan2_) fan2_->setPercent(fanOut_);
 
   // Diagnoseausgabe alle 3s (intern)
   {
