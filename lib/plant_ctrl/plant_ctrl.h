@@ -48,6 +48,18 @@ struct PhaseModeSettings {
   float vpdMax;       // VPD-Zielbereich obere Grenze (kPa)
 };
 
+// Globaler Silent-Modus (Nachts leiser)
+struct GlobalSilentSettings {
+  bool    enabled;
+  TimeHM  start;
+  TimeHM  end;
+  float   fanExhaustMin;
+  float   fanExhaustMax;
+  float   fanCircMin;
+  float   fanCircMax;
+  bool    pumpEnabled;
+};
+
 class PlantCtrl {
 public:
   PlantCtrl();
@@ -58,6 +70,7 @@ public:
              GP8211Ctrl& led,
              FanCtrl& fan,
              FanCtrl* fan2,
+             FanCtrl* fan3,
              StepperCtrl& stepper,
              ToFCtrl& tof,
              RTC_Ctrl* rtc = nullptr,
@@ -77,6 +90,11 @@ public:
   // Zeitpläne
   void setSchedule(vpd_calc::GrowthStage st, const LightSchedule& sch);
   LightSchedule getSchedule(vpd_calc::GrowthStage st) const;
+
+  // Globaler Silent-Modus
+  void setGlobalSilent(const GlobalSilentSettings& s);
+  GlobalSilentSettings getGlobalSilent() const { return silent_; }
+  bool isGlobalSilentActive() const { return silentActive_; }
 
   // Regelungsparameter
   void setKpFan(float kp);
@@ -229,6 +247,7 @@ private:
   GP8211Ctrl* led_       = nullptr;
   FanCtrl*    fan_       = nullptr;
   FanCtrl*    fan2_      = nullptr;
+  FanCtrl*    fan3_      = nullptr;
   StepperCtrl* step_     = nullptr;
   ToFCtrl*     tof_      = nullptr;
   RTC_Ctrl*    rtc_      = nullptr;
@@ -274,6 +293,10 @@ private:
   // Humidity-Priority Cooldown
   uint32_t hpCooldownMs_ = 30000;
   uint32_t hpCooldownUntilMs_ = 0;
+
+  // Globaler Silent-Modus
+  GlobalSilentSettings silent_ = {false, {22,0}, {6,0}, 20.0f, 40.0f, 20.0f, 40.0f, false};
+  bool silentActive_ = false;
 };
 
 } // namespace plant_ctrl

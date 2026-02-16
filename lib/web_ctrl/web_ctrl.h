@@ -28,6 +28,14 @@ struct DryingState { bool active=false; uint32_t start_epoch=0; };
 struct NotifyCfg { bool enabled=false; String phone; String apikey; };
 struct StepperCfg { float max_travel_mm = 440.0f; };
 struct ToFCfg { int16_t offset_mm = 0; };
+struct GlobalSilentCfg {
+  bool enabled = false;
+  uint8_t startH = 22, startM = 0;
+  uint8_t endH = 6, endM = 0;
+  float fanExhaustMin = 20, fanExhaustMax = 40;
+  float fanCircMin = 20, fanCircMax = 40;
+  bool pumpEnabled = false;
+};
 
 class WebCtrl {
 public:
@@ -60,6 +68,8 @@ public:
   bool savePhases(plant_ctrl::PlantCtrl* ctrl);
   bool loadMqttCfg(MqttConfig& out);
   bool saveMqttCfg(const MqttConfig& c);
+  bool loadGlobalSilent(GlobalSilentCfg& out);
+  bool saveGlobalSilent(const GlobalSilentCfg& c);
 
 private:
   // HTTP handlers
@@ -127,6 +137,7 @@ private:
   StepperCfg stepper_cfg_;
   ToFCfg tof_cfg_;
   MqttConfig mqtt_cfg_;
+  GlobalSilentCfg silent_;
 
   uint32_t nextPushAt_ = 0;
   uint32_t nextProbeAt_ = 0;

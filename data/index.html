@@ -220,7 +220,7 @@
       @media (min-width: 1024px) {
         #modesGrid {
           display: grid !important;
-          grid-template-columns: repeat(3, 1fr) !important;
+          grid-template-columns: repeat(2, 1fr) !important;
           gap: 0.75rem !important;
         }
       }
@@ -298,6 +298,47 @@
                 </small>
               </div>
             </details>
+            
+            <details id="detailsSilent" style="margin-top: 0.5rem; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.5rem 1rem;">
+              <summary style="font-weight: 600; cursor: pointer;">Silent-Modus (Nachts leiser)</summary>
+              <div style="margin-top: 1rem; display: grid; gap: 1rem;">
+                <label><input type="checkbox" id="silentEnabled" role="switch"> Silent-Modus aktivieren</label>
+                
+                <div id="silentContent" class="hidden">
+                  <div class="grid">
+                    <label>Startzeit <input type="time" id="silentStart"></label>
+                    <label>Endzeit <input type="time" id="silentEnd"></label>
+                  </div>
+                  
+                  <div style="display: grid; gap: 0.75rem; margin-top: 0.5rem;">
+                    <div class="mode-settings-block">
+                      <strong class="mode-label">Lüfter-Limits (Silent)</strong>
+                      <div class="mode-inputs-list">
+                        <div class="input-row"><label>Abluft-Lüfter (1 & 2)</label>
+                          <input type="number" id="silentFExhMin" placeholder="Min">
+                          <input type="number" id="silentFExhMax" placeholder="Max">
+                          <span class="unit">%</span>
+                        </div>
+                        <div class="input-row"><label>Umluft-Lüfter (LED)</label>
+                          <input type="number" id="silentFCircMin" placeholder="Min">
+                          <input type="number" id="silentFCircMax" placeholder="Max">
+                          <span class="unit">%</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style="margin-top: 0.5rem;">
+                    <label><input type="checkbox" id="silentPump"> Pumpe während Silent-Phase erlaubt</label>
+                  </div>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end;">
+                  <button id="btnSilentSaveMain" class="primary">Silent-Modus speichern</button>
+                </div>
+              </div>
+            </details>
+
             <details style="margin-top: 0.5rem; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.5rem 1rem;">
               <summary style="font-weight: 600; cursor: pointer;">Phasen-Konfiguration</summary>
               <div style="margin-top: 1rem; display: grid; gap: 1rem;">
@@ -313,7 +354,6 @@
                   <label>Licht AN <input type="time" id="phOn"></label>
                   <label>Licht AUS <input type="time" id="phOff"></label>
                 </div>
-                <label><input type="checkbox" id="phSilent"> Silent-Modus (Nachts leiser)</label>
 
                 <div style="margin-top:0.5rem">
                   <label><input type="checkbox" id="toggleProfi" role="switch"> Profi-Modus</label>
@@ -832,6 +872,25 @@
           $("ssid").value = w.ssid || ""; $("pass").value = ""; $("useStatic").checked = !!w.use_static;
           const st = w.static || {}; $("ip").value = st.ip || ""; $("mask").value = st.mask || ""; $("gw").value = st.gw || ""; $("dns").value = st.dns || "";
           $("staticBlock").classList.toggle("hidden", !$("useStatic").checked);
+          
+          await loadSilent();
+        } catch (_) {}
+      }
+
+      async function loadSilent() {
+        try {
+          const r = await fetch("/api/settings/silent");
+          if (!r.ok) return;
+          const s = await r.json();
+          $("silentEnabled").checked = !!s.enabled;
+          $("silentStart").value = `${String(s.startH).padStart(2, '0')}:${String(s.startM).padStart(2, '0')}`;
+          $("silentEnd").value = `${String(s.endH).padStart(2, '0')}:${String(s.endM).padStart(2, '0')}`;
+          $("silentFExhMin").value = s.fanExhaustMin;
+          $("silentFExhMax").value = s.fanExhaustMax;
+          $("silentFCircMin").value = s.fanCircMin;
+          $("silentFCircMax").value = s.fanCircMax;
+          $("silentPump").checked = !!s.pumpEnabled;
+          $("silentContent").classList.toggle("hidden", !s.enabled);
         } catch (_) {}
       }
 
@@ -953,6 +1012,30 @@
         showToastHtml('WLAN gespeichert. Bitte jetzt ins Heimnetz wechseln und <a href="http://luminagrowx.local/" target="_blank">http://luminagrowx.local/</a> aufrufen.');
         try { fetch("/api/network", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); } catch (_) {}
       });
+
+      $("silentEnabled").addEventListener("change", () => $("silentContent").classList.toggle("hidden", !$("silentEnabled").checked));
+      
+      $("btnSilentSaveMain").addEventListener("click", async () => {
+        try {
+          const startArr = $("silentStart").value.split(":");
+          const endArr = $("silentEnd").value.split(":");
+          const body = {
+            enabled: $("silentEnabled").checked,
+            startH: parseInt(startArr[0] || 22),
+            startM: parseInt(startArr[1] || 0),
+            endH: parseInt(endArr[0] || 6),
+            endM: parseInt(endArr[1] || 0),
+            fanExhaustMin: parseFloat($("silentFExhMin").value),
+            fanExhaustMax: parseFloat($("silentFExhMax").value),
+            fanCircMin: parseFloat($("silentFCircMin").value),
+            fanCircMax: parseFloat($("silentFCircMax").value),
+            pumpEnabled: $("silentPump").checked
+          };
+          await fetchJSON("/api/settings/silent", { method: "POST", body: JSON.stringify(body) });
+          showToast("Silent-Einstellungen gespeichert");
+        } catch (e) { showToast("Fehler: " + e.message); }
+      });
+
       // Icons initialisieren
       function initIcons() {
         const iconGrowbox = $("iconGrowbox"); if (iconGrowbox) iconGrowbox.innerHTML = icons.plant;
@@ -994,15 +1077,13 @@
         const s = p.schedule;
         $("phOn").value = s.on || "06:00";
         $("phOff").value = s.off || "00:00";
-        $("phSilent").checked = !!s.use_silent;
         $("phRise").value = s.sunrise_min || 0;
         $("phSet").value = s.sunset_min || 0;
 
         const modesDiv = $("modesGrid");
         modesDiv.innerHTML = 
           renderModeInputs("day", "Tag (Licht AN)") +
-          renderModeInputs("night", "Nacht (Licht AUS)") +
-          renderModeInputs("night_silent", "Nacht (Silent)");
+          renderModeInputs("night", "Nacht (Licht AUS)");
         
         const inputs = modesDiv.querySelectorAll("input");
         inputs.forEach(inp => {
@@ -1023,7 +1104,6 @@
         // Save global schedule fields to current phase slot
         p.schedule.on = $("phOn").value;
         p.schedule.off = $("phOff").value;
-        p.schedule.use_silent = $("phSilent").checked;
         p.schedule.sunrise_min = parseInt($("phRise").value) || 0;
         p.schedule.sunset_min = parseInt($("phSet").value) || 0;
 

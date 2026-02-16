@@ -321,7 +321,7 @@ void setup()
   // ===== 5) Weitere Aktoren + Controller =====
   // Controller verbinden und konfigurieren (inkl. Stepper/ToF/RTC/Tuer)
   if (!g_setupMode) {
-    controller.begin(sht_in, sht_out, dac, fan, &fan2, step, tof, &rtc, lumina::plant::DOOR_SWITCH_PIN);
+    controller.begin(sht_in, sht_out, dac, fan, &fan2, &fan3, step, tof, &rtc, lumina::plant::DOOR_SWITCH_PIN);
     controller.applyLuminaConfig();
   }
 

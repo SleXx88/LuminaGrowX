@@ -31,6 +31,7 @@ static const char* NVS_TOF = "tof";
 static const char* NVS_UPDATE = "update_cfg";
 static const char* NVS_PHASES = "cfg_phases";
 static const char* NVS_MQTT = "mqtt";
+static const char* NVS_SILENT = "cfg_silent";
 
 // GitHub Releases (latest) defaults â€“ fest im Code hinterlegt
 static const char* GH_OWNER = "SleXx88";
@@ -205,6 +206,62 @@ bool WebCtrl::saveMqttCfg(const MqttConfig& c) {
     return true;
 }
 
+bool WebCtrl::loadGlobalSilent(GlobalSilentCfg& out) {
+  Preferences prefs;
+  if (!prefs.begin(NVS_SILENT, true)) return false;
+  out.enabled = prefs.getBool("enabled", false);
+  out.startH = (uint8_t)prefs.getUInt("startH", 22);
+  out.startM = (uint8_t)prefs.getUInt("startM", 0);
+  out.endH = (uint8_t)prefs.getUInt("endH", 6);
+  out.endM = (uint8_t)prefs.getUInt("endM", 0);
+  out.fanExhaustMin = prefs.getFloat("fanExhMin", 20.0f);
+  out.fanExhaustMax = prefs.getFloat("fanExhMax", 40.0f);
+  out.fanCircMin = prefs.getFloat("fanCircMin", 20.0f);
+  out.fanCircMax = prefs.getFloat("fanCircMax", 40.0f);
+  out.pumpEnabled = prefs.getBool("pumpEnabled", false);
+  prefs.end();
+  silent_ = out;
+  if (ctrl_) {
+    plant_ctrl::GlobalSilentSettings s;
+    s.enabled = out.enabled;
+    s.start.hour = out.startH; s.start.minute = out.startM;
+    s.end.hour = out.endH; s.end.minute = out.endM;
+    s.fanExhaustMin = out.fanExhaustMin; s.fanExhaustMax = out.fanExhaustMax;
+    s.fanCircMin = out.fanCircMin; s.fanCircMax = out.fanCircMax;
+    s.pumpEnabled = out.pumpEnabled;
+    ctrl_->setGlobalSilent(s);
+  }
+  return true;
+}
+
+bool WebCtrl::saveGlobalSilent(const GlobalSilentCfg& c) {
+  Preferences prefs;
+  if (!prefs.begin(NVS_SILENT, false)) return false;
+  prefs.putBool("enabled", c.enabled);
+  prefs.putUInt("startH", c.startH);
+  prefs.putUInt("startM", c.startM);
+  prefs.putUInt("endH", c.endH);
+  prefs.putUInt("endM", c.endM);
+  prefs.putFloat("fanExhMin", c.fanExhaustMin);
+  prefs.putFloat("fanExhMax", c.fanExhaustMax);
+  prefs.putFloat("fanCircMin", c.fanCircMin);
+  prefs.putFloat("fanCircMax", c.fanCircMax);
+  prefs.putBool("pumpEnabled", c.pumpEnabled);
+  prefs.end();
+  silent_ = c;
+  if (ctrl_) {
+    plant_ctrl::GlobalSilentSettings s;
+    s.enabled = c.enabled;
+    s.start.hour = c.startH; s.start.minute = c.startM;
+    s.end.hour = c.endH; s.end.minute = c.endM;
+    s.fanExhaustMin = c.fanExhaustMin; s.fanExhaustMax = c.fanExhaustMax;
+    s.fanCircMin = c.fanCircMin; s.fanCircMax = c.fanCircMax;
+    s.pumpEnabled = c.pumpEnabled;
+    ctrl_->setGlobalSilent(s);
+  }
+  return true;
+}
+
 #pragma pack(push, 1)
 struct PhaseBlob {
   plant_ctrl::LightSchedule schedule;
@@ -295,7 +352,7 @@ void WebCtrl::begin(plant_ctrl::PlantCtrl* ctrl, RTC_Ctrl* rtc, NetCtrl* net) {
 
   // Ensure all NVS namespaces exist by opening in RW mode once
   {
-    const char* ns[] = {NVS_APP, NVS_GROW, NVS_DRY, NVS_NOTIFY, NVS_STEPPER, NVS_TOF, NVS_UPDATE, NVS_PHASES, NVS_MQTT};
+    const char* ns[] = {NVS_APP, NVS_GROW, NVS_DRY, NVS_NOTIFY, NVS_STEPPER, NVS_TOF, NVS_UPDATE, NVS_PHASES, NVS_MQTT, NVS_SILENT};
     Preferences p; for (auto s : ns) { p.begin(s, false); p.end(); }
   }
 
@@ -312,6 +369,8 @@ void WebCtrl::begin(plant_ctrl::PlantCtrl* ctrl, RTC_Ctrl* rtc, NetCtrl* net) {
   tof_cfg_ = tmpT;
   MqttConfig tmpM; loadMqttCfg(tmpM);
   mqtt_cfg_ = tmpM;
+  GlobalSilentCfg tmpGS; loadGlobalSilent(tmpGS);
+  silent_ = tmpGS;
   
   if (ctrl_) {
     loadPhases(ctrl_);
@@ -810,6 +869,40 @@ void WebCtrl::setupRoutes_() {
           
           saveMqttCfg(c);
           req->send(200, "application/json", "{\"ok\":true}");
+  });
+
+  http_.on("/api/settings/silent", HTTP_GET, [this](AsyncWebServerRequest* req){
+    JsonDocument doc;
+    doc["enabled"] = silent_.enabled;
+    doc["startH"] = silent_.startH;
+    doc["startM"] = silent_.startM;
+    doc["endH"] = silent_.endH;
+    doc["endM"] = silent_.endM;
+    doc["fanExhaustMin"] = silent_.fanExhaustMin;
+    doc["fanExhaustMax"] = silent_.fanExhaustMax;
+    doc["fanCircMin"] = silent_.fanCircMin;
+    doc["fanCircMax"] = silent_.fanCircMax;
+    doc["pumpEnabled"] = silent_.pumpEnabled;
+    String out; serializeJson(doc, out); req->send(200, "application/json", out);
+  });
+
+  http_.on("/api/settings/silent", HTTP_POST, [](AsyncWebServerRequest*){}, NULL,
+    [this](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t, size_t){
+      JsonDocument doc; if (deserializeJson(doc, data, len)) { req->send(400, "application/json", "{\"error\":\"bad json\"}"); return; }
+      GlobalSilentCfg c = silent_;
+      if (!doc["enabled"].isNull()) c.enabled = doc["enabled"].as<bool>();
+      if (!doc["startH"].isNull()) c.startH = (uint8_t)doc["startH"].as<uint8_t>();
+      if (!doc["startM"].isNull()) c.startM = (uint8_t)doc["startM"].as<uint8_t>();
+      if (!doc["endH"].isNull()) c.endH = (uint8_t)doc["endH"].as<uint8_t>();
+      if (!doc["endM"].isNull()) c.endM = (uint8_t)doc["endM"].as<uint8_t>();
+      if (!doc["fanExhaustMin"].isNull()) c.fanExhaustMin = doc["fanExhaustMin"].as<float>();
+      if (!doc["fanExhaustMax"].isNull()) c.fanExhaustMax = doc["fanExhaustMax"].as<float>();
+      if (!doc["fanCircMin"].isNull()) c.fanCircMin = doc["fanCircMin"].as<float>();
+      if (!doc["fanCircMax"].isNull()) c.fanCircMax = doc["fanCircMax"].as<float>();
+      if (!doc["pumpEnabled"].isNull()) c.pumpEnabled = doc["pumpEnabled"].as<bool>();
+      
+      saveGlobalSilent(c);
+      req->send(200, "application/json", "{\"ok\":true}");
   });
 
   // Register updater routes
