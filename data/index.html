@@ -304,6 +304,20 @@
               </div>
             </details>
             
+            <details id="detailsDoorActions" style="margin-top: 0.5rem; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.5rem 1rem;">
+              <summary style="font-weight: 600; cursor: pointer;">Maßnahmen wenn Tür geöffnet wird</summary>
+              <div style="margin-top: 1rem; display: grid; gap: 0.75rem;">
+                <label><input type="checkbox" id="doorPauseControl"> Regelung pausieren wenn Tür offen</label>
+                <label><input type="checkbox" id="doorLightOn"> Beleuchtung EIN (Arbeitslicht 10%)</label>
+                <label><input type="checkbox" id="doorPumpOff"> Pumpe AUS</label>
+                <label><input type="checkbox" id="doorLiftPanel"> LED-Panel anheben (10cm)</label>
+                
+                <div style="display: flex; justify-content: flex-end; margin-top: 0.5rem;">
+                  <button id="btnDoorActionsSave" class="primary">Maßnahmen speichern</button>
+                </div>
+              </div>
+            </details>
+
             <details id="detailsSilent" style="margin-top: 0.5rem; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.5rem 1rem;">
               <summary style="font-weight: 600; cursor: pointer;">Silent-Modus (Nachts leiser)</summary>
               <div style="margin-top: 1rem; display: grid; gap: 1rem;">
@@ -778,7 +792,25 @@
           const total = s.grow.total_days || 0, day = s.grow.day || 0;
           const pct = total > 0 ? Math.min(100, Math.round((day / total) * 100)) : 0;
           $("growProgress").style.width = pct + "%";
-          updateToggleButton(s.grow.started);
+          
+          // Button-Zustand Grow Start/Stop / Pausiert
+          const toggleBtn = $("toggleGrow");
+          const growStarted = !!s.grow.started;
+          const controlPaused = !!(s.health && s.health.control_paused);
+          
+          if (growStarted && controlPaused && s.door_open) {
+            toggleBtn.textContent = "Regelung pausiert";
+            toggleBtn.classList.remove("primary");
+            toggleBtn.style.backgroundColor = "var(--warn)";
+            toggleBtn.style.borderColor = "var(--warn)";
+            toggleBtn.style.color = "#000";
+          } else {
+            toggleBtn.textContent = growStarted ? "STOP" : "START";
+            toggleBtn.style.backgroundColor = "";
+            toggleBtn.style.borderColor = "";
+            toggleBtn.style.color = "";
+            toggleBtn.classList.toggle("primary", growStarted);
+          }
         }
         // Trocknung
         if (s.drying) {
@@ -949,6 +981,7 @@
           $("staticBlock").classList.toggle("hidden", !$("useStatic").checked);
           
           await loadSilent();
+          await loadDoorActions();
         } catch (_) {}
       }
 
@@ -968,6 +1001,43 @@
           $("silentContent").classList.toggle("hidden", !s.enabled);
         } catch (_) {}
       }
+
+      async function loadDoorActions() {
+        try {
+          const r = await fetch("/api/settings/door_actions");
+          if (!r.ok) return;
+          const s = await r.json();
+          $("doorPauseControl").checked = !!s.pauseControl;
+          $("doorLightOn").checked = !!s.lightOn;
+          $("doorPumpOff").checked = !!s.pumpOff;
+          $("doorLiftPanel").checked = !!s.liftPanel;
+        } catch (_) {}
+      }
+
+      async function saveDoorActions() {
+        const payload = {
+          pauseControl: $("doorPauseControl").checked,
+          lightOn: $("doorLightOn").checked,
+          pumpOff: $("doorPumpOff").checked,
+          liftPanel: $("doorLiftPanel").checked
+        };
+        try {
+          console.log("[DEBUG] Saving Door Actions:", payload);
+          const res = await fetchJSON("/api/settings/door_actions", { method: "POST", body: JSON.stringify(payload) });
+          if (res.ok) {
+            showToast("Tür-Maßnahmen gespeichert");
+            const btn = $("btnDoorActionsSave");
+            const oldText = btn.textContent;
+            btn.textContent = "GESPEICHERT";
+            btn.style.backgroundColor = "var(--ok)";
+            setTimeout(() => {
+              btn.textContent = oldText;
+              btn.style.backgroundColor = "";
+            }, 2000);
+          }
+        } catch (e) { showToast("Fehler: " + e.message); }
+      }
+      $("btnDoorActionsSave").addEventListener("click", saveDoorActions);
 
       async function fetchJSON(url, options) {
         const r = await fetch(url, Object.assign({ headers: { "Content-Type": "application/json" } }, options || {}));

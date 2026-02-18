@@ -4,6 +4,7 @@
 
 #include "plant_ctrl.h"
 #include "../../include/lumina_config.h" // zentrale Defaults/Parameter
+#include "../../include/health.h"
 #include <math.h>
 #include <time.h>
 
@@ -311,7 +312,7 @@ bool PlantCtrl::update() {
     return true; 
   }
 
-  // Wenn weder Grow noch Trocknung aktiv: Alle Hardware deaktivieren
+  // Wenn weder Grow noch Trocknung aktiv: Alle Hardware deaktivieren (außer Tür-Overrides)
   if (!growActive_ && !dryingMode_) {
     vpdIn_ = computeVpd(tIn_, rhIn_);
     dpIn_  = computeDewPoint(tIn_, rhIn_);
@@ -320,19 +321,36 @@ bool PlantCtrl::update() {
     else if (emaAlpha_ > 0.0f && emaAlpha_ < 1.0f) vpdFilt_ = emaAlpha_ * vpdIn_ + (1.0f - emaAlpha_) * vpdFilt_;
     else vpdFilt_ = vpdIn_;
 
-    if (ledOut_ != 0.0f || fanOut_ != 0.0f) {
-      ledOut_ = 0.0f;
-      led_->setPercent(0.0f);
-      ledApplied_ = 0.0f;
+    // Zielwerte im Standby
+    float targetLed = 0.0f;
+    if (!lastDoorClosed_ && doorActions_.lightOn) {
+      targetLed = 10.0f; // Arbeitslicht
+    }
 
+    // LED anpassen falls nötig
+    if (led_ && (isnan(ledApplied_) || fabsf(ledOut_ - targetLed) > 0.1f)) {
+      ledOut_ = targetLed;
+      ledApplied_ = targetLed;
+      led_->setPercent(targetLed);
+      if (targetLed > 0) Serial.println(F("[CTRL] Standby: Arbeitslicht EIN (10%)"));
+      else Serial.println(F("[CTRL] Standby: Hardware deaktiviert"));
+    }
+
+    // Lüfter im Standby immer AUS
+    if (fanOut_ != 0.0f) {
       fanOut_ = 0.0f;
-      fan_->setPercent(0.0f);
+      if (fan_) fan_->setPercent(0.0f);
       if (fan2_) fan2_->setPercent(0.0f);
       if (fan3_) fan3_->setPercent(0.0f);
       lastFanOut_ = 0.0f;
-
-      Serial.println(F("[CTRL] Kein Grow/Trocknung aktiv - Hardware deaktiviert"));
     }
+
+    // Pumpe ggf. AUS override
+    if (!lastDoorClosed_ && doorActions_.pumpOff) {
+      int pPin = lumina::pins::PUMP_EN;
+      if (pPin >= 0) digitalWrite(pPin, LOW);
+    }
+
     return true;
   }
 
@@ -631,12 +649,51 @@ bool PlantCtrl::update() {
   fan_->setPercent(fanOut_);
   if (fan2_) fan2_->setPercent(fanOut_);
 
+  // --- 10) Finale Tür-Maßnahmen (überschreibt alle vorherigen Berechnungen) ---
+  if (!lastDoorClosed_) {
+    if (doorActions_.pauseControl) {
+      health::state().control_paused = true;
+      
+      // Lüfter aus
+      fanOut_ = 0.0f;
+      if (fan_) fan_->setPercent(0.0f);
+      if (fan2_) fan2_->setPercent(0.0f);
+      if (fan3_) fan3_->setPercent(0.0f);
+      lastFanOut_ = 0.0f;
+
+      // LED: Arbeitslicht 10% oder AUS
+      if (doorActions_.lightOn) {
+        ledOut_ = 10.0f;
+        if (led_) led_->setPercent(10.0f);
+        ledApplied_ = 10.0f;
+      } else {
+        ledOut_ = 0.0f;
+        if (led_) led_->setPercent(0.0f);
+        ledApplied_ = 0.0f;
+      }
+    } else {
+      // Nicht pausiert, aber ggf. Arbeitslicht an
+      if (doorActions_.lightOn) {
+        ledOut_ = 10.0f;
+        if (led_) led_->setPercent(10.0f);
+        ledApplied_ = 10.0f;
+      }
+    }
+    
+    // Pumpe AUS override
+    if (doorActions_.pumpOff) {
+      int pPin = lumina::pins::PUMP_EN;
+      if (pPin >= 0) digitalWrite(pPin, LOW);
+    }
+  }
+
   {
     static uint32_t dbgLastMs = 0;
     if (now - dbgLastMs >= 3000) {
       dbgLastMs = now;
-      Serial.printf("[CTRL] Silent:%d Fan:%.1f Max:%.1f Pump:%d\n", 
-        (int)silentActive_, fanOut_, fanMaxEff, (int)(digitalRead(lumina::pins::PUMP_EN)==HIGH));
+      Serial.printf("[CTRL] Silent:%d Fan:%.1f Max:%.1f Pump:%d DoorPaused:%d\n", 
+        (int)silentActive_, fanOut_, fanMaxEff, (int)(digitalRead(lumina::pins::PUMP_EN)==HIGH),
+        (int)(!lastDoorClosed_ && doorActions_.pauseControl));
     }
   }
 
@@ -672,7 +729,14 @@ void PlantCtrl::updateDoorState_(uint32_t now) {
       } else {
         Serial.println(F("[DOOR] offen"));
         adjustActive_ = false;
-        if (step_) step_->stop();
+        if (step_) {
+          step_->stop();
+          // Wenn konfiguriert: LED-Panel 10cm anheben (nur wenn Grow gestartet)
+          if (doorActions_.liftPanel && growActive_) {
+            Serial.println(F("[CTRL] Tür offen -> LED-Panel 10cm anheben"));
+            step_->moveUp(100.0f, lumina::plant::SPEED_LEVEL);
+          }
+        }
       }
     }
   }

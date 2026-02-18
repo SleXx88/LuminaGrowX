@@ -63,6 +63,14 @@ struct GlobalSilentSettings {
   bool    pumpEnabled;
 };
 
+// Maßnahmen bei geöffneter Tür
+struct DoorActionSettings {
+  bool pauseControl = false; // Regelung pausieren (Lüfter/LED aus)
+  bool lightOn      = false; // Arbeitslicht (10%) an
+  bool pumpOff      = false; // Pumpe aus
+  bool liftPanel    = false; // LED-Panel anheben
+};
+
 class PlantCtrl {
 public:
   PlantCtrl();
@@ -138,6 +146,10 @@ public:
   // Grow-Modus aktivieren/deaktivieren
   void setGrowActive(bool active);
   bool isGrowActive() const { return growActive_; }
+
+  // Tür-Maßnahmen Konfiguration
+  void setDoorActions(const DoorActionSettings& s) { doorActions_ = s; }
+  DoorActionSettings getDoorActions() const { return doorActions_; }
 
   // Periodisches Update; gibt false zurück, wenn Sensorabfrage fehlgeschlagen
   bool update();
@@ -303,6 +315,9 @@ private:
   // Globaler Silent-Modus
   GlobalSilentSettings silent_ = {false, {22,0}, {6,0}, 20.0f, 40.0f, 20.0f, 40.0f, false};
   bool silentActive_ = false;
+
+  // Tür-Maßnahmen
+  DoorActionSettings doorActions_;
 };
 
 } // namespace plant_ctrl

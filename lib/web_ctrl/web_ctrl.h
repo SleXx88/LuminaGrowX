@@ -36,6 +36,12 @@ struct GlobalSilentCfg {
   float fanCircMin = 20, fanCircMax = 40;
   bool pumpEnabled = false;
 };
+struct DoorActionCfg {
+  bool pauseControl = false;
+  bool lightOn      = false;
+  bool pumpOff      = false;
+  bool liftPanel    = false;
+};
 
 class WebCtrl {
 public:
@@ -70,6 +76,8 @@ public:
   bool saveMqttCfg(const MqttConfig& c);
   bool loadGlobalSilent(GlobalSilentCfg& out);
   bool saveGlobalSilent(const GlobalSilentCfg& c);
+  bool loadDoorActions(DoorActionCfg& out);
+  bool saveDoorActions(const DoorActionCfg& c);
 
 private:
   // HTTP handlers
@@ -138,6 +146,7 @@ private:
   ToFCfg tof_cfg_;
   MqttConfig mqtt_cfg_;
   GlobalSilentCfg silent_;
+  DoorActionCfg door_actions_;
 
   uint32_t nextPushAt_ = 0;
   uint32_t nextProbeAt_ = 0;

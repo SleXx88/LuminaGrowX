@@ -32,8 +32,9 @@ static const char* NVS_UPDATE = "update_cfg";
 static const char* NVS_PHASES = "cfg_phases";
 static const char* NVS_MQTT = "mqtt";
 static const char* NVS_SILENT = "cfg_silent";
+static const char* NVS_DOOR_ACT = "cfg_door_act";
 
-// GitHub Releases (latest) defaults â€“ fest im Code hinterlegt
+// GitHub Releases (latest) defaults – fest im Code hinterlegt
 static const char* GH_OWNER = "SleXx88";
 static const char* GH_REPO  = "LuminaGrowX";
 static const char* GH_ASSET = "LuminaGrowX_Update.tar";
@@ -262,6 +263,46 @@ bool WebCtrl::saveGlobalSilent(const GlobalSilentCfg& c) {
   return true;
 }
 
+bool WebCtrl::loadDoorActions(DoorActionCfg& out) {
+  Preferences prefs;
+  if (!prefs.begin(NVS_DOOR_ACT, true)) return false;
+  out.pauseControl = prefs.getBool("pause", false);
+  out.lightOn = prefs.getBool("light", false);
+  out.pumpOff = prefs.getBool("pump", false);
+  out.liftPanel = prefs.getBool("lift", false);
+  prefs.end();
+  door_actions_ = out;
+  if (ctrl_) {
+    plant_ctrl::DoorActionSettings s;
+    s.pauseControl = out.pauseControl;
+    s.lightOn = out.lightOn;
+    s.pumpOff = out.pumpOff;
+    s.liftPanel = out.liftPanel;
+    ctrl_->setDoorActions(s);
+  }
+  return true;
+}
+
+bool WebCtrl::saveDoorActions(const DoorActionCfg& c) {
+  Preferences prefs;
+  if (!prefs.begin(NVS_DOOR_ACT, false)) return false;
+  prefs.putBool("pause", c.pauseControl);
+  prefs.putBool("light", c.lightOn);
+  prefs.putBool("pump", c.pumpOff);
+  prefs.putBool("lift", c.liftPanel);
+  prefs.end();
+  door_actions_ = c;
+  if (ctrl_) {
+    plant_ctrl::DoorActionSettings s;
+    s.pauseControl = c.pauseControl;
+    s.lightOn = c.lightOn;
+    s.pumpOff = c.pumpOff;
+    s.liftPanel = c.liftPanel;
+    ctrl_->setDoorActions(s);
+  }
+  return true;
+}
+
 #pragma pack(push, 1)
 struct PhaseBlob {
   plant_ctrl::LightSchedule schedule;
@@ -355,7 +396,7 @@ void WebCtrl::begin(plant_ctrl::PlantCtrl* ctrl, RTC_Ctrl* rtc, NetCtrl* net) {
 
   // Ensure all NVS namespaces exist by opening in RW mode once
   {
-    const char* ns[] = {NVS_APP, NVS_GROW, NVS_DRY, NVS_NOTIFY, NVS_STEPPER, NVS_TOF, NVS_UPDATE, NVS_PHASES, NVS_MQTT, NVS_SILENT};
+    const char* ns[] = {NVS_APP, NVS_GROW, NVS_DRY, NVS_NOTIFY, NVS_STEPPER, NVS_TOF, NVS_UPDATE, NVS_PHASES, NVS_MQTT, NVS_SILENT, NVS_DOOR_ACT};
     Preferences p; for (auto s : ns) { p.begin(s, false); p.end(); }
   }
 
@@ -374,6 +415,8 @@ void WebCtrl::begin(plant_ctrl::PlantCtrl* ctrl, RTC_Ctrl* rtc, NetCtrl* net) {
   mqtt_cfg_ = tmpM;
   GlobalSilentCfg tmpGS; loadGlobalSilent(tmpGS);
   silent_ = tmpGS;
+  DoorActionCfg tmpDA; loadDoorActions(tmpDA);
+  door_actions_ = tmpDA;
   
   if (ctrl_) {
     loadPhases(ctrl_);
@@ -933,6 +976,28 @@ void WebCtrl::setupRoutes_() {
       if (!doc["pumpEnabled"].isNull()) c.pumpEnabled = doc["pumpEnabled"].as<bool>();
       
       saveGlobalSilent(c);
+      req->send(200, "application/json", "{\"ok\":true}");
+  });
+
+  http_.on("/api/settings/door_actions", HTTP_GET, [this](AsyncWebServerRequest* req){
+    JsonDocument doc;
+    doc["pauseControl"] = door_actions_.pauseControl;
+    doc["lightOn"] = door_actions_.lightOn;
+    doc["pumpOff"] = door_actions_.pumpOff;
+    doc["liftPanel"] = door_actions_.liftPanel;
+    String out; serializeJson(doc, out); req->send(200, "application/json", out);
+  });
+
+  http_.on("/api/settings/door_actions", HTTP_POST, [](AsyncWebServerRequest*){}, NULL,
+    [this](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t, size_t){
+      JsonDocument doc; if (deserializeJson(doc, data, len)) { req->send(400, "application/json", "{\"error\":\"bad json\"}"); return; }
+      DoorActionCfg c = door_actions_;
+      if (!doc["pauseControl"].isNull()) c.pauseControl = doc["pauseControl"].as<bool>();
+      if (!doc["lightOn"].isNull())      c.lightOn      = doc["lightOn"].as<bool>();
+      if (!doc["pumpOff"].isNull())      c.pumpOff      = doc["pumpOff"].as<bool>();
+      if (!doc["liftPanel"].isNull())    c.liftPanel    = doc["liftPanel"].as<bool>();
+      
+      saveDoorActions(c);
       req->send(200, "application/json", "{\"ok\":true}");
   });
 
@@ -2113,4 +2178,10 @@ void WebCtrl::checkStepperCalibration_() {
         Serial.printf("[WEB] Saved new stepper calibration: %.2f mm\n", stepper_cfg_.max_travel_mm);
     }
 }
+
+
+
+
+
+
 
