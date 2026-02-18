@@ -5,7 +5,7 @@
 
 [CmdletBinding()]
 param(
-  [string]$Env = "esp32-s3-devkitc-1",
+  [string]$Env = "esp32s3",
   [string]$Out = "LuminaGrowX-package.tar",
   [switch]$NoFirmware
 )

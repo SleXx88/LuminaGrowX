@@ -4,7 +4,7 @@
 $ErrorActionPreference = "Stop"
 
 # Pfade
-$pioBuildDir = ".pio\build\esp32-s3-devkitc-1"
+$pioBuildDir = ".pio\build\esp32s3"
 $releaseDir = "release"
 $outFile = "$releaseDir\LuminaGrowX_Factory.bin"
 
