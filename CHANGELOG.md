@@ -2,6 +2,35 @@
 
 Alle wichtigen Änderungen und Features der automatisierten Growbox-Steuerung.
 
+## [V1.0.5] - 2026-02-19
+### Performance-Optimierung & Erweiterte Tür-Logik
+
+Dieses Release fokussiert sich auf die Stabilisierung der Regelstrategie, eine intelligentere Reaktion auf Tür-Interaktionen und die Behebung kritischer Anlauf-Probleme der Lüfter.
+
+#### 🔧 Bugs behoben
+*   **Sofortige Annäherung:** Triggert jetzt eine sofortige LED-Annäherung, wenn ein Grow gestartet wird (neu oder nach Boot) oder wenn die Tür geschlossen wird (nur während eines aktiven Grows).
+*   **Tür-Zustandserkennung:** Korrektur der Anzeige/Erkennung des Türzustands, wenn der Grow gestoppt oder pausiert ist.
+*   **Erhöhte Entprellzeit:** Die Zeitspanne, die der Tür-Pin stabil bleiben muss, bevor ein Zustandswechsel akzeptiert wird, wurde von 50 ms auf **200 ms** erhöht.
+*   **Lüfter-Anlauf Fix:** Behebung eines Fehlers, bei dem die Abluft-Lüfter (FAN1 & 2) beim Start der Regelung bei 0% PWM blieben, obwohl ein "Lüfter Min (Tag/Nacht)" Wert hinterlegt war.
+
+#### 📈 Regelstrategie verbessert
+*   **Stabilität des Regeltakts:** Die Steuerung wurde auf eine feste Frequenz gedrosselt. Dies verhindert "Einfrieren" der Berechnungen durch die extrem hohe Taktrate des Prozessors.
+*   **Anlauf-Blockade gelöst:** Entfernung einer minimalen Schwelle, die verhinderte, dass Lüfter ihren sanften Anlauf aus dem Stillstand heraus starten konnten.
+*   **Intelligente Priorisierung:** Neusortierung der Sicherheitsfunktionen (z. B. bei extremer Feuchtigkeit/Hitze). Der jeweils höchste Leistungsbedarf gewinnt nun automatisch, ohne gegenseitige Blockade.
+*   **Permanenter Klima-Abgleich:** Das System prüft nun kontinuierlich, ob Außenluft tatsächlich zur Verbesserung des Innenklimas beitragen kann, bevor die Lüfterleistung unnötig erhöht wird.
+*   **Verstärkte Reaktionskraft:** Die grundlegende Reaktion auf Abweichungen wurde spürbarer eingestellt, sodass das System früher und entschlossener eingreift.
+*   **Dynamische Anpassung:** Erhöhung der Geschwindigkeit, mit der Lüfter ihre Drehzahl ändern dürfen, für eine lebendigere Regelung.
+
+#### ✨ Neuerungen
+*   **Automatisches Parken:** Das LED-Panel fährt nun automatisch nach oben, sobald der Grow gestoppt wird.
+*   **Interaktive Tür-Maßnahmen:** Neue Optionen beim Öffnen der Tür:
+    *   Regelung pausieren.
+    *   Beleuchtung EIN (Arbeitslicht 10%, auch bei inaktiver Regelung).
+    *   Pumpe AUS.
+    *   LED-Panel anheben (10cm) für besseren Zugriff.
+
+---
+
 ## [V1.0.4] - 2026-02-17
 ### Erweiterte Pumpen- & Lüftersteuerung
 
