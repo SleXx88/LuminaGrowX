@@ -547,30 +547,52 @@ bool PlantCtrl::update() {
     humidityPriorityActive_ = false;
   }
 
-  // 6) Außen feuchter -> Lüfter blockieren
+  // 6) Außen feuchter -> Lüfter blockieren (Sicherheitsfeature)
   const bool heatEmergency = (tIn_ > (maxTemp_ + 0.5f));
   const bool moisturePanic = (rhIn_ >= rhHighThr_);
-
+  const double dewGapIn    = tIn_ - dpIn_;
+  bool blockActive = false;
+  
   if (!heatEmergency && !moisturePanic && blockOutsideHumid_ && (!isnan(dpIn_) && !isnan(dpOut_)) && ((float)dpOut_ >= (float)dpIn_ + dpHumidHyst_)) {
-    float fanCmd = 15.0f;
-    // Sicherstellen, dass auch im Sperr-Modus die Silent-Grenzen (oder Phasen-Grenzen) gelten
-    fanCmd = clamp(fanCmd, baseFan, fanMaxEff);
-    
-    fanCmd = limitRate(fanCmd, lastFanOut_, dt_s);
-    lastFanOut_ = fanOut_ = fanCmd;
-    fan_->setPercent(fanOut_);
-    if (fan2_) fan2_->setPercent(fanOut_);
-    
-    iTermFan_ *= 0.98f;
-    distanceTick_(now);
-    return true;
+    blockActive = true;
   }
 
-  // 7) Overrides (Feuchte/Taupunkt/Temperatur)
-  bool overrideActive = humidityPriorityActive_;
-  const double dewGapIn = tIn_ - dpIn_;
-
+  // 7) Regelung & Overrides
+  updateFanSignFromDewpoints(); // Immer aktuell halten
+  
   float fanCmd = baseFan + iTermFan_;
+  bool overrideActive = false;
+
+  // 9) PI-Regelung (Normalbetrieb)
+  if (now >= holdUntilMs_) {
+    const float vpdRange = fmaxf(0.0f, ps.vpdMax - ps.vpdMin);
+    const float localDeadband = fminf(deadband_, 0.5f * vpdRange);
+    const float error = (float)vpdFilt_ - vpdTarget;
+    float e = 0.0f;
+    if      (error >  localDeadband) e = error - localDeadband;
+    else if (error < -localDeadband) e = error + localDeadband;
+    else e = 0.0f;
+
+    // PI-Berechnung
+    float pTerm = (float)fanSign_ * kpFan_ * e;
+    const float iDelta = ((float)fanSign_) * kiFan_ * e * dt_s;
+    
+    float preClamp = baseFan + iTermFan_ + pTerm + iDelta;
+    float clamped  = clamp(preClamp, baseFan, fanMaxEff);
+    
+    if (fabsf(preClamp - clamped) < 1e-3f) {
+      iTermFan_ += iDelta; 
+      if (iTermFan_ >  20.0f) iTermFan_ =  20.0f;
+      if (iTermFan_ < -20.0f) iTermFan_ = -20.0f;
+    } else {
+      iTermFan_ *= 0.98f; 
+    }
+    fanCmd = clamped;
+  } else {
+    iTermFan_ *= 0.995f;
+  }
+
+  // Override 1: Schimmelprävention (Humidity-Priority)
   if (humidityPriorityActive_) {
     float overshootRH = (float)rhIn_ - cap; if (overshootRH < 0.0f) overshootRH = 0.0f;
     float overshootDP = dpGapReq - (float)(tIn_ - dpIn_); if (overshootDP < 0.0f) overshootDP = 0.0f;
@@ -585,66 +607,36 @@ bool PlantCtrl::update() {
     if (silentActive_ && maxLimit > silent_.fanExhaustMax) maxLimit = silent_.fanExhaustMax;
 
     if (maxLimit < baseFan) maxLimit = baseFan;
-    float scaledFan = clamp(targetFan, baseFan, maxLimit);
-    if (scaledFan < fanOut_) {
-      fanCmd = fanOut_;
-    } else {
-      fanCmd = scaledFan;
-    }
-    iTermFan_ *= 0.995f;
+    fanCmd = fmaxf(fanCmd, clamp(targetFan, baseFan, maxLimit));
+    overrideActive = true;
   }
-  if (!overrideActive && (rhIn_ >= rhHighThr_ || dewGapIn <= dewGapMinC_)) {
+
+  // Override 2: Feuchte-Notfall (Moisture Panic)
+  if (moisturePanic || dewGapIn <= dewGapMinC_) {
     float maxLimit = fanMaxEff;
     if (mode_ == DayMode::NightSilent && allowSilentOv_) {
       maxLimit = fminf(100.0f, maxLimit + 20.0f);
     }
     if (silentActive_ && maxLimit > silent_.fanExhaustMax) maxLimit = silent_.fanExhaustMax;
-    fanCmd = clamp(fmaxf(baseFan + humidBoost_, fanOut_), baseFan, maxLimit);
-    overrideActive = true;
-  }
-  if (!overrideActive && (tIn_ >= tempHighFanC_ || heatEmergency)) {
-    fanCmd = clamp(fmaxf(baseFan + tempHighFanBoost_, fanOut_), baseFan, fanMaxEff);
+    fanCmd = fmaxf(fanCmd, clamp(baseFan + humidBoost_, baseFan, maxLimit));
     overrideActive = true;
   }
 
-  // 8) Holds (Tür/Modus)
-  if (!overrideActive && now < holdUntilMs_) {
-    fanCmd = clamp(baseFan + iTermFan_, baseFan, fanMaxEff);
+  // Override 3: Temperatur-Notfall
+  if (tIn_ >= tempHighFanC_ || heatEmergency) {
+    fanCmd = fmaxf(fanCmd, clamp(baseFan + tempHighFanBoost_, baseFan, fanMaxEff));
+    overrideActive = true;
   }
 
-  // 9) PI-Regelung
-  if (!overrideActive && now >= holdUntilMs_) {
-    updateFanSignFromDewpoints();
-    const float vpdRange = fmaxf(0.0f, ps.vpdMax - ps.vpdMin);
-    const float localDeadband = fminf(deadband_, 0.5f * vpdRange);
-    const float error = (float)vpdFilt_ - vpdTarget;
-    float e = 0.0f;
-    if      (error >  localDeadband) e = error - localDeadband;
-    else if (error < -localDeadband) e = error + localDeadband;
-    else e = 0.0f;
-
-    fanCmd = baseFan + iTermFan_ + (float)fanSign_ * kpFan_ * e;
-    const float iDelta = ((float)fanSign_) * kiFan_ * e * dt_s;
-    float preClamp = fanCmd + iDelta;
-    float clamped  = clamp(preClamp, baseFan, fanMaxEff);
-    if (fabsf(preClamp - clamped) < 1e-3f) {
-      iTermFan_ += iDelta; 
-      if (iTermFan_ >  20.0f) iTermFan_ =  20.0f;
-      if (iTermFan_ < -20.0f) iTermFan_ = -20.0f;
-    } else {
-      iTermFan_ *= 0.98f; 
-    }
-    fanCmd = clamped;
-  } else {
-    iTermFan_ *= 0.995f;
+  // Anwendung der Außenfeuchte-Sperre (nur wenn kein Notfall)
+  if (blockActive) {
+    fanCmd = clamp(15.0f, baseFan, fanMaxEff);
   }
 
+  // Finale Begrenzung & Rampe
   fanCmd = clamp(fanCmd, baseFan, fanMaxEff);
   fanCmd = limitRate(fanCmd, lastFanOut_, dt_s); 
-  const float offEps = 0.5f; 
-  if (fanCmd > 0.0f && fanCmd < offEps) {
-    fanCmd = 0.0f;
-  }
+
   lastFanOut_ = fanOut_ = fanCmd;
   fan_->setPercent(fanOut_);
   if (fan2_) fan2_->setPercent(fanOut_);

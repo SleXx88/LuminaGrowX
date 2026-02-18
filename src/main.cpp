@@ -375,6 +375,7 @@ void setup()
 
 void loop()
 {
+  unsigned long now = millis();
   // Keep stepper ticking every frame
   step.tick();
   
@@ -390,12 +391,16 @@ void loop()
   // Regelung nur laufen lassen, wenn kritische Sensoren OK
   if (health::critical_ok()) {
     health::state().control_paused = false;
-    // Run controller at high rate every loop iteration
-    bool okUpdate = controller.update();
-    if (!okUpdate) {
-      // Sensor-Lesefehler -> pausieren und markieren
-      health::state().control_paused = true;
-      // Versuche, bei nächstem Loop weiterzumachen; hier kein harter Reset
+    
+    // Regelung auf ~10 Hz drosseln für stabile Zeit-Deltas (dt_s)
+    static uint32_t lastCtrlMs = 0;
+    if (now - lastCtrlMs >= 100) {
+      lastCtrlMs = now;
+      bool okUpdate = controller.update();
+      if (!okUpdate) {
+        // Sensor-Lesefehler -> pausieren und markieren
+        health::state().control_paused = true;
+      }
     }
   } else {
     health::state().control_paused = true;
@@ -404,7 +409,6 @@ void loop()
 
   // Debug print every ~3s; nur wenn Regelung aktiv
   static unsigned long lastLogMs = 0;
-  unsigned long now = millis();
   if (now - lastLogMs >= 3000) {
     lastLogMs = now;
     if (!health::state().control_paused) {

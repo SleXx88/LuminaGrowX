@@ -249,11 +249,11 @@ namespace lumina
     // Konservative Parameter für träge Systeme (kleine Box, hohe Totzeit)
     // Kleine Box (160L) mit passivem Einlass reagiert langsam -> niedrige Verstärkung nötig
     constexpr Params PARAMS{
-        /*Kp*/ 4.0f,               // Halbiert für träges System (war 8.0)
-        /*Ki*/ 0.010f,             // Stark reduziert (war 0.030) - Totzeit vermeidet Windup
-        /*deadband_kPa*/ 0.12f,    // Vergrößert für Stabilität (war 0.08)
-        /*rate_limit_pct_s*/ 1.5f, // Langsamer (war 3.0) - System braucht Zeit zu reagieren
-        /*ema_alpha*/ 0.15f,       // Mehr Glättung (war 0.30) gegen Sensorrauschen
+        /*Kp*/ 18.0f,              // Erhöht für direktere Reaktion (war 12.0)
+        /*Ki*/ 0.100f,             // Erhöht für schnelleres Nachregeln (war 0.050)
+        /*deadband_kPa*/ 0.05f,    // Verkleinert für höhere Präzision (war 0.12)
+        /*rate_limit_pct_s*/ 4.0f, // Erhöht für schnellere Reaktion (war 1.5)
+        /*ema_alpha*/ 0.30f,       // Weniger Glättung für schnellere Reaktion (war 0.25)
 
         /*outside_block*/ true,         // Lüfter blockieren wenn außen feuchter
         /*dp_hyst_C*/ 0.5f,             // Hysterese für Taupunktvergleich
@@ -261,7 +261,7 @@ namespace lumina
         /*rh_high_thr*/ 85.0f,          // Schwelle für Feuchte-Override
         /*dew_gap_min_C*/ 1.5f,         // Mindestabstand Temp-Taupunkt innen
         /*allow_silent_ov*/ true,       // NightSilent darf lauter werden
-        /*humid_boost_pct*/ 20.0f,      // Zusatz-Lüfterleistung bei Override
+        /*humid_boost_pct*/ 30.0f,      // Zusatz-Lüfterleistung bei Override (war 20.0)
 
         /*max_temp_C*/ 30.0f,           // LED-Reduktion ab dieser Temp
         /*led_reduce_pct*/ 5.0f,        // LED-Reduktion in %
