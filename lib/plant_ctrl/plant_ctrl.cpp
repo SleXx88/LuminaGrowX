@@ -59,6 +59,7 @@ void PlantCtrl::begin(SHT41Ctrl& sensorIndoor,
   ledOut_ = settings_[idxStage(stage_)][idxMode(mode_)].ledPercent;
   if (led_) { led_->setPercent(ledOut_); ledApplied_ = ledOut_; }
   initialApproachDone_ = false;
+  doorTriggeredApproach_ = false;
 }
 
 void PlantCtrl::setStage(vpd_calc::GrowthStage s) {
@@ -205,6 +206,22 @@ void PlantCtrl::setDryingMode(bool active) {
 }
 
 void PlantCtrl::setGrowActive(bool active) {
+  if (active && !growActive_) {
+    // Wenn Grow gestartet wird (neu oder nach Boot): Initial-Annäherung triggern, sobald Tür zu
+    if (lastDoorClosed_) {
+      adjustActive_ = true;
+      adjustUntilMs_ = millis() + lumina::plant::AUTO_APPROACH_TIMEOUT_MS;
+      lastTofReadMs_ = 0; // Sofortige Messung auslösen
+      Serial.println(F("[CTRL] Grow gestartet -> Initial-Annäherung getriggert"));
+    }
+  } else if (!active && growActive_) {
+    // Wenn Grow beendet wird: LED nach oben fahren
+    adjustActive_ = false;
+    if (step_ && lastDoorClosed_) {
+      Serial.println(F("[CTRL] Grow beendet -> Fahre LED in Referenzposition (oben)"));
+      step_->goTop(lumina::plant::SPEED_LEVEL);
+    }
+  }
   growActive_ = active;
 }
 
@@ -212,6 +229,10 @@ bool PlantCtrl::update() {
   if (!sensorIn_ || !sensorOut_ || !fan_ || !led_) return false;
 
   const uint32_t now = millis();
+  
+  // Tür-Status IMMER aktualisieren (für UI und Sicherheit)
+  updateDoorState_(now);
+
   const float dt_s = (lastMs_ == 0) ? 0.0f : (float)(now - lastMs_) / 1000.0f;
   lastMs_ = now;
 
@@ -637,20 +658,30 @@ static inline unsigned long long makeTokenYMDHM(int y, int m, int d, int hh, int
   return (((Y*100ULL + M)*100ULL + D)*100ULL + H)*100ULL + Min;
 }
 
-bool PlantCtrl::allowDownAdjustNow_(uint32_t now) {
+void PlantCtrl::updateDoorState_(uint32_t now) {
   bool closed = isDoorClosed_();
   if (closed != lastDoorClosed_) {
-    if (now - doorLastChangeMs_ > 50) {
+    if (now - doorLastChangeMs_ > 200) {
       lastDoorClosed_ = closed;
       doorLastChangeMs_ = now;
       if (closed) {
         Serial.println(F("[DOOR] geschlossen (stabil)"));
-        if (lumina::plant::AUTO_APPROACH_DOOR) return true; 
+        if (lumina::plant::AUTO_APPROACH_DOOR) {
+          doorTriggeredApproach_ = true;
+        }
       } else {
         Serial.println(F("[DOOR] offen"));
         adjustActive_ = false;
+        if (step_) step_->stop();
       }
     }
+  }
+}
+
+bool PlantCtrl::allowDownAdjustNow_(uint32_t now) {
+  if (doorTriggeredApproach_) {
+    doorTriggeredApproach_ = false;
+    return true;
   }
 
   if (rtc_) {
@@ -688,7 +719,7 @@ float PlantCtrl::targetDistanceMm_() const {
 }
 
 void PlantCtrl::distanceTick_(uint32_t now) {
-  if (!step_ || !tof_) return;
+  if (!step_ || !tof_ || !growActive_) return;
   bool canAdjust = allowDownAdjustNow_(now);
   if (!isDoorClosed_()) { 
     if (adjustActive_) { step_->stop(); adjustActive_ = false; }
@@ -734,7 +765,11 @@ void PlantCtrl::distanceTick_(uint32_t now) {
 }
 
 void PlantCtrl::runStartupApproachBlocking() {
-  if (!step_ || !tof_) { initialApproachDone_ = true; return; }
+  // Annäherung nur wenn ein Grow aktiv ist
+  if (!step_ || !tof_ || !growActive_) { 
+    initialApproachDone_ = true; 
+    return; 
+  }
   const float target = targetDistanceMm_();
   const float offset = (float)lumina::plant::TOF_LED_OFFSET_MM;
   const float hyst   = lumina::plant::ADJUST_HYST_MM;

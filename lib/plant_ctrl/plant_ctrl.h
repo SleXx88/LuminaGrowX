@@ -195,6 +195,7 @@ private:
   float limitRate(float tgt, float last, float dt_s) const;
   void detectDoorOrTransient(float t_now, float rh_now, uint32_t now_ms);
   void updateFanSignFromDewpoints();
+  void updateDoorState_(uint32_t now);
 
   // Abstand/ToF/Stepper
   void distanceTick_(uint32_t now);
@@ -275,6 +276,7 @@ private:
   uint32_t lastTofReadMs_ = 0;
   int      lastTofMm_ = -1; // -1 ungültig / außerhalb Messbereich, -2 zu nah
   bool     lastDoorClosed_ = true;
+  bool     doorTriggeredApproach_ = false;
   uint32_t doorLastChangeMs_ = 0;
 
   // Zeitplan-Auslöser (einmal pro Ereignis/Tag) – 64-bit, um Überläufe zu vermeiden
