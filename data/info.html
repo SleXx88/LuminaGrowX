@@ -288,7 +288,11 @@
         $("valDew").textContent = (s.dew_c != null ? s.dew_c.toFixed(1) : "-") + " °C";
         
         $("valLed").textContent = (s.light_pct != null ? s.light_pct.toFixed(1) : "0.0") + " % (" + (s.light_on ? "AN" : "AUS") + ")";
-        $("valFans").textContent = (s.fan_pct || 0).toFixed(0) + " / " + (s.fan2_pct || 0).toFixed(0) + " / " + (s.fan3_pct || 0).toFixed(0) + " %";
+        
+        const f1 = (s.fan_pct || 0).toFixed(0) + " % (" + (s.fan_rpm || 0) + " RPM)";
+        const f2 = (s.fan2_pct || 0).toFixed(0) + " % (" + (s.fan2_rpm || 0) + " RPM)";
+        const f3 = (s.fan3_pct || 0).toFixed(0) + " %";
+        $("valFans").textContent = f1 + " / " + f2 + " / " + f3;
         
         $("valIp").textContent = s.ip || "-";
         $("valSsid").textContent = s.ssid || (s.wifi_connected ? "Verbunden" : "Nicht verbunden");

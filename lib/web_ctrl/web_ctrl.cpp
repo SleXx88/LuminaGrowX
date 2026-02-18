@@ -1367,25 +1367,41 @@ String WebCtrl::makeStatusJson_() {
     ledPct = dac_->getPercent();
   }
   
-  float fanPct = fan_ ? fan_->getPercent() : 0.0f;
-  int fanRpm = fan_ ? fan_->getRPM() : 0;
-  int fan2Rpm = fan2_ ? fan2_->getRPM() : 0;
-  float fan2Pct = fan2_ ? fan2_->getPercent() : 0.0f;
-  float fan3Pct = fan3_ ? fan3_->getPercent() : 0.0f;
+        float fanPct = fan_ ? fan_->getPercent() : 0.0f;
   
-  doc["light_on"] = ledPct > 0.5f;
-  doc["light_pct"] = round1(ledPct);
-  doc["fan_on"]   = fanPct > 0.5f;
-  doc["fan_pct"]  = round1(fanPct);
-  doc["fan_rpm"]  = fanRpm;
-  doc["fan2_on"]  = fan2Pct > 0.5f;
-  doc["fan2_pct"] = round1(fan2Pct);
-  doc["fan2_rpm"] = fan2Rpm;
-  doc["fan3_on"]  = fan3Pct > 0.5f;
-  doc["fan3_pct"] = round1(fan3Pct);
+        int fanRpm = fan_ ? fan_->getRPM() : 0;
   
-  int pPin = lumina::pins::PUMP_EN;
-  doc["pump_on"]  = (pPin >= 0) && (digitalRead(pPin) == HIGH);
+        int fan2Rpm = fan2_ ? fan2_->getRPM() : 0;
+  
+        float fan2Pct = fan2_ ? fan2_->getPercent() : 0.0f;
+  
+        float fan3Pct = fan3_ ? fan3_->getPercent() : 0.0f;
+  
+        
+  
+        doc["light_on"] = ledPct > 0.5f;
+  
+        doc["light_pct"] = round1(ledPct);
+  
+        doc["fan_on"]   = fanPct > 0.5f;
+  
+        doc["fan_pct"]  = round1(fanPct);
+  
+        doc["fan_rpm"]  = fanRpm;
+  
+        doc["fan2_on"]  = fan2Pct > 0.5f;
+  
+        doc["fan2_pct"] = round1(fan2Pct);
+  
+        doc["fan2_rpm"] = fan2Rpm;
+  
+        doc["fan3_on"]  = fan3Pct > 0.5f;
+  
+        doc["fan3_pct"] = round1(fan3Pct);
+  
+        
+  
+        int pPin = lumina::pins::PUMP_EN;  doc["pump_on"]  = (pPin >= 0) && (digitalRead(pPin) == HIGH);
 
   // TÃ¼r-Status
   bool doorOpen = ctrl_ ? ctrl_->isDoorOpen() : false;
