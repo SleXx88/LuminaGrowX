@@ -12,6 +12,7 @@ bool NetCtrl::loadConfig(NetworkConfig& out) {
   if (!prefs.begin(kNetNamespace, true)) return false;
   out.ssid = prefs.getString("ssid", "");
   out.pass = prefs.getString("pass", "");
+  out.hostname = prefs.getString("hostname", "");
   out.useStatic = prefs.getBool("use_static", false);
   out.ip = prefs.getString("ip", "");
   out.mask = prefs.getString("mask", "255.255.255.0");
@@ -27,6 +28,7 @@ bool NetCtrl::saveConfig(const NetworkConfig& c) {
   if (!prefs.begin(kNetNamespace, false)) return false;
   prefs.putString("ssid", c.ssid);
   prefs.putString("pass", c.pass);
+  prefs.putString("hostname", c.hostname);
   prefs.putBool("use_static", c.useStatic);
   prefs.putString("ip", c.ip);
   prefs.putString("mask", c.mask);
@@ -48,10 +50,11 @@ void NetCtrl::ntpInit() {
   configTzTime("CET-1CEST,M3.5.0/2,M10.5.0/3", "pool.ntp.org", "time.nist.gov");
 }
 
-void NetCtrl::configureResetPin(int gpio, bool activeHigh, uint32_t holdMs) {
+void NetCtrl::configureResetPin(int gpio, bool activeHigh, uint32_t holdMs, uint32_t factoryHoldMs) {
   resetPin_ = gpio;
   resetActiveHigh_ = activeHigh;
   resetHoldMs_ = holdMs;
+  factoryResetHoldMs_ = factoryHoldMs;
   if (resetPin_ >= 0) {
     pinMode(resetPin_, resetActiveHigh_ ? INPUT : INPUT_PULLUP);
   }
@@ -120,17 +123,28 @@ void NetCtrl::begin(bool forceAP, const char* mdnsName, RTC_Ctrl* rtc, bool keep
   WiFi.setTxPower(WIFI_POWER_19_5dBm);
   WiFi.setSleep(false);
 
-  // AP SSID: LuminaGrowX-Setup-<last4 mac>
+  // AP SSID: LisaPro-Setup-<last4 mac>
   String mac = WiFi.macAddress();
   mac.replace(":", "");
   mac = mac.substring(mac.length() - 4);
-  apSSID_ = String("LuminaGrowX-Setup-") + mac;
+  apSSID_ = String("LisaPro-Setup-") + mac;
+
+  // Hostname für DHCP (Fritzbox) und mDNS: Priorität auf gespeicherte Config, sonst Default Name + MAC
+  if (cfg_.hostname.length() > 0) {
+    mdnsName_ = cfg_.hostname;
+  } else {
+    String base = (mdnsName && strlen(mdnsName) > 0) ? String(mdnsName) : String("LisaPro");
+    mdnsName_ = base + "-" + mac;
+  }
+  WiFi.setHostname(mdnsName_.c_str());
+
   // Statische AP-IP sicherstellen (Standard 192.168.4.1)
   WiFi.softAPConfig(IPAddress(192,168,4,1), IPAddress(192,168,4,1), IPAddress(255,255,255,0));
   // Offener AP ohne Passwort, sichtbare SSID, Kanal 1
   WiFi.softAP(apSSID_.c_str(), "", 1, 0);
   apActive_ = true;
   Serial.printf("[NET] AP gestartet (offen): SSID=%s, IP=%s\n", apSSID_.c_str(), WiFi.softAPIP().toString().c_str());
+  Serial.printf("[NET] Hostname gesetzt auf: %s\n", mdnsName_.c_str());
 
   if (!forceAP && cfg_.ssid.length()) {
     if (cfg_.useStatic) {
@@ -150,7 +164,7 @@ void NetCtrl::begin(bool forceAP, const char* mdnsName, RTC_Ctrl* rtc, bool keep
 
   // STA-Verbindung herstellen (falls konfiguriert); AP bei Erfolg deaktivieren
   if (WiFi.isConnected() && !forceAP && cfg_.ssid.length() > 0) {
-    if (mdnsName && MDNS.begin(mdnsName)) {
+    if (mdnsName_.length() > 0 && MDNS.begin(mdnsName_.c_str())) {
       MDNS.addService("http", "tcp", 80);
       mdnsOk_ = true;
     }
@@ -193,7 +207,7 @@ void NetCtrl::startAP() {
   String mac = WiFi.macAddress();
   mac.replace(":", "");
   mac = mac.substring(mac.length() - 4);
-  apSSID_ = String("LuminaGrowX-Setup-") + mac;
+  apSSID_ = String("LisaPro-Setup-") + mac;
 
   // Statische AP-IP sicherstellen (Standard 192.168.4.1)
   WiFi.softAPConfig(IPAddress(192,168,4,1), IPAddress(192,168,4,1), IPAddress(255,255,255,0));
@@ -234,8 +248,8 @@ bool NetCtrl::reconnectSTA(bool closeAPOnSuccess, uint32_t timeoutMs) {
   return false;
 }
 
-void NetCtrl::tick() {
-  if (resetPin_ < 0) return;
+NetCtrl::ResetEvent NetCtrl::tick() {
+  if (resetPin_ < 0) return ResetEvent::NONE;
 
   // Auto-Close Logik für AP (falls über Button gestartet)
   if (apAutoCloseAt_ > 0 && millis() >= apAutoCloseAt_) {
@@ -250,16 +264,24 @@ void NetCtrl::tick() {
   bool level = digitalRead(resetPin_);
   bool isActive = resetActiveHigh_ ? level : !level;
 
+  ResetEvent event = ResetEvent::NONE;
+
   if (isActive) {
     if (resetPinPressStart_ == 0) {
       resetPinPressStart_ = millis();
-    } else if (resetPinPressStart_ == 0xFFFFFFFF) {
-      // Bereits ausgelöst, warte auf Loslassen
-      return;
+      apTriggeredThisPress_ = false;
+      factoryTriggeredThisPress_ = false;
     } else {
       uint32_t holdTime = millis() - resetPinPressStart_;
-      if (holdTime >= resetHoldMs_) {
-        // Button wurde 5 Sekunden gehalten
+
+      // 10 Sekunden: Factory Reset
+      if (holdTime >= factoryResetHoldMs_ && !factoryTriggeredThisPress_) {
+        Serial.println(F("[NET] Reset-Button 10s gehalten -> Starte Factory Reset!"));
+        factoryTriggeredThisPress_ = true;
+        event = ResetEvent::FACTORY_RESET;
+      }
+      // 5 Sekunden: AP Reset
+      else if (holdTime >= resetHoldMs_ && !apTriggeredThisPress_ && !factoryTriggeredThisPress_) {
         if (!apActive_) {
           Serial.println(F("[NET] Reset-Button 5s gehalten -> AP für 1 Minute aktiv."));
           startAP();
@@ -267,11 +289,15 @@ void NetCtrl::tick() {
         } else {
           Serial.println(F("[NET] Reset-Button 5s gehalten -> AP ist bereits aktiv."));
         }
-        // Markieren als ausgelöst
-        resetPinPressStart_ = 0xFFFFFFFF;
+        apTriggeredThisPress_ = true;
+        event = ResetEvent::AP_RESET;
       }
     }
   } else {
     resetPinPressStart_ = 0;
+    apTriggeredThisPress_ = false;
+    factoryTriggeredThisPress_ = false;
   }
+
+  return event;
 }

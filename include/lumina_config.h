@@ -65,6 +65,7 @@ namespace lumina
     constexpr int      AP_RESET_PIN          = 6;       // z.B. GPIO6
     constexpr bool     AP_RESET_ACTIVE_HIGH  = false;   // aktiv LOW (empfohlen mit Pullup)
     constexpr uint32_t AP_RESET_HOLD_MS      = 5000;    // 5 Sekunden
+    constexpr uint32_t FACTORY_RESET_HOLD_MS = 10000;   // 10 Sekunden
   }
 
   // --- Startup-Optionen ---

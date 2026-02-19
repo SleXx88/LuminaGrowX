@@ -2,6 +2,20 @@
 
 Alle wichtigen Änderungen und Features der automatisierten Growbox-Steuerung.
 
+## [V1.0.6] - 2026-02-19
+### Netzwerk-Identifikation & Hostname-Anpassung
+
+Verbesserung der Sichtbarkeit und Identifizierung der LisaPro im Heimnetzwerk (z.B. Fritzbox).
+
+#### 🚀 Neue Features
+*   **Eindeutiger Hostname:** Das Gerät meldet sich nun standardmäßig mit `LisaPro-[MAC]` (z.B. `LisaPro-A1B2`) beim Router an, anstatt des generischen Namens `ESP32`.
+*   **Konfigurierbarer Hostname:** Der Name für mDNS und DHCP kann nun in den **Einstellungen** individuell angepasst werden.
+*   **mDNS Zugriff:** Die Box ist im Browser nun über `http://LisaPro-[MAC].local` (bzw. den gewählten Namen) erreichbar.
+
+#### 🔧 Verbesserungen
+*   **Dynamische Links:** Erfolgsmeldungen im Web-Interface zeigen nun automatisch den korrekten Link zum Gerät an, basierend auf dem gewählten Hostnamen.
+*   **Setup-Flow:** Der Inbetriebnahme-Assistent erkennt den konfigurierten Namen und bietet am Ende den passenden Link zur Weiterleitung an.
+
 ## [V1.0.5] - 2026-02-19
 ### Performance-Optimierung & Erweiterte Tür-Logik
 

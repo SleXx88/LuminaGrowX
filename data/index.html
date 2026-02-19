@@ -1154,7 +1154,10 @@
           if (dns && !ipv4ok(dns)) { showToast("Ungültige IPv4 in DNS"); return; }
         }
         const payload = {}; if (ssid) payload.ssid = ssid; if (pass) payload.pass = pass; payload.use_static = !!useStatic; payload.static = useStatic ? { ip, mask, gw, dns } : null; payload.reboot = true;
-        showToastHtml('WLAN gespeichert. Bitte jetzt ins Heimnetz wechseln und <a href="http://luminagrowx.local/" target="_blank">http://luminagrowx.local/</a> aufrufen.');
+        
+        // Try to guess hostname from current URL or use fallback
+        const currentHost = window.location.hostname || "LisaPro.local";
+        showToastHtml(`WLAN gespeichert. Bitte jetzt ins Heimnetz wechseln und <a href="http://${currentHost}/" target="_blank">http://${currentHost}/</a> aufrufen.`);
         try { fetch("/api/network", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); } catch (_) {}
       });
 

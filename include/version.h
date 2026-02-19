@@ -1,5 +1,5 @@
 #pragma once
 
 // Zentrale Firmware-Versionsangabe
-#define FW_VERSION "V1.0.5"
+#define FW_VERSION "V1.0.6"
 

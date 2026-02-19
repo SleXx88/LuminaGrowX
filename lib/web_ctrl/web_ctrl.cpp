@@ -401,6 +401,12 @@ void WebCtrl::begin(plant_ctrl::PlantCtrl* ctrl, RTC_Ctrl* rtc, NetCtrl* net) {
   }
 
   AppCfg tmpA; loadAppCfg(tmpA);
+  // Wenn Name noch auf Default "LisaPro" steht, versuche den Hostnamen von NetCtrl zu übernehmen
+  if (net_ && tmpA.name == "LisaPro") {
+      tmpA.name = net_->mdnsName();
+  }
+  app_ = tmpA;
+
   GrowState tmpG; loadGrow(tmpG);
   grow_ = tmpG;
   DryingState tmpD; loadDrying(tmpD);
@@ -1013,10 +1019,18 @@ void WebCtrl::setupRoutes_() {
                  app_.name = String((const char*)doc["name"]); 
                  changed = true;
                  if (mqtt_) mqtt_->setDeviceName(app_.name);
+                 // Synchronisiere Hostnamen für mDNS/Router
+                 if (net_) {
+                    net_ctrl::NetworkConfig nc = net_->cfg();
+                    nc.hostname = app_.name;
+                    net_->saveConfig(nc);
+                 }
              }
              if (changed) saveAppCfg(app_);
+             bool requestedReboot = doc["reboot"] | false;
              req->send(200, "application/json", "{\"ok\":true}");
              if (ws_.count() > 0) ws_.textAll(makeStatusJson_());
+             if (requestedReboot) rebootAt_ = millis() + 800;
            });
 
   // /api/network: accepts { ssid?, pass?, use_static?, static:{ip,mask,gw,dns}? , notify?{}, reboot? }
@@ -1028,6 +1042,7 @@ void WebCtrl::setupRoutes_() {
              bool anyNetFieldTouched = false;
              if (!doc["ssid"].isNull()) { nc.ssid = String((const char*)doc["ssid"]); anyNetFieldTouched = true; }
              if (!doc["pass"].isNull()) { nc.pass = String((const char*)doc["pass"]); anyNetFieldTouched = true; }
+             if (!doc["hostname"].isNull()) { nc.hostname = String((const char*)doc["hostname"]); anyNetFieldTouched = true; }
              if (!doc["use_static"].isNull()) { nc.useStatic = doc["use_static"].as<bool>(); anyNetFieldTouched = true; }
              if (!doc["static"].isNull()) {
                JsonObject st = doc["static"].as<JsonObject>();
@@ -1080,7 +1095,7 @@ void WebCtrl::setupRoutes_() {
                float t = 0.f, rh = 0.f; float vpd = 0.f; float led = 0.f, fan = 0.f;
                if (ctrl_) { t = (float)ctrl_->currentTemp(); rh = (float)ctrl_->currentRh(); vpd = (float)ctrl_->currentVpd();
                  led = ctrl_->currentLedPercentEffective(); fan = ctrl_->currentFanPercent(); }
-               String msg = String("LuminaGrowX: Benachrichtigung aktiviert ") + timeStr +
+               String msg = app_.name + ": Benachrichtigung aktiviert " + timeStr +
                             String(" | IP ") + ipStr +
                             String(" | RSSI ") + String(rssi) + String(" dBm") +
                             String(" | T ") + String(t,1) + String(" C, RH ") + String(rh,1) + String("%, VPD ") + String(vpd,2) + String(" kPa") +
@@ -1120,7 +1135,7 @@ void WebCtrl::setupRoutes_() {
                float t = 0.f, rh = 0.f; float vpd = 0.f; float led = 0.f, fan = 0.f;
                if (ctrl_) { t = (float)ctrl_->currentTemp(); rh = (float)ctrl_->currentRh(); vpd = (float)ctrl_->currentVpd();
                  led = ctrl_->currentLedPercentEffective(); fan = ctrl_->currentFanPercent(); }
-               String _msg = String("LuminaGrowX Test ") + timeStr +
+               String _msg = app_.name + " Test " + timeStr +
                              String(" | IP ") + ipStr +
                              String(" | RSSI ") + String(rssi) + String(" dBm") +
                              String(" | T ") + String(t,1) + String(" C, RH ") + String(rh,1) + String("%, VPD ") + String(vpd,2) + String(" kPa") +
@@ -1147,7 +1162,7 @@ void WebCtrl::setupRoutes_() {
                t = (float)ctrl_->currentTemp(); rh = (float)ctrl_->currentRh(); vpd = (float)ctrl_->currentVpd();
                led = ctrl_->currentLedPercentEffective(); fan = ctrl_->currentFanPercent();
              }
-             String msg = String("LuminaGrowX Test ") + timeStr +
+             String msg = app_.name + " Test " + timeStr +
                           String(" | IP ") + ipStr +
                           String(" | RSSI ") + String(rssi) + String(" dBm") +
                           String(" | T ") + String(t,1) + String(" C, RH ") + String(rh,1) + String("%, VPD ") + String(vpd,2) + String(" kPa") +
@@ -1595,6 +1610,7 @@ String WebCtrl::makeInfoJson_() {
   if (net_) {
     netw["ssid"] = net_->cfg().ssid;
     netw["pass"] = net_->cfg().pass.length() > 0 ? "********" : "";
+    netw["hostname"] = net_->mdnsName();
     netw["use_static"] = net_->cfg().useStatic;
     JsonObject st = netw["static"].to<JsonObject>();
     st["ip"]   = net_->cfg().ip;

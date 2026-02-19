@@ -11,6 +11,7 @@
 #include <HTTPClient.h>
 #include <time.h>
 #include <sys/time.h>
+#include <nvs_flash.h>
 
 #include <Wire.h>
 #include "sht41_ctrl.h"
@@ -328,11 +329,12 @@ void setup()
   // Netzwerk + Web am Ende
   net.configureResetPin(lumina::netcfg::AP_RESET_PIN,
                         /*activeHigh=*/lumina::netcfg::AP_RESET_ACTIVE_HIGH,
-                        /*holdMs=*/lumina::netcfg::AP_RESET_HOLD_MS);
+                        /*holdMs=*/lumina::netcfg::AP_RESET_HOLD_MS,
+                        /*factoryHoldMs=*/lumina::netcfg::FACTORY_RESET_HOLD_MS);
   {
     bool forceAP = net.shouldForceAPAtBoot();
     // keepAP = g_setupMode (AP bleibt aktiv, auch wenn STA verbindet)
-    net.begin(forceAP, "luminagrowx", &rtc, g_setupMode);
+    net.begin(forceAP, "LisaPro", &rtc, g_setupMode);
   }
   web.begin(&controller, &rtc, &net);
   // Hardware-Referenzen für Setup/Tests an WebCtrl geben (inkl. SHT41, Fan2, Fan3)
@@ -382,6 +384,27 @@ void loop()
   
   // Update LED effects
   statusLed.update();
+
+  // Web/Net periodische Aufgaben (immer prüfen, auch im Setup-Modus)
+  net_ctrl::NetCtrl::ResetEvent btn = net.tick();
+  if (btn == net_ctrl::NetCtrl::ResetEvent::FACTORY_RESET) {
+    // 1) LED 5x schnell rot blinken
+    statusLed.setMode(LedCtrl::Mode::SOLID);
+    for (int i = 0; i < 5; i++) {
+      statusLed.setColor(LedCtrl::Color::RED);
+      delay(100);
+      statusLed.setColor(LedCtrl::Color::OFF);
+      delay(100);
+    }
+    // 2) Alles löschen (NVS-Partition platt machen)
+    Serial.println(F("[FACTORY] Loesche alle Einstellungen (NVS)..."));
+    nvs_flash_erase();
+    nvs_flash_init();
+    // 3) Neustart
+    Serial.println(F("[FACTORY] Neustart in 1s..."));
+    delay(1000);
+    ESP.restart();
+  }
 
   // Setup-Modus: nur Setup-Flow + Netzwerk/Web aktiv halten
   if (g_setupMode) {
@@ -454,7 +477,5 @@ void loop()
     }
   }
 
-  // Web/Net periodische Aufgaben
-  net.tick();
   web.loop();
 }

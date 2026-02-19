@@ -194,14 +194,15 @@
       <!-- SCHRITT 1: NAME -->
       <article>
         <header>
-          <h3><span class="step-number">1</span> <span>Gerätename</span></h3>
+          <h3><span class="step-number">1</span> <span>Gerätename & Hostname</span></h3>
         </header>
         <div class="content">
           <div class="instruction">
-            Gib Deiner LisaPro einen Namen (max. 10 Zeichen, keine Leerzeichen). Dies hilft Dir, mehrere Geräte im Netzwerk zu unterscheiden.
+            Gib Deiner LisaPro einen Namen (max. 15 Zeichen, keine Leerzeichen). 
+            Dieser wird im <strong>Dashboard</strong>, in <strong>Benachrichtigungen</strong> (z.B. WhatsApp) und als Adresse im Browser (z.B. <code>http://LisaPro-A1B2.local</code>) verwendet.
           </div>
           <div class="btn-row" style="display: flex; gap: 0.5rem; align-items: stretch;">
-            <input id="deviceName" type="text" maxlength="10" placeholder="z.B. LisaPro-1" style="flex: 1; margin: 0;" />
+            <input id="deviceName" type="text" maxlength="15" placeholder="z.B. Box1" style="flex: 1; margin: 0;" />
             <button id="nameSave" type="button" class="primary" style="margin: 0;">Speichern</button>
           </div>
           <div id="nameState" style="text-align: center; font-weight: bold; margin: 0.5rem 0;">Status: -</div>
@@ -774,6 +775,11 @@
           // Name prefill
           if (live && live.device_name && !$("deviceName").value) {
             $("deviceName").value = live.device_name;
+          } else if (live && live.ap && live.ap.ssid && !$("deviceName").value) {
+            // Default: LisaPro-XXXX (from AP SSID LisaPro-Setup-XXXX)
+            const apSsid = live.ap.ssid;
+            const macPart = apSsid.split("-").pop();
+            if (macPart) $("deviceName").value = "LisaPro-" + macPart;
           }
 
           // WiFi Badge
@@ -1238,9 +1244,17 @@
       // Finish
       $("btnDone").addEventListener("click", async () => {
         try {
+          // Get configured hostname first
+          let host = "LisaPro.local";
+          try {
+            const info = await fetchJSON("/api/info");
+            if (info && info.network && info.network.hostname) {
+              host = info.network.hostname + ".local";
+            }
+          } catch(e) {}
+
           const r = await fetch("/api/setup/done", { method: "POST" });
           if (r.ok) {
-            const host = "luminagrowx.local";
             showToast(
               `<strong>Einrichtung abgeschlossen!</strong><br><br>` +
               `Das System startet jetzt neu und verbindet sich mit Deinem WLAN.<br><br>` +

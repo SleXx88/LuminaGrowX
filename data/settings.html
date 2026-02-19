@@ -56,6 +56,15 @@
       
       .content { padding: 1rem; }
       .hidden { display: none !important; }
+
+      .instruction { 
+        background: rgba(255,255,255,0.03); 
+        padding: 0.75rem; 
+        border-radius: 8px; 
+        border-left: 3px solid var(--accent);
+        font-size: 0.9rem;
+        margin-bottom: 0.75rem;
+      }
       
       h4 { 
         color: var(--accent); 
@@ -161,12 +170,17 @@
         <div class="content">
           <form id="netForm">
             <h4>Allgemein</h4>
+            <div class="instruction">
+              Wird im Dashboard, in Benachrichtigungen (z.B. WhatsApp/MQTT) und als Name in deinem Router (mDNS/Browseradresse, z.B. <code>http://LisaPro-A1B2.local</code>) verwendet. 
+              <strong>Reboot</strong> erforderlich für Netzwerkänderungen. Leer lassen für Standard (LisaPro + MAC).
+            </div>
+
             <div style="display: flex; gap: 0.5rem; align-items: flex-end; margin-bottom: 1rem; flex-wrap: wrap;">
               <div style="flex: 1; min-width: 200px;">
-                <label style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.2rem;">Gerätename (max. 10 Zeichen)</label>
-                <input id="deviceName" name="name" maxlength="10" placeholder="z.B. LisaPro-1" style="margin:0;" />
+                <label style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.2rem;">Anzeigename / Hostname (max. 15 Zeichen)</label>
+                <input id="deviceName" name="name" maxlength="15" placeholder="z.B. Box1" style="margin:0;" />
               </div>
-              <button type="button" id="btnNameSave" class="primary" style="margin:0;">Speichern</button>
+              <button type="button" id="btnNameSave" class="primary" style="margin:0;">Speichern & Neustarten</button>
             </div>
 
             <hr />
@@ -221,7 +235,7 @@
             </div>
             
             <div style="display:flex; justify-content:flex-end; margin-top: 1rem;">
-              <button type="button" id="btnNetSave" class="primary">WLAN Einstellungen & Reboot</button>
+              <button type="button" id="btnNetSave" class="primary">Speichern & Neustarten</button>
             </div>
 
             <hr />
@@ -496,9 +510,10 @@
         const name = $('deviceName').value.trim();
         if(!name){ showToast('Bitte Namen eingeben'); return; }
         if(name.includes(' ')){ showToast('Name darf keine Leerzeichen enthalten'); return; }
+        
+        showToastHtml(`Name gespeichert. Das Gerät startet neu. Bitte in Kürze <a href="http://${name}.local/" target="_blank">http://${name}.local/</a> aufrufen.`);
         try{
-          await fetchJSON('/api/app', { method:'POST', body: JSON.stringify({ name }) });
-          showToast('Gerätename gespeichert');
+          await fetchJSON('/api/app', { method:'POST', body: JSON.stringify({ name, reboot: true }) });
         } catch(e){ showToast('Fehler: ' + e.message); }
       });
 
@@ -512,6 +527,7 @@
         const mask=$('mask').value.trim();
         const gw=$('gw').value.trim();
         const dns=$('dns').value.trim();
+        const hostname=$('deviceName').value.trim();
         
         if(!ssid){ showToast('Bitte SSID wählen oder eingeben'); return; }
         
@@ -521,13 +537,14 @@
           }
           if(dns && !ipv4ok(dns)){ showToast('Ungültige IPv4 in DNS'); return; }
         }
-        const payload = { ssid };
+        const payload = { ssid, hostname };
         if(pass && pass !== "********") payload.pass = pass;
         payload.use_static = !!useStatic;
         payload.static = useStatic ? { ip, mask, gw, dns } : null;
         payload.reboot = true;
         
-        showToastHtml('WLAN gespeichert. Das Gerät startet neu. Bitte jetzt ins Heimnetz wechseln und <a href="http://luminagrowx.local/" target="_blank">http://luminagrowx.local/</a> aufrufen.');
+        const displayHost = hostname || "LisaPro";
+        showToastHtml(`WLAN gespeichert. Das Gerät startet neu. Bitte in Kürze <a href="http://${displayHost}.local/" target="_blank">http://${displayHost}.local/</a> aufrufen.`);
         try{ fetch('/api/network', {method:'POST', body: JSON.stringify(payload)}); }catch(_){ }
       });
 

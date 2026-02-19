@@ -14,6 +14,7 @@ namespace net_ctrl {
 struct NetworkConfig {
   String ssid;
   String pass;
+  String hostname; // Eigener Hostname/mDNS-Name
   bool   useStatic = false;
   String ip;
   String mask = "255.255.255.0";
@@ -26,7 +27,7 @@ public:
   NetCtrl() {}
 
   // Blocking boot-time check for AP reset pin (default active LOW for 5s)
-  void configureResetPin(int gpio, bool activeHigh = false, uint32_t holdMs = 5000);
+  void configureResetPin(int gpio, bool activeHigh = false, uint32_t holdMs = 5000, uint32_t factoryHoldMs = 10000);
   bool shouldForceAPAtBoot();
 
   // Start WiFi: AP is always started; optional STA connect using stored config unless forceAP
@@ -35,8 +36,14 @@ public:
   // Try reconnecting STA immediately with stored cfg (non-blocking of main loop, but waits up to timeoutMs here)
   bool reconnectSTA(bool closeAPOnSuccess = true, uint32_t timeoutMs = 12000);
 
+  enum class ResetEvent {
+    NONE,
+    AP_RESET,
+    FACTORY_RESET
+  };
+
   // Non-blocking loop task to check reset pin for long-press
-  void tick();
+  ResetEvent tick();
 
   // AP control
   void stopAP() { WiFi.softAPdisconnect(true); apActive_ = false; }
@@ -56,6 +63,7 @@ public:
   IPAddress staIP() const { return isConnected() ? WiFi.localIP() : IPAddress(0,0,0,0); }
   IPAddress apIP() const { return WiFi.softAPIP(); }
   const String& apSSID() const { return apSSID_; }
+  const String& mdnsName() const { return mdnsName_; }
   bool internetOK() const { return internetOK_; }
   bool apActive() const { return apActive_; }
 
@@ -79,7 +87,10 @@ private:
   int  resetPin_ = -1;
   bool resetActiveHigh_ = false;
   uint32_t resetHoldMs_ = 5000;
+  uint32_t factoryResetHoldMs_ = 10000;
   uint32_t resetPinPressStart_ = 0;
+  bool     apTriggeredThisPress_ = false;
+  bool     factoryTriggeredThisPress_ = false;
   uint32_t apAutoCloseAt_ = 0;
 };
 
