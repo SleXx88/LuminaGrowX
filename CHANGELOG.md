@@ -3,16 +3,21 @@
 Alle wichtigen Änderungen und Features der automatisierten Growbox-Steuerung.
 
 ## [V1.0.6] - 2026-02-19
-### Netzwerk-Identifikation & Hostname-Anpassung
+### Hardware-Erkennung, LED-Signalisierung & Hostname-Anpassung
 
-Verbesserung der Sichtbarkeit und Identifizierung der LisaPro im Heimnetzwerk (z.B. Fritzbox).
+Verbesserung der Systemstabilität bei fehlender Hardware, visuelles Feedback für den AP-Modus und Identifizierung im Netzwerk.
 
 #### 🚀 Neue Features
+*   **Intelligente Hardware-Erkennung (TMC2209):** Das System erkennt nun beim Start automatisch, ob ein Stepper-Controller angeschlossen ist. Fehlende Hardware führt nicht mehr zum "Hängenbleiben" des Boot-Vorgangs.
+*   **Visuelles AP-Feedback:** Wird der Access Point manuell über den Reset-Button gestartet (5s halten), signalisiert die Status-LED dies nun durch **blaues Blinken** (500ms Takt).
 *   **Eindeutiger Hostname:** Das Gerät meldet sich nun standardmäßig mit `LisaPro-[MAC]` (z.B. `LisaPro-A1B2`) beim Router an, anstatt des generischen Namens `ESP32`.
 *   **Konfigurierbarer Hostname:** Der Name für mDNS und DHCP kann nun in den **Einstellungen** individuell angepasst werden.
 *   **mDNS Zugriff:** Die Box ist im Browser nun über `http://LisaPro-[MAC].local` (bzw. den gewählten Namen) erreichbar.
 
 #### 🔧 Verbesserungen
+*   **Performance-Optimierung (Status-Abfragen):** Die Abfrage des Systemstatus blockiert den Haupt-Loop nicht mehr durch unnötige UART-Abfragen, wenn kein Stepper-Controller erkannt wurde.
+*   **Sicherheits-Guards:** Homing-Routinen und automatische Abstandsregelung werden bei fehlender Hardware sofort übersprungen, um Endlosschleifen zu vermeiden.
+*   **Web-Konfiguration:** Der Standardwert für den "Seed-Namen" wurde auf ein leeres Feld gesetzt, um das Speichern irrelevanter Standarddaten ("Northern Lights") während der Erstinbetriebnahme zu vermeiden.
 *   **Dynamische Links:** Erfolgsmeldungen im Web-Interface zeigen nun automatisch den korrekten Link zum Gerät an, basierend auf dem gewählten Hostnamen.
 *   **Setup-Flow:** Der Inbetriebnahme-Assistent erkennt den konfigurierten Namen und bietet am Ende den passenden Link zur Weiterleitung an.
 

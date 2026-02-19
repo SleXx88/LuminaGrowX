@@ -10,7 +10,8 @@ StepperCtrl::StepperCtrl(const StepperPins &pins,
                          const HomingParams &hp,
                          const SpeedTable &spd)
     : p_(pins), k_(kin), l_(lim), c_(tmc), h_(hp), s_(spd),
-      stepper_(p_.pin_step, p_.pin_dir, p_.pin_en, p_.uart, c_.r_sense, c_.driver_addr)
+      stepper_(p_.pin_step, p_.pin_dir, p_.pin_en, p_.uart, c_.r_sense, c_.driver_addr),
+      hardware_ok_(false)
 {
 }
 
@@ -36,9 +37,11 @@ void StepperCtrl::begin()
   // Initialize TMC Registers
   setupDriver_();
 
-  stepper_.setMaxSpeed(2500.0f);
-  stepper_.setAcceleration(5000.0f);
-  stepper_.setCurrentPosition(0);
+  if (hardware_ok_) {
+    stepper_.setMaxSpeed(2500.0f);
+    stepper_.setAcceleration(5000.0f);
+    stepper_.setCurrentPosition(0);
+  }
 
   recomputeSoftLimits_();
 
@@ -48,9 +51,9 @@ void StepperCtrl::begin()
   if (debug_)
   {
     Serial.printf(
-        "[INIT] microsteps=%u lead=%.2fmm Irun=%umA Ihold=%umA max=%.1fmm (Soft: %ld..%ld)\n",
+        "[INIT] microsteps=%u lead=%.2fmm Irun=%umA Ihold=%umA max=%.1fmm (Soft: %ld..%ld) hardware_ok=%d\n",
         k_.microsteps, k_.lead_mm, c_.irun_mA, c_.ihold_mA, l_.max_travel_mm,
-        softMinSteps_, softMaxSteps_);
+        softMinSteps_, softMaxSteps_, hardware_ok_);
   }
 }
 
@@ -81,12 +84,17 @@ void StepperCtrl::setupDriver_()
       }
   }
 
+  hardware_ok_ = found;
+
   if (!found) {
       Serial.println("[INIT] ERROR: TMC2209 not found on addr 0-3 (UART Read Failed). Assuming Addr 0 and attempting BLIND WRITE.");
       stepper_.setAddress(c_.driver_addr); // Fallback to config
   }
 
   // 2. Configuration
+  // If hardware is missing, we still "try" but we know it won't do much.
+  // Except for SGTHRS and currents which are blind writes anyway if found==false in the original code.
+  
   stepper_.setMicrosteps(k_.microsteps);
   
   // Enable StealthChop (required for StallGuard4)
@@ -138,6 +146,11 @@ void StepperCtrl::setupDriver_()
 void StepperCtrl::tick()
 {
   if (mutex_) xSemaphoreTake(mutex_, portMAX_DELAY);
+
+  if (!hardware_ok_) {
+      if (mutex_) xSemaphoreGive(mutex_);
+      return;
+  }
 
   // --- Auto Enable/Disable Logic ---
   if (stepper_.isRunning()) {
@@ -207,6 +220,8 @@ void StepperCtrl::tick()
 
 bool StepperCtrl::startHoming(bool fullCalibration)
 {
+  if (!hardware_ok_) return false;
+
   if (mutex_) xSemaphoreTake(mutex_, portMAX_DELAY);
   
   if (homingFinished_) {
@@ -377,15 +392,8 @@ StepperStatus StepperCtrl::status() const
   s.isMoving = stepper_.isRunning() || (mode_ == Mode::HOMING);
   s.lastOpDone = lastOpDone_;
   
-  // We cannot call testConnection() inside here recursively if mutex is non-recursive.
-  // But we have the lock. We can call internal helpers or just replicate logic?
-  // testConnection() calls public locking. 
-  // Let's just do it raw here since we have the lock.
-  // Warning: stepper_ is mutable, so we can access it.
-  uint32_t val = 0;
-  // This UART read is blocking/slow. Ideally avoid in frequent status(), but status() IS frequent.
-  // For now we do it.
-  s.uart_ok = self->stepper_.readRegister(TMCTiny::GCONF, val);
+  // Use cached hardware state instead of blocking UART read
+  s.uart_ok = hardware_ok_;
 
   if (self->mutex_) xSemaphoreGive(self->mutex_);
   return s;
@@ -764,6 +772,7 @@ void StepperCtrl::debugPrintLimits() const
 
 void StepperCtrl::startContinuousLogical_(float speedHz, int logicalDir, bool keepMode)
 {
+  if (!hardware_ok_) return;
   // Internal, called with lock
   if (!keepMode) mode_ = Mode::CONTINUOUS;
   
@@ -781,6 +790,7 @@ void StepperCtrl::startContinuousLogical_(float speedHz, int logicalDir, bool ke
 
 void StepperCtrl::moveRelativeLogicalMM_(float mmLogical, float maxHz)
 {
+  if (!hardware_ok_) return;
   // Internal, called with lock
   stepper_.enable(true);
   lastMotorActivityMs_ = millis();
@@ -833,6 +843,7 @@ void StepperCtrl::homeMoveRelativeMM_(float mmLogical, float maxHz)
 
 void StepperCtrl::moveToAbsMM_(float mm, float maxHz)
 {
+  if (!hardware_ok_) return;
   // Internal, called with lock
   if (mm < 0) mm = 0;
   if (mm > l_.max_travel_mm) mm = l_.max_travel_mm;

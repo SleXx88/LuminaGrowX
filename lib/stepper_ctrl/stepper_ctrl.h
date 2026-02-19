@@ -186,6 +186,7 @@ private:
   bool      homingBackoffActive_ = false;
   bool      fullCalibration_ = true;
   bool      newCalibrationAvailable_ = false;
+  bool      hardware_ok_ = false;
 
   uint32_t  lastDebugPosMs_ = 0;
   uint16_t  debugMoveLogIntervalMs_ = 100;

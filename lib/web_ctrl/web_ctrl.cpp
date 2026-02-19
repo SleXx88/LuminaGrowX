@@ -46,7 +46,7 @@ bool WebCtrl::loadAppCfg(AppCfg& out) {
   Preferences prefs;
   if (!prefs.begin(NVS_APP, true)) return false;
   if (prefs.isKey("seed")) out.seed = prefs.getString("seed");
-  else out.seed = "Northern Lights";
+  else out.seed = "";
   if (prefs.isKey("name")) out.name = prefs.getString("name");
   else out.name = "LisaPro";
   prefs.end();

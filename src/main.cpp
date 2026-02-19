@@ -387,7 +387,11 @@ void loop()
 
   // Web/Net periodische Aufgaben (immer prüfen, auch im Setup-Modus)
   net_ctrl::NetCtrl::ResetEvent btn = net.tick();
-  if (btn == net_ctrl::NetCtrl::ResetEvent::FACTORY_RESET) {
+  if (btn == net_ctrl::NetCtrl::ResetEvent::AP_RESET) {
+    statusLed.setMode(LedCtrl::Mode::BLINK);
+    statusLed.setColor(LedCtrl::Color::BLUE);
+    statusLed.setCycleTime(500); // 500ms blink cycle
+  } else if (btn == net_ctrl::NetCtrl::ResetEvent::FACTORY_RESET) {
     // 1) LED 5x schnell rot blinken
     statusLed.setMode(LedCtrl::Mode::SOLID);
     for (int i = 0; i < 5; i++) {
@@ -405,6 +409,15 @@ void loop()
     delay(1000);
     ESP.restart();
   }
+
+  // Auto-Stop blinking if AP was started via button and closed after timeout
+  static bool lastApActive = false;
+  bool currentApActive = net.apActive();
+  if (lastApActive && !currentApActive && !g_setupMode) {
+      statusLed.setMode(LedCtrl::Mode::SOLID);
+      statusLed.setColor(LedCtrl::Color::OFF);
+  }
+  lastApActive = currentApActive;
 
   // Setup-Modus: nur Setup-Flow + Netzwerk/Web aktiv halten
   if (g_setupMode) {

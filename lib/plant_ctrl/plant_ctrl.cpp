@@ -775,7 +775,7 @@ float PlantCtrl::targetDistanceMm_() const {
 }
 
 void PlantCtrl::distanceTick_(uint32_t now) {
-  if (!step_ || !tof_ || !growActive_) return;
+  if (!step_ || !tof_ || !growActive_ || !step_->status().uart_ok) return;
   bool canAdjust = allowDownAdjustNow_(now);
   if (!isDoorClosed_()) { 
     if (adjustActive_) { step_->stop(); adjustActive_ = false; }
@@ -821,8 +821,8 @@ void PlantCtrl::distanceTick_(uint32_t now) {
 }
 
 void PlantCtrl::runStartupApproachBlocking() {
-  // Annäherung nur wenn ein Grow aktiv ist
-  if (!step_ || !tof_ || !growActive_) { 
+  // Annäherung nur wenn ein Grow aktiv ist und Stepper OK ist
+  if (!step_ || !tof_ || !growActive_ || !step_->status().uart_ok) { 
     initialApproachDone_ = true; 
     return; 
   }
