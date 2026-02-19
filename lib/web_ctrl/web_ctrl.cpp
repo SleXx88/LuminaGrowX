@@ -1053,7 +1053,8 @@ void WebCtrl::setupRoutes_() {
              bool connectedNow = false;
              if (anyNetFieldTouched && net_ && connectNow) {
                // Sofortiger Verbindungsversuch ohne Reboot
-               connectedNow = net_->reconnectSTA(true /*close AP on success*/);
+               // Im Setup-Modus (is_done=false) soll der AP aktiv bleiben (closeAPOnSuccess = false)
+               connectedNow = net_->reconnectSTA(setup_flag::is_done() /*close AP on success*/);
              }
              // Wenn erfolgreich direkt verbunden: Reboot unterdrÃ¼cken, sonst optional rebooten
              bool doReboot = (!connectedNow) && requestedReboot;

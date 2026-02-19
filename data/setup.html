@@ -404,7 +404,7 @@
           <div class="checklist-box">
             <strong>Checkliste:</strong>
             <label>
-              <input type="checkbox" id="cb_tof" disabled /> 
+              <input type="checkbox" id="cb_tof" /> 
               Kalibrierung OK?
             </label>
           </div>
@@ -576,6 +576,18 @@
       <!-- Hidden module msg for debugging -->
       <small id="modulesMsg" class="hidden"></small>
 
+      <footer class="site" style="padding: 0.9rem 1.1rem; background: var(--glass); border: 1px solid var(--border); border-radius: var(--radius); backdrop-filter: blur(3px); margin-bottom: 1.5rem;">
+        <small style="display:block">&copy; 2026 Martin Teske – Alle Rechte vorbehalten.</small>
+        <small style="display:block">
+          <strong>LuminaGrowX</strong> ist eine kostenlose Software von 
+          <a href="https://martinteske-blog.de" target="_blank">MartinTeske-Blog.de</a>, 
+          entwickelt für die <strong>LisaPro Growbox</strong>.
+          <br>
+          Die LisaPro Growbox ist exklusiv erhältlich bei 
+          <a href="https://mutualgarden.de" target="_blank">MutualGarden.de</a>.
+        </small>
+        <small style="display:block"><span id="apInfo" class="mono"></span></small>
+      </footer>
     </main>
 
     <dialog id="toast" class="modal">
@@ -670,6 +682,12 @@
         }
       }
 
+      function updateWifiBtn() {
+        const ssid = $("wifiSSID").value;
+        const pass = $("wifiPass").value;
+        $("btnSaveWifi").disabled = !ssid || !pass;
+      }
+
       function updateFanBadge(id, rpm, on) {
         const el = $(id);
         if (!el) return;
@@ -714,11 +732,30 @@
             $("stepExisting").style.display = "block";
           }
 
-          // Show existing WiFi
+          // Show existing WiFi in setup status
           if (st.wifi_ssid && st.wifi_ssid.length > 0) {
-            const wifiBadge = $("b_wifi");
-            wifiBadge.textContent = "WLAN: " + st.wifi_ssid;
-            wifiBadge.classList.add("ok");
+            const sel = $("wifiSSID");
+            let found = false;
+            for(let i=0; i<sel.options.length; i++) {
+              if(sel.options[i].value === st.wifi_ssid) { found = true; break; }
+            }
+            if(!found) {
+              const opt = document.createElement("option");
+              opt.value = st.wifi_ssid;
+              opt.textContent = st.wifi_ssid + " (Gespeichert)";
+              sel.appendChild(opt);
+            }
+            if(!sel.value) {
+              sel.value = st.wifi_ssid;
+              // If we pre-fill SSID, check if we have a password saved
+              try {
+                const info = await fetchJSON("/api/info");
+                if (info && info.network && info.network.pass === "********") {
+                   if (!$("wifiPass").value) $("wifiPass").value = "********";
+                }
+              } catch(e) {}
+              updateWifiBtn();
+            }
           }
           
           // "Zurück" button logic:
@@ -737,6 +774,16 @@
           // Name prefill
           if (live && live.device_name && !$("deviceName").value) {
             $("deviceName").value = live.device_name;
+          }
+
+          // WiFi Badge
+          const wifiBadge = $("b_wifi");
+          if (live.wifi_connected) {
+            wifiBadge.textContent = "WLAN: " + (live.ssid || "-") + " (Verbunden)";
+            wifiBadge.classList.add("ok"); wifiBadge.classList.remove("err");
+          } else {
+            wifiBadge.textContent = "WLAN: Nicht verbunden";
+            wifiBadge.classList.remove("ok"); wifiBadge.classList.add("err");
           }
 
           // SHT
@@ -780,6 +827,8 @@
 
           // Pump
           updateToggleBtns("pumpOff", "pumpOn", !!live.pump_on);
+
+          if (live.ap && live.ap.ssid && live.ap.ip) { $("apInfo").textContent = "AP: " + live.ap.ssid + " @ " + live.ap.ip; }
 
           // RTC Prefill if empty
           if (live && live.ntp_time) {
@@ -1037,10 +1086,6 @@
         } catch (e) { $("tofMsg").textContent = "Fehler"; }
       });
 
-      $("cb_tof_2").addEventListener("change", (e) => {
-        $("cb_tof").disabled = !e.target.checked;
-      });
-
       async function pollDoor() {
         try {
           const d = await fetchJSON("/api/door/status");
@@ -1056,6 +1101,9 @@
       }
 
       // 8. Wi-Fi
+      $("wifiSSID").addEventListener("change", updateWifiBtn);
+      $("wifiPass").addEventListener("input", updateWifiBtn);
+
       $("cb_static_ip").addEventListener("change", (e) => {
         $("staticIPConfig").style.display = e.target.checked ? "block" : "none";
       });
@@ -1124,19 +1172,20 @@
 
       $("btnSaveWifi").addEventListener("click", async () => {
         const ssid = $("wifiSSID").value;
-        const pass = $("wifiPass").value;
+        let pass = $("wifiPass").value;
         const useStatic = $("cb_static_ip").checked;
         
         if (!ssid) return showToast("Bitte ein Netzwerk auswählen");
+        if (pass === "********") pass = null; // Don't overwrite if it's the mask
         
         const payload = {
           ssid: ssid,
-          pass: pass,
           use_static: useStatic,
           static: {},
           reboot: false, // Erst am Ende
           connect_now: false // Nicht sofort verbinden, nur speichern
         };
+        if (pass !== null) payload.pass = pass;
         
         if (useStatic) {
           payload.static = {
@@ -1178,7 +1227,7 @@
         const need = [
           "cb_name", "cb_rtc", "cb_sht", "cb_sht_out", "cb_fan", "cb_fan2", "cb_fan3",
           "cb_led", "cb_step_home", "cb_step_down", "cb_step_up", 
-          "cb_tof_1", "cb_tof_2", "cb_tof", "cb_door", "cb_water", "cb_pump", "cb_wifi_done"
+          "cb_tof", "cb_door", "cb_water", "cb_pump", "cb_wifi_done"
         ];
         const all = need.every((id) => $(id) && $(id).checked);
         $("btnDone").disabled = !all;

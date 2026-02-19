@@ -48,12 +48,20 @@ void NetCtrl::ntpInit() {
   configTzTime("CET-1CEST,M3.5.0/2,M10.5.0/3", "pool.ntp.org", "time.nist.gov");
 }
 
-bool NetCtrl::shouldForceAPAtBoot(uint32_t holdMs) {
+void NetCtrl::configureResetPin(int gpio, bool activeHigh, uint32_t holdMs) {
+  resetPin_ = gpio;
+  resetActiveHigh_ = activeHigh;
+  resetHoldMs_ = holdMs;
+  if (resetPin_ >= 0) {
+    pinMode(resetPin_, resetActiveHigh_ ? INPUT : INPUT_PULLUP);
+  }
+}
+
+bool NetCtrl::shouldForceAPAtBoot() {
   if (resetPin_ < 0) return false;
-  pinMode(resetPin_, resetActiveHigh_ ? INPUT : INPUT_PULLUP);
   uint32_t t0 = millis();
   bool active = false;
-  while (millis() - t0 < holdMs) {
+  while (millis() - t0 < resetHoldMs_) {
     bool level = digitalRead(resetPin_);
     bool isActive = resetActiveHigh_ ? level : !level;
     if (!isActive) {
@@ -178,12 +186,22 @@ bool NetCtrl::probeInternet() {
 
 void NetCtrl::startAP() {
   if (apActive_) return;
+  
+  // Sicherstellen, dass wir im AP+STA Modus sind
+  WiFi.mode(WIFI_AP_STA);
+  
   String mac = WiFi.macAddress();
   mac.replace(":", "");
   mac = mac.substring(mac.length() - 4);
   apSSID_ = String("LuminaGrowX-Setup-") + mac;
-  WiFi.softAP(apSSID_.c_str());
+
+  // Statische AP-IP sicherstellen (Standard 192.168.4.1)
+  WiFi.softAPConfig(IPAddress(192,168,4,1), IPAddress(192,168,4,1), IPAddress(255,255,255,0));
+  // Offener AP ohne Passwort, sichtbare SSID, Kanal 1
+  WiFi.softAP(apSSID_.c_str(), "", 1, 0);
+  
   apActive_ = true;
+  Serial.printf("[NET] AP manuell gestartet: SSID=%s, IP=%s\n", apSSID_.c_str(), WiFi.softAPIP().toString().c_str());
 }
 
 bool NetCtrl::reconnectSTA(bool closeAPOnSuccess, uint32_t timeoutMs) {
@@ -214,4 +232,46 @@ bool NetCtrl::reconnectSTA(bool closeAPOnSuccess, uint32_t timeoutMs) {
     return true;
   }
   return false;
+}
+
+void NetCtrl::tick() {
+  if (resetPin_ < 0) return;
+
+  // Auto-Close Logik für AP (falls über Button gestartet)
+  if (apAutoCloseAt_ > 0 && millis() >= apAutoCloseAt_) {
+    if (apActive_) {
+      Serial.println(F("[NET] AP-Zeitlimit (1 Min) abgelaufen -> Schließe AP."));
+      stopAP();
+    }
+    apAutoCloseAt_ = 0;
+  }
+  
+  // Wir lesen den Pin. Falls activeHigh, ist HIGH = aktiv, sonst LOW = aktiv.
+  bool level = digitalRead(resetPin_);
+  bool isActive = resetActiveHigh_ ? level : !level;
+
+  if (isActive) {
+    if (resetPinPressStart_ == 0) {
+      resetPinPressStart_ = millis();
+    } else if (resetPinPressStart_ == 0xFFFFFFFF) {
+      // Bereits ausgelöst, warte auf Loslassen
+      return;
+    } else {
+      uint32_t holdTime = millis() - resetPinPressStart_;
+      if (holdTime >= resetHoldMs_) {
+        // Button wurde 5 Sekunden gehalten
+        if (!apActive_) {
+          Serial.println(F("[NET] Reset-Button 5s gehalten -> AP für 1 Minute aktiv."));
+          startAP();
+          apAutoCloseAt_ = millis() + 60000; // 60 Sekunden Timer
+        } else {
+          Serial.println(F("[NET] Reset-Button 5s gehalten -> AP ist bereits aktiv."));
+        }
+        // Markieren als ausgelöst
+        resetPinPressStart_ = 0xFFFFFFFF;
+      }
+    }
+  } else {
+    resetPinPressStart_ = 0;
+  }
 }

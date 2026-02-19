@@ -327,9 +327,10 @@ void setup()
 
   // Netzwerk + Web am Ende
   net.configureResetPin(lumina::netcfg::AP_RESET_PIN,
-                        /*activeHigh=*/lumina::netcfg::AP_RESET_ACTIVE_HIGH);
+                        /*activeHigh=*/lumina::netcfg::AP_RESET_ACTIVE_HIGH,
+                        /*holdMs=*/lumina::netcfg::AP_RESET_HOLD_MS);
   {
-    bool forceAP = net.shouldForceAPAtBoot(lumina::netcfg::AP_RESET_HOLD_MS);
+    bool forceAP = net.shouldForceAPAtBoot();
     // keepAP = g_setupMode (AP bleibt aktiv, auch wenn STA verbindet)
     net.begin(forceAP, "luminagrowx", &rtc, g_setupMode);
   }
@@ -454,5 +455,6 @@ void loop()
   }
 
   // Web/Net periodische Aufgaben
+  net.tick();
   web.loop();
 }

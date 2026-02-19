@@ -260,8 +260,38 @@
         </footer>
       </article>
 
-      <footer class="site" style="padding: 0.9rem 1.1rem; margin-top: auto; margin-bottom: 1rem;">
-        <small style="display:block">&copy; 2025 Martin Teske – LisaPro Growbox</small>
+      <article id="legalSection">
+        <header><h3>Lizenzen & Rechtliches</h3></header>
+        <div class="content">
+          <p style="font-size: 0.85rem; opacity: 0.9;">
+            LuminaGrowX ist <strong>kostenlose Software</strong> für private Zwecke. Die Nutzung erfolgt auf eigene Gefahr.
+          </p>
+          <div style="background: rgba(0,0,0,0.2); padding: 0.75rem; border-radius: 12px; font-size: 0.8rem; border-left: 3px solid var(--accent);">
+            <strong>Haftungsausschluss:</strong> Der Entwickler übernimmt keine Haftung für Sachschäden (z. B. durch Fehlsteuerung der Hardware, Brände oder Wasserschäden), die durch die Nutzung dieser Software entstehen könnten.
+          </div>
+          <p style="font-size: 0.8rem; margin-top: 1rem;"><strong>Verwendete Open-Source Bibliotheken:</strong></p>
+          <ul style="font-size: 0.75rem; color: var(--text-dim);">
+            <li>ESPAsyncWebServer (LGPL-3.0)</li>
+            <li>AsyncTCP (LGPL-3.0)</li>
+            <li>Adafruit NeoPixel (LGPL-3.0)</li>
+            <li>ArduinoJson (MIT)</li>
+            <li>PubSubClient (MIT)</li>
+            <li>Pico CSS (MIT)</li>
+          </ul>
+        </div>
+      </article>
+
+      <footer class="site" style="padding: 0.9rem 1.1rem; background: var(--glass); border: 1px solid var(--border); border-radius: var(--radius); backdrop-filter: blur(3px); margin-top: auto; margin-bottom: 1rem;">
+        <small style="display:block">&copy; 2026 Martin Teske – Alle Rechte vorbehalten.</small>
+        <small style="display:block">
+          <strong>LuminaGrowX</strong> ist eine kostenlose Software von 
+          <a href="https://martinteske-blog.de" target="_blank">MartinTeske-Blog.de</a>, 
+          entwickelt für die <strong>LisaPro Growbox</strong>.
+          <br>
+          Die LisaPro Growbox ist exklusiv erhältlich bei 
+          <a href="https://mutualgarden.de" target="_blank">MutualGarden.de</a>.
+        </small>
+        <small style="display:block"><span id="apInfo" class="mono"></span></small>
       </footer>
     </main>
 
@@ -301,6 +331,8 @@
         $("valEspTemp").textContent = (s.esp_temp != null ? s.esp_temp.toFixed(1) : "-") + " °C";
         $("valFw").textContent = s.fw || "-";
         $("valBuild").textContent = s.build || "-";
+
+        if (s.ap && s.ap.ssid && s.ap.ip) { $("apInfo").textContent = "AP: " + s.ap.ssid + " @ " + s.ap.ip; }
 
         // ToF & Stepper (some data might need /api/setup/status if missing from /api/status)
         if (s.stepper) {

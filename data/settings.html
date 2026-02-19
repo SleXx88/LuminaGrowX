@@ -287,6 +287,19 @@
           <button id="btnSetup" class="secondary" style="flex: 1;">Inbetriebnahme Assistent starten</button>
         </footer>
       </article>
+
+      <footer class="site" style="padding: 0.9rem 1.1rem; background: var(--glass); border: 1px solid var(--border); border-radius: var(--radius); backdrop-filter: blur(3px); margin-bottom: 1.5rem;">
+        <small style="display:block">&copy; 2026 Martin Teske – Alle Rechte vorbehalten.</small>
+        <small style="display:block">
+          <strong>LuminaGrowX</strong> ist eine kostenlose Software von 
+          <a href="https://martinteske-blog.de" target="_blank">MartinTeske-Blog.de</a>, 
+          entwickelt für die <strong>LisaPro Growbox</strong>.
+          <br>
+          Die LisaPro Growbox ist exklusiv erhältlich bei 
+          <a href="https://mutualgarden.de" target="_blank">MutualGarden.de</a>.
+        </small>
+        <small style="display:block"><span id="apInfo" class="mono"></span></small>
+      </footer>
     </main>
 
     <!-- Dialog: Inbetriebnahme Bestätigung -->
@@ -460,6 +473,8 @@
           const dryingActive = !!(st && st.drying && st.drying.active);
           const canSetup = !growActive && !dryingActive;
 
+          if (st.ap && st.ap.ssid && st.ap.ip) { $("apInfo").textContent = "AP: " + st.ap.ssid + " @ " + st.ap.ip; }
+
           const btn = $('btnSetup');
           if(canSetup){
             btn.style.pointerEvents = '';
@@ -566,8 +581,8 @@
         try{
           const r = await fetch('/api/setup/reset', {method:'POST'});
           if (r.ok) {
-            showToast('Inbetriebnahme Assistent wird gestartet. Gerät startet neu...');
-            setTimeout(()=> window.location.href = '/setup', 3000);
+            showToast('Inbetriebnahme Assistent wird gestartet. Das Gerät startet nun neu und eröffnet ein eigenes WLAN. Du wirst in Kürze weitergeleitet...');
+            setTimeout(()=> window.location.href = '/setup', 5000);
           } else {
             showToast('Fehler: ' + r.statusText);
           }

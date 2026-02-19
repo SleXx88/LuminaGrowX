@@ -82,17 +82,16 @@ Jedes Modul ist eigenständig und lässt sich auch in anderen Projekten wiederve
 
 ---
 
-## 🌍 Roadmap
+## 📜 Lizenz & Nutzung
 
-* Erweiterung der Regelstrategien (z. B. vollständige PID-Implementierung)
-* Unterstützung für zusätzliche Sensoren (Bodenfeuchte, CO₂-Messung)
-* Energiemanagement & Logging
-* Tiefere Integration in Home Assistant (MQTT Discovery, Energie-Dashboard)
-* Mobile Web-UI mit Live-Daten
+LuminaGrowX ist ab 2026 **kostenlose Software** (Freeware).  
+Die Nutzung für private Zwecke ist ausdrücklich erlaubt. Eine kommerzielle Verwertung, Decompilierung oder die Verbreitung modifizierter Versionen ohne vorherige Zustimmung ist nicht gestattet.
+
+Die verwendeten Bibliotheken (z. B. ESPAsyncWebServer, ArduinoJson) unterliegen ihren jeweiligen Open-Source-Lizenzen (MIT, LGPL, BSD). Details dazu finden sich in der Benutzeroberfläche unter „Info“.
 
 ---
 
-## 📜 Lizenz
+## 🌍 Kontakt & Support
 
-Dieses Projekt steht unter der **MIT-Lizenz**.
-Freie Nutzung, Modifikation und Weitergabe sind erlaubt – ein Hinweis auf das Originalprojekt wird geschätzt.
+- **Projekt-Blog:** [MartinTeske-Blog.de](https://martinteske-blog.de)
+- **Hardware:** [MutualGarden.de](https://mutualgarden.de)

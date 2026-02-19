@@ -460,6 +460,24 @@
           <header><h2>Live Status</h2></header>
           <div class="content" style="padding: 0.75rem; display: grid; gap: 0.75rem;">
             
+            <!-- RAUMKLIMA -->
+            <div style="padding: 0.5rem; background: rgba(59, 130, 246, 0.08); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
+              <div style="font-size: 0.75rem; font-weight: 600; color: #60a5fa; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.3rem;">
+                <span style="display: inline-flex; width: 0.9rem; height: 0.9rem; color: #60a5fa;" id="iconRaum"></span>
+                <span>Raumklima (Außen)</span>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem;">
+                <div style="padding: 0.5rem; background: var(--muted); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
+                  <div style="font-size: 0.65rem; color: var(--text-dim);">Temperatur</div>
+                  <div style="font-size: 1.1rem; font-weight: 700;" class="mono"><span id="stTOut">-</span> <small style="font-size: 0.65rem; font-weight: normal; color: var(--text-dim);">°C</small></div>
+                </div>
+                <div style="padding: 0.5rem; background: var(--muted); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
+                  <div style="font-size: 0.65rem; color: var(--text-dim);">Luftfeuchte</div>
+                  <div style="font-size: 1.1rem; font-weight: 700;" class="mono"><span id="stHOut">-</span> <small style="font-size: 0.65rem; font-weight: normal; color: var(--text-dim);">%</small></div>
+                </div>
+              </div>
+            </div>
+
             <!-- KLIMA INNEN -->
             <div style="padding: 0.5rem; background: rgba(239, 68, 68, 0.08); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
               <div style="font-size: 0.75rem; font-weight: 600; color: var(--accent); margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.3rem;">
@@ -538,24 +556,6 @@
               </div>
             </div>
 
-            <!-- RAUMKLIMA -->
-            <div style="padding: 0.5rem; background: rgba(59, 130, 246, 0.08); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
-              <div style="font-size: 0.75rem; font-weight: 600; color: #60a5fa; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.3rem;">
-                <span style="display: inline-flex; width: 0.9rem; height: 0.9rem; color: #60a5fa;" id="iconRaum"></span>
-                <span>Raumklima (Außen)</span>
-              </div>
-              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem;">
-                <div style="padding: 0.5rem; background: var(--muted); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
-                  <div style="font-size: 0.65rem; color: var(--text-dim);">Temperatur</div>
-                  <div style="font-size: 1.1rem; font-weight: 700;" class="mono"><span id="stTOut">-</span> <small style="font-size: 0.65rem; font-weight: normal; color: var(--text-dim);">°C</small></div>
-                </div>
-                <div style="padding: 0.5rem; background: var(--muted); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
-                  <div style="font-size: 0.65rem; color: var(--text-dim);">Luftfeuchte</div>
-                  <div style="font-size: 1.1rem; font-weight: 700;" class="mono"><span id="stHOut">-</span> <small style="font-size: 0.65rem; font-weight: normal; color: var(--text-dim);">%</small></div>
-                </div>
-              </div>
-            </div>
-
             <!-- SYSTEM -->
             <div style="padding: 0.5rem; background: rgba(156, 163, 175, 0.08); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
               <div style="font-size: 0.75rem; font-weight: 600; color: #9ca3af; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.3rem;">
@@ -590,9 +590,9 @@
           </div>
 
           <footer class="site" style="padding: 0.9rem 1.1rem; background: var(--glass); border: 1px solid var(--border); border-radius: var(--radius); backdrop-filter: blur(3px);">
-            <small style="display:block">&copy; 2025 Martin Teske – Alle Rechte vorbehalten.</small>
+            <small style="display:block">&copy; 2026 Martin Teske – Alle Rechte vorbehalten.</small>
             <small style="display:block">
-              <strong>LuminaGrowX</strong> ist eine Open-Source-Software von 
+              <strong>LuminaGrowX</strong> ist eine kostenlose Software von 
               <a href="https://martinteske-blog.de" target="_blank">MartinTeske-Blog.de</a>, 
               entwickelt für die <strong>LisaPro Growbox</strong>.
               <br>

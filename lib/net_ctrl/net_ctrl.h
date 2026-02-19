@@ -26,14 +26,17 @@ public:
   NetCtrl() {}
 
   // Blocking boot-time check for AP reset pin (default active LOW for 5s)
-  void configureResetPin(int gpio, bool activeHigh = false) { resetPin_ = gpio; resetActiveHigh_ = activeHigh; }
-  bool shouldForceAPAtBoot(uint32_t holdMs = 5000);
+  void configureResetPin(int gpio, bool activeHigh = false, uint32_t holdMs = 5000);
+  bool shouldForceAPAtBoot();
 
   // Start WiFi: AP is always started; optional STA connect using stored config unless forceAP
   void begin(bool forceAP, const char* mdnsName, RTC_Ctrl* rtc = nullptr, bool keepAP = false);
 
   // Try reconnecting STA immediately with stored cfg (non-blocking of main loop, but waits up to timeoutMs here)
   bool reconnectSTA(bool closeAPOnSuccess = true, uint32_t timeoutMs = 12000);
+
+  // Non-blocking loop task to check reset pin for long-press
+  void tick();
 
   // AP control
   void stopAP() { WiFi.softAPdisconnect(true); apActive_ = false; }
@@ -75,6 +78,9 @@ private:
 
   int  resetPin_ = -1;
   bool resetActiveHigh_ = false;
+  uint32_t resetHoldMs_ = 5000;
+  uint32_t resetPinPressStart_ = 0;
+  uint32_t apAutoCloseAt_ = 0;
 };
 
 } // namespace net_ctrl
