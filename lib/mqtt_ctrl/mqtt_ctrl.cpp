@@ -178,42 +178,42 @@ void MqttCtrl::publishUpdateDiscovery_(const char* objectId, const char* name) {
     JsonDocument doc;
     doc["name"] = name;
     doc["has_entity_name"] = true;
-    doc["uniq_id"] = "lumina_" + deviceId_ + "_" + sanId;
+    doc["unique_id"] = "lumina_" + deviceId_ + "_" + sanId;
     
     String stateTopic = getBaseTopic_() + "/state";
     
-    // Versions information
-    doc["ins_v_t"] = stateTopic;
-    doc["ins_v_tpl"] = "{{ value_json.fw }}";
-    doc["lat_v_t"] = stateTopic;
-    doc["lat_v_tpl"] = "{{ value_json.upd_latest }}";
+    // Versions information (Full Keys for better compatibility with Update Dashboard)
+    doc["installed_version_topic"] = stateTopic;
+    doc["installed_version_template"] = "{{ value_json.fw }}";
+    doc["latest_version_topic"] = stateTopic;
+    doc["latest_version_template"] = "{{ value_json.upd_latest }}";
     
     // Status (in_progress: true/false)
-    doc["in_pr_t"] = stateTopic;
-    doc["in_pr_tpl"] = "{{ 'true' if value_json.upd_status == 'installing' else 'false' }}";
+    doc["in_progress_topic"] = stateTopic;
+    doc["in_progress_template"] = "{{ 'true' if value_json.upd_status == 'installing' else 'false' }}";
     
     // Availability
-    doc["avty_t"] = getBaseTopic_() + "/status";
+    doc["availability_topic"] = getBaseTopic_() + "/status";
     
     // Progress
-    doc["pr_t"] = stateTopic;
-    doc["pr_tpl"] = "{{ value_json.upd_progress }}";
+    doc["progress_topic"] = stateTopic;
+    doc["progress_template"] = "{{ value_json.upd_progress }}";
     
-    doc["dev_cla"] = "firmware";
+    doc["device_class"] = "firmware";
     
     // Link to GitHub
-    doc["rel_u"] = "https://github.com/SleXx88/LuminaGrowX/releases/latest";
+    doc["release_url"] = "https://github.com/SleXx88/LuminaGrowX/releases/latest";
     
     // Command
-    doc["cmd_t"] = getBaseTopic_() + "/update/cmd";
+    doc["command_topic"] = getBaseTopic_() + "/update/cmd";
     doc["payload_install"] = "install";
 
-    JsonObject dev = doc["dev"].to<JsonObject>();
-    dev["ids"] = "lumina_" + deviceId_;
+    JsonObject dev = doc["device"].to<JsonObject>();
+    dev["identifiers"] = "lumina_" + deviceId_;
     dev["name"] = deviceName_;
-    dev["mdl"] = "LuminaGrowX";
-    dev["sw"] = FW_VERSION;
-    dev["mf"] = "SleXx88";
+    dev["model"] = "LuminaGrowX";
+    dev["sw_version"] = FW_VERSION;
+    dev["manufacturer"] = "SleXx88";
 
     String payload;
     serializeJson(doc, payload);

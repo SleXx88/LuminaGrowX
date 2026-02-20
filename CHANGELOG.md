@@ -2,6 +2,20 @@
 
 Alle wichtigen Änderungen und Features der automatisierten Growbox-Steuerung.
 
+## [V1.0.7] - 2026-02-20
+### MQTT Standardisierung & Home Assistant Integration
+
+Dieses Release optimiert die MQTT-Kommunikation nach modernen Home Assistant Standards und verbessert die Benutzererfahrung im Dashboard.
+
+#### 🌐 MQTT & Smart Home
+*   **Namens-Fix:** Doppeltes Präfix im Entitätsnamen entfernt (Behebung des "LisaPro-LisaPro" Namensschemas).
+*   **HA Standards:** Unterstützung für `has_entity_name: true` zur sauberen Gruppierung von Entitäten unter dem Gerätenamen.
+*   **Verfügbarkeits-Status:** Implementierung von Last Will and Testament (LWT). Das Gerät wird nun korrekt als `online` oder `offline` in Home Assistant angezeigt.
+*   **Entitäts-Kategorien:** Zuweisung technischer Sensoren zur Kategorie `diagnostic` für ein übersichtlicheres Standard-Dashboard.
+*   **Statistik-Support:** Einführung von State Classes (`measurement` und `total_increasing`) für Langzeit-Statistiken von Temperatur, Luftfeuchtigkeit und Energieverbrauch (falls vorhanden).
+*   **Native Update Entität:** Implementierung einer `update` Entität für Home Assistant. Firmware-Updates können nun direkt über das HA-Dashboard per Knopfdruck ("Installieren") gestartet werden.
+*   **Anzeige-Präzision:** Hinzufügen von `suggested_display_precision` für eine einheitliche und saubere Darstellung der Messwerte.
+
 ## [V1.0.6] - 2026-02-19
 ### Hardware-Erkennung, LED-Signalisierung & Hostname-Anpassung
 
