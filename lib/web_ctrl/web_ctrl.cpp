@@ -177,6 +177,14 @@ void WebCtrl::setMqtt(MqttCtrl* mqtt) {
     if (mqtt_) {
         // Apply currently loaded config
         mqtt_->begin(mqtt_cfg_, app_.name);
+        
+        // Register callback for MQTT commands (e.g. from HA Update Entity)
+        mqtt_->onCommand([this](const String& topic, const String& payload) {
+            if (topic.endsWith("/update/cmd") && payload == "install") {
+                Serial.println("[MQTT] Remote update requested via HA");
+                this->startRemoteUpdateJob_();
+            }
+        });
     }
 }
 

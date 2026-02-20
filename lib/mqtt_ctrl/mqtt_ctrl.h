@@ -4,6 +4,7 @@
 #include <PubSubClient.h>
 #include <WiFi.h>
 #include <ArduinoJson.h>
+#include <functional>
 
 struct MqttConfig {
     bool enabled = false;
@@ -12,6 +13,8 @@ struct MqttConfig {
     String user = "";
     String pass = "";
 };
+
+typedef std::function<void(const String& topic, const String& payload)> MqttCommandCallback;
 
 class MqttCtrl {
 public:
@@ -33,18 +36,25 @@ public:
     // Send HA Auto Discovery Config
     void sendDiscovery();
 
+    // Callback for incoming commands
+    void onCommand(MqttCommandCallback cb) { commandCb_ = cb; }
+
 private:
     MqttConfig config_;
     WiFiClient wifiClient_;
     PubSubClient client_;
     String deviceName_;
     String deviceId_; // derived from MAC
+    MqttCommandCallback commandCb_ = nullptr;
 
     uint32_t lastReconnectAttempt_ = 0;
     bool discoverySent_ = false;
 
     void reconnect_();
     String getBaseTopic_();
-    void publishDiscovery_(const char* component, const char* objectId, const char* name, const char* unit, const char* devClass, const char* stateClass = nullptr, const char* icon = nullptr);
+    void publishDiscovery_(const char* component, const char* objectId, const char* name, const char* unit, const char* devClass, const char* stateClass = nullptr, const char* icon = nullptr, const char* entCat = nullptr, int precision = -1);
+    void publishUpdateDiscovery_(const char* objectId, const char* name);
     void publishSwitchDiscovery_(const char* objectId, const char* name, const char* icon);
+    
+    void callback_(char* topic, uint8_t* payload, unsigned int length);
 };

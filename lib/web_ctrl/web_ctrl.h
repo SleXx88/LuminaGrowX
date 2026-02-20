@@ -109,8 +109,11 @@ private:
   String fsListJson_(const char* path);
   bool fileExists_(const char* path);
 
+public: // Triggerable via MQTT
   // Async update job
   void startRemoteUpdateJob_();
+
+private:
   void startApplyUploadedJob_();
   static void updateTaskTrampoline_(void* arg);
   void updateTaskRun_(bool remote, const String& localTarPath);

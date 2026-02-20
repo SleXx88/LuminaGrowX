@@ -1,12 +1,15 @@
 #include "mqtt_ctrl.h"
 #include "../../include/version.h"
 
+static MqttCtrl* g_mqttInstance = nullptr;
+
 MqttCtrl::MqttCtrl() : client_(wifiClient_) {
     // Generate Device ID from MAC
     uint64_t chipid = ESP.getEfuseMac();
     char buf[13];
     snprintf(buf, sizeof(buf), "%04X%08X", (uint16_t)(chipid >> 32), (uint32_t)chipid);
     deviceId_ = String(buf);
+    g_mqttInstance = this;
 }
 
 void MqttCtrl::begin(const MqttConfig& config, const String& deviceName) {
@@ -15,6 +18,17 @@ void MqttCtrl::begin(const MqttConfig& config, const String& deviceName) {
     if (config_.enabled && config_.server.length() > 0) {
         client_.setServer(config_.server.c_str(), config_.port);
         client_.setBufferSize(3072); // Status JSON is large
+        client_.setCallback([](char* topic, uint8_t* payload, unsigned int length) {
+            if (g_mqttInstance) g_mqttInstance->callback_(topic, payload, length);
+        });
+    }
+}
+
+void MqttCtrl::callback_(char* topic, uint8_t* payload, unsigned int length) {
+    String p = "";
+    for (unsigned int i = 0; i < length; i++) p += (char)payload[i];
+    if (commandCb_) {
+        commandCb_(String(topic), p);
     }
 }
 
@@ -70,16 +84,21 @@ void MqttCtrl::reconnect_() {
     Serial.print("...");
 
     String clientId = "Lumina-" + deviceId_;
+    String willTopic = getBaseTopic_() + "/status";
     bool connected = false;
     
     if (config_.user.length() > 0) {
-        connected = client_.connect(clientId.c_str(), config_.user.c_str(), config_.pass.c_str());
+        connected = client_.connect(clientId.c_str(), config_.user.c_str(), config_.pass.c_str(), 
+                                    willTopic.c_str(), 0, true, "offline");
     } else {
-        connected = client_.connect(clientId.c_str());
+        connected = client_.connect(clientId.c_str(), nullptr, nullptr, 
+                                    willTopic.c_str(), 0, true, "offline");
     }
 
     if (connected) {
         Serial.println("connected");
+        client_.publish(willTopic.c_str(), "online", true); // Retained online status
+        client_.subscribe((getBaseTopic_() + "/update/cmd").c_str());
     } else {
         Serial.print("failed, rc=");
         Serial.println(client_.state());
@@ -109,7 +128,7 @@ void MqttCtrl::publishState(const String& payload) {
     }
 }
 
-void MqttCtrl::publishDiscovery_(const char* component, const char* objectId, const char* name, const char* unit, const char* devClass, const char* stateClass, const char* icon) {
+void MqttCtrl::publishDiscovery_(const char* component, const char* objectId, const char* name, const char* unit, const char* devClass, const char* stateClass, const char* icon, const char* entCat, int precision) {
     // Topic: homeassistant/<component>/<node_id>/<object_id>/config
     // Replace dots in objectId for the topic path but keep them for val_tpl
     String sanId = String(objectId);
@@ -117,9 +136,11 @@ void MqttCtrl::publishDiscovery_(const char* component, const char* objectId, co
     String topic = "homeassistant/" + String(component) + "/lumina_" + deviceId_ + "/" + sanId + "/config";
     
     JsonDocument doc;
-    doc["name"] = deviceName_ + " " + name;
+    doc["name"] = name;
+    doc["has_entity_name"] = true;
     doc["uniq_id"] = "lumina_" + deviceId_ + "_" + sanId;
     doc["stat_t"] = getBaseTopic_() + "/state";
+    doc["avty_t"] = getBaseTopic_() + "/status";
     
     if (strcmp(component, "binary_sensor") == 0) {
         doc["val_tpl"] = "{{ 'ON' if value_json." + String(objectId) + " else 'OFF' }}";
@@ -131,6 +152,8 @@ void MqttCtrl::publishDiscovery_(const char* component, const char* objectId, co
     if (devClass) doc["dev_cla"] = devClass;
     if (stateClass) doc["stat_cla"] = stateClass;
     if (icon) doc["icon"] = icon;
+    if (entCat) doc["ent_cat"] = entCat;
+    if (precision >= 0) doc["sug_dsp_prc"] = precision;
 
     JsonObject dev = doc["dev"].to<JsonObject>();
     dev["ids"] = "lumina_" + deviceId_;
@@ -144,29 +167,64 @@ void MqttCtrl::publishDiscovery_(const char* component, const char* objectId, co
     client_.publish(topic.c_str(), payload.c_str(), true); // Retain discovery
 }
 
+void MqttCtrl::publishUpdateDiscovery_(const char* objectId, const char* name) {
+    String sanId = String(objectId);
+    sanId.replace('.', '_');
+    String topic = "homeassistant/update/lumina_" + deviceId_ + "/" + sanId + "/config";
+    
+    JsonDocument doc;
+    doc["name"] = name;
+    doc["has_entity_name"] = true;
+    doc["uniq_id"] = "lumina_" + deviceId_ + "_" + sanId;
+    doc["stat_t"] = getBaseTopic_() + "/state";
+    doc["avty_t"] = getBaseTopic_() + "/status";
+    
+    doc["dev_cla"] = "firmware";
+    doc["ent_cat"] = "diagnostic";
+    
+    // Templates to extract versions from the state JSON
+    doc["ins_v_tpl"] = "{{ value_json.fw }}";
+    doc["lat_v_tpl"] = "{{ value_json.update.latest }}";
+    
+    // Command topic for triggering update
+    doc["cmd_t"] = getBaseTopic_() + "/update/cmd";
+    doc["payload_install"] = "install";
+
+    JsonObject dev = doc["dev"].to<JsonObject>();
+    dev["ids"] = "lumina_" + deviceId_;
+    dev["name"] = deviceName_;
+    dev["mdl"] = "LuminaGrowX";
+    dev["sw"] = FW_VERSION;
+    dev["mf"] = "SleXx88";
+
+    String payload;
+    serializeJson(doc, payload);
+    client_.publish(topic.c_str(), payload.c_str(), true);
+}
+
 void MqttCtrl::sendDiscovery() {
     if (!client_.connected()) return;
     Serial.println("[MQTT] Sending HA Discovery...");
 
     // Basic Sensors
-    publishDiscovery_("sensor", "temp_c", "Temperatur", "°C", "temperature", "measurement");
-    publishDiscovery_("sensor", "humi_rh", "Luftfeuchtigkeit", "%", "humidity", "measurement");
-    publishDiscovery_("sensor", "vpd_kpa", "VPD", "kPa", "pressure", "measurement");
-    publishDiscovery_("sensor", "dew_c", "Taupunkt", "°C", "temperature", "measurement");
+    publishDiscovery_("sensor", "temp_c", "Temperatur", "°C", "temperature", "measurement", nullptr, nullptr, 1);
+    publishDiscovery_("sensor", "humi_rh", "Luftfeuchtigkeit", "%", "humidity", "measurement", nullptr, nullptr, 1);
+    publishDiscovery_("sensor", "vpd_kpa", "VPD", "kPa", "pressure", "measurement", nullptr, nullptr, 2);
+    publishDiscovery_("sensor", "dew_c", "Taupunkt", "°C", "temperature", "measurement", nullptr, nullptr, 1);
     
-    publishDiscovery_("sensor", "temp_out_c", "Temp Außen", "°C", "temperature", "measurement");
-    publishDiscovery_("sensor", "humi_out_rh", "RH Außen", "%", "humidity", "measurement");
+    publishDiscovery_("sensor", "temp_out_c", "Temp Außen", "°C", "temperature", "measurement", nullptr, nullptr, 1);
+    publishDiscovery_("sensor", "humi_out_rh", "RH Außen", "%", "humidity", "measurement", nullptr, nullptr, 1);
 
     // Fans & Light
-    publishDiscovery_("sensor", "fan_pct", "Lüfter", "%", nullptr, "measurement", "mdi:fan");
-    publishDiscovery_("sensor", "fan_rpm", "Lüfter RPM", "rpm", nullptr, "measurement", "mdi:fan");
-    publishDiscovery_("sensor", "fan2_pct", "Lüfter 2", "%", nullptr, "measurement", "mdi:fan");
-    publishDiscovery_("sensor", "fan2_rpm", "Lüfter 2 RPM", "rpm", nullptr, "measurement", "mdi:fan");
-    publishDiscovery_("sensor", "fan3_pct", "Lüfter 3", "%", nullptr, "measurement", "mdi:fan");
-    publishDiscovery_("sensor", "light_pct", "Licht", "%", nullptr, "measurement", "mdi:led-strip");
+    publishDiscovery_("sensor", "fan_pct", "Lüfter", "%", nullptr, "measurement", "mdi:fan", nullptr, 0);
+    publishDiscovery_("sensor", "fan_rpm", "Lüfter RPM", "rpm", nullptr, "measurement", "mdi:fan", nullptr, 0);
+    publishDiscovery_("sensor", "fan2_pct", "Lüfter 2", "%", nullptr, "measurement", "mdi:fan", nullptr, 0);
+    publishDiscovery_("sensor", "fan2_rpm", "Lüfter 2 RPM", "rpm", nullptr, "measurement", "mdi:fan", nullptr, 0);
+    publishDiscovery_("sensor", "fan3_pct", "Lüfter 3", "%", nullptr, "measurement", "mdi:fan", nullptr, 0);
+    publishDiscovery_("sensor", "light_pct", "Licht", "%", nullptr, "measurement", "mdi:led-strip", nullptr, 0);
     
     // Distance
-    publishDiscovery_("sensor", "tof_mm", "Abstand", "mm", "distance", "measurement", "mdi:ruler");
+    publishDiscovery_("sensor", "tof_mm", "Abstand", "mm", "distance", "measurement", "mdi:ruler", nullptr, 0);
     
     // Binary Status
     publishDiscovery_("binary_sensor", "door_open", "Tür", nullptr, "door", nullptr);
@@ -175,25 +233,28 @@ void MqttCtrl::sendDiscovery() {
     publishDiscovery_("binary_sensor", "fan_on", "Lüfter Status", nullptr, "running", nullptr);
 
     // Stepper
-    publishDiscovery_("sensor", "stepper.pos_mm", "Lampen Höhe", "mm", nullptr, "measurement", "mdi:arrow-up-down");
+    publishDiscovery_("sensor", "stepper.pos_mm", "Lampen Höhe", "mm", nullptr, "measurement", "mdi:arrow-up-down", nullptr, 1);
     publishDiscovery_("binary_sensor", "stepper.moving", "Motor fährt", nullptr, "moving", nullptr);
     publishDiscovery_("binary_sensor", "stepper.homing", "Referenzfahrt", nullptr, nullptr, nullptr, "mdi:home-search");
-    publishDiscovery_("binary_sensor", "stepper.uart_ok", "Motor UART OK", nullptr, "connectivity", nullptr);
+    publishDiscovery_("binary_sensor", "stepper.uart_ok", "Motor UART OK", nullptr, "connectivity", nullptr, nullptr, "diagnostic");
 
     // Grow & Info
     publishDiscovery_("sensor", "grow.phase", "Phase", nullptr, nullptr, nullptr, "mdi:sprout");
-    publishDiscovery_("sensor", "grow.day", "Tag", "d", nullptr, "total_increasing", "mdi:calendar-today");
-    publishDiscovery_("sensor", "grow.total_days", "Gesamttage", "d", nullptr, nullptr, "mdi:calendar-range");
+    publishDiscovery_("sensor", "grow.day", "Tag", "d", nullptr, "total_increasing", "mdi:calendar-today", nullptr, 0);
+    publishDiscovery_("sensor", "grow.total_days", "Gesamttage", "d", nullptr, nullptr, "mdi:calendar-range", "diagnostic", 0);
     publishDiscovery_("sensor", "seed", "Sorte", nullptr, nullptr, nullptr, "mdi:seed");
 
+    // Update Entity
+    publishUpdateDiscovery_("firmware", "Firmware Update");
+
     // System Diagnostic
-    publishDiscovery_("sensor", "health.state", "System Status", nullptr, nullptr, nullptr, "mdi:heart-pulse");
-    publishDiscovery_("sensor", "esp_temp", "Chip Temperatur", "°C", "temperature", "measurement", "mdi:cpu-64-bit");
-    publishDiscovery_("sensor", "rssi", "WLAN Signal", "dBm", "signal_strength", "measurement");
-    publishDiscovery_("sensor", "uptime_s", "Laufzeit", "s", "duration", "total_increasing");
-    publishDiscovery_("sensor", "ip", "IP Adresse", nullptr, nullptr, nullptr, "mdi:ip-network");
-    publishDiscovery_("sensor", "ssid", "WLAN SSID", nullptr, nullptr, nullptr, "mdi:wifi");
-    publishDiscovery_("binary_sensor", "wifi_connected", "WLAN verbunden", nullptr, "connectivity", nullptr);
-    publishDiscovery_("binary_sensor", "internet_ok", "Internet OK", nullptr, "connectivity", nullptr);
-    publishDiscovery_("binary_sensor", "update_available", "Update verfügbar", nullptr, "update", nullptr);
+    publishDiscovery_("sensor", "health.state", "System Status", nullptr, nullptr, nullptr, "mdi:heart-pulse", "diagnostic");
+    publishDiscovery_("sensor", "esp_temp", "Chip Temperatur", "°C", "temperature", "measurement", "mdi:cpu-64-bit", "diagnostic", 1);
+    publishDiscovery_("sensor", "rssi", "WLAN Signal", "dBm", "signal_strength", "measurement", nullptr, "diagnostic", 0);
+    publishDiscovery_("sensor", "uptime_s", "Laufzeit", "s", "duration", "total_increasing", nullptr, "diagnostic", 0);
+    publishDiscovery_("sensor", "ip", "IP Adresse", nullptr, nullptr, nullptr, "mdi:ip-network", "diagnostic");
+    publishDiscovery_("sensor", "ssid", "WLAN SSID", nullptr, nullptr, nullptr, "mdi:wifi", "diagnostic");
+    publishDiscovery_("binary_sensor", "wifi_connected", "WLAN verbunden", nullptr, "connectivity", nullptr, nullptr, "diagnostic");
+    publishDiscovery_("binary_sensor", "internet_ok", "Internet OK", nullptr, "connectivity", nullptr, nullptr, "diagnostic");
+    publishDiscovery_("binary_sensor", "update_available", "Update verfügbar", nullptr, "update", nullptr, nullptr, "diagnostic");
 }
