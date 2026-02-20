@@ -569,7 +569,10 @@
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
                   <div style="padding: 0.5rem; background: var(--muted); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
-                    <div style="font-size: 0.65rem; color: var(--text-dim);">IP-Adresse</div>
+                    <div style="font-size: 0.65rem; color: var(--text-dim); display: flex; justify-content: space-between;">
+                      <span>IP-Adresse</span>
+                      <span id="stNet" style="text-transform: none; font-weight: normal; opacity: 0.8;"></span>
+                    </div>
                     <div style="font-size: 0.9rem; font-weight: 600;" class="mono" id="stIp">-</div>
                   </div>
                   <div style="padding: 0.5rem; background: var(--muted); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7);">
@@ -936,9 +939,12 @@
         }
 
         // Netzwerk
-        $("stIp").textContent = s.ip || "-";
-        $("stNet").textContent = s.wifi_connected ? "verbunden" : "AP-Only";
-        $("stRssi").textContent = (s.rssi != null ? s.rssi : "-");
+        if ($("stIp")) $("stIp").textContent = s.ip || "-";
+        if ($("stNet")) $("stNet").textContent = s.wifi_connected ? "verbunden" : "AP-Only";
+        if ($("stRssi")) {
+          const rssi = (s.rssi != null && s.rssi > -127) ? s.rssi : "-";
+          $("stRssi").textContent = rssi;
+        }
         // Health banner
         const hb = $("healthBanner");
         try {

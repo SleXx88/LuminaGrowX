@@ -17,7 +17,7 @@ void MqttCtrl::begin(const MqttConfig& config, const String& deviceName) {
     deviceName_ = deviceName;
     if (config_.enabled && config_.server.length() > 0) {
         client_.setServer(config_.server.c_str(), config_.port);
-        client_.setBufferSize(3072); // Status JSON is large
+        client_.setBufferSize(4096); // Status JSON is large
         client_.setCallback([](char* topic, uint8_t* payload, unsigned int length) {
             if (g_mqttInstance) g_mqttInstance->callback_(topic, payload, length);
         });
@@ -38,7 +38,7 @@ void MqttCtrl::setConfig(const MqttConfig& config) {
     if (!config_.enabled) {
         client_.disconnect();
     } else {
-        client_.setBufferSize(3072);
+        client_.setBufferSize(4096);
         if (serverChanged) {
             client_.disconnect();
             client_.setServer(config_.server.c_str(), config_.port);
@@ -97,6 +97,7 @@ void MqttCtrl::reconnect_() {
 
     if (connected) {
         Serial.println("connected");
+        discoverySent_ = false; // Trigger discovery send in loop
         client_.publish(willTopic.c_str(), "online", true); // Retained online status
         client_.subscribe((getBaseTopic_() + "/update/cmd").c_str());
     } else {
@@ -142,7 +143,9 @@ void MqttCtrl::publishDiscovery_(const char* component, const char* objectId, co
     doc["stat_t"] = getBaseTopic_() + "/state";
     doc["avty_t"] = getBaseTopic_() + "/status";
     
-    if (strcmp(component, "binary_sensor") == 0) {
+    if (strcmp(objectId, "upd_latest") == 0) {
+        doc["val_tpl"] = "{{ value_json.upd_latest if value_json.update_available else 'Aktuell' }}";
+    } else if (strcmp(component, "binary_sensor") == 0) {
         doc["val_tpl"] = "{{ 'ON' if value_json." + String(objectId) + " else 'OFF' }}";
     } else {
         doc["val_tpl"] = "{{ value_json." + String(objectId) + " }}";
@@ -176,17 +179,22 @@ void MqttCtrl::publishUpdateDiscovery_(const char* objectId, const char* name) {
     doc["name"] = name;
     doc["has_entity_name"] = true;
     doc["uniq_id"] = "lumina_" + deviceId_ + "_" + sanId;
-    doc["stat_t"] = getBaseTopic_() + "/state";
+    
+    String stateTopic = getBaseTopic_() + "/state";
+    doc["ins_v_t"] = stateTopic;
+    doc["lat_v_t"] = stateTopic;
     doc["avty_t"] = getBaseTopic_() + "/status";
+    
+    // Show progress directly in the update entity
+    doc["pr_t"] = stateTopic;
+    doc["pr_tpl"] = "{{ value_json.upd_progress }}";
     
     doc["dev_cla"] = "firmware";
     doc["ent_cat"] = "diagnostic";
     
-    // Templates to extract versions from the state JSON
     doc["ins_v_tpl"] = "{{ value_json.fw }}";
-    doc["lat_v_tpl"] = "{{ value_json.update.latest }}";
+    doc["lat_v_tpl"] = "{{ value_json.upd_latest }}";
     
-    // Command topic for triggering update
     doc["cmd_t"] = getBaseTopic_() + "/update/cmd";
     doc["payload_install"] = "install";
 
@@ -200,6 +208,49 @@ void MqttCtrl::publishUpdateDiscovery_(const char* objectId, const char* name) {
     String payload;
     serializeJson(doc, payload);
     client_.publish(topic.c_str(), payload.c_str(), true);
+}
+
+void MqttCtrl::publishButtonDiscovery_(const char* objectId, const char* name, const char* icon, const char* entCat, const char* payload, const char* avtyTpl) {
+    String sanId = String(objectId);
+    sanId.replace('.', '_');
+    String topic = "homeassistant/button/lumina_" + deviceId_ + "/" + sanId + "/config";
+    
+    JsonDocument doc;
+    doc["name"] = name;
+    doc["has_entity_name"] = true;
+    doc["uniq_id"] = "lumina_" + deviceId_ + "_" + sanId;
+    
+    // Command topic
+    doc["cmd_t"] = getBaseTopic_() + "/update/cmd";
+    doc["payload_press"] = payload;
+    
+    if (avtyTpl) {
+        // Multi-Availability: Device online AND Update available
+        JsonArray avty = doc["availability"].to<JsonArray>();
+        
+        JsonObject av1 = avty.add<JsonObject>();
+        av1["t"] = getBaseTopic_() + "/status";
+        
+        JsonObject av2 = avty.add<JsonObject>();
+        av2["t"] = getBaseTopic_() + "/state";
+        av2["val_tpl"] = avtyTpl;
+    } else {
+        doc["avty_t"] = getBaseTopic_() + "/status";
+    }
+    
+    if (icon) doc["icon"] = icon;
+    if (entCat) doc["ent_cat"] = entCat;
+
+    JsonObject dev = doc["dev"].to<JsonObject>();
+    dev["ids"] = "lumina_" + deviceId_;
+    dev["name"] = deviceName_;
+    dev["mdl"] = "LuminaGrowX";
+    dev["sw"] = FW_VERSION;
+    dev["mf"] = "SleXx88";
+
+    String p;
+    serializeJson(doc, p);
+    client_.publish(topic.c_str(), p.c_str(), true);
 }
 
 void MqttCtrl::sendDiscovery() {
@@ -229,7 +280,7 @@ void MqttCtrl::sendDiscovery() {
     // Binary Status
     publishDiscovery_("binary_sensor", "door_open", "Tür", nullptr, "door", nullptr);
     publishDiscovery_("binary_sensor", "pump_on", "Pumpe (Luft)", nullptr, "running", nullptr);
-    publishDiscovery_("binary_sensor", "light_on", "Licht Status", nullptr, "light", nullptr);
+    publishDiscovery_("binary_sensor", "light_on", "LED Beleuchtung", nullptr, nullptr, nullptr, "mdi:led-on");
     publishDiscovery_("binary_sensor", "fan_on", "Lüfter Status", nullptr, "running", nullptr);
 
     // Stepper
@@ -244,11 +295,23 @@ void MqttCtrl::sendDiscovery() {
     publishDiscovery_("sensor", "grow.total_days", "Gesamttage", "d", nullptr, nullptr, "mdi:calendar-range", "diagnostic", 0);
     publishDiscovery_("sensor", "seed", "Sorte", nullptr, nullptr, nullptr, "mdi:seed");
 
-    // Update Entity
+    // Update Entity & Manual Button (Button stays prominent)
     publishUpdateDiscovery_("firmware", "Firmware Update");
+    publishButtonDiscovery_("start_update", "Firmware Update starten", "mdi:update", nullptr, "install", "{{ 'online' if value_json.update_available else 'offline' }}");
+    
+    // Additional Update Sensors (Progress in main, Latest in diagnostic)
+    publishDiscovery_("binary_sensor", "update_available", "Update verfügbar", nullptr, "update", nullptr, "mdi:package-down", "diagnostic");
+    publishDiscovery_("sensor", "upd_latest", "Neueste Version", nullptr, nullptr, nullptr, "mdi:github", "diagnostic");
+    publishDiscovery_("sensor", "upd_progress", "Update Fortschritt", "%", nullptr, nullptr, "mdi:progress-download", nullptr, 0);
 
     // System Diagnostic
     publishDiscovery_("sensor", "health.state", "System Status", nullptr, nullptr, nullptr, "mdi:heart-pulse", "diagnostic");
+    publishDiscovery_("binary_sensor", "health.modules.dac", "Modul: LED-Treiber", nullptr, "connectivity", nullptr, nullptr, "diagnostic");
+    publishDiscovery_("binary_sensor", "health.modules.sht_in", "Modul: SHT Innen", nullptr, "connectivity", nullptr, nullptr, "diagnostic");
+    publishDiscovery_("binary_sensor", "health.modules.sht_out", "Modul: SHT Außen", nullptr, "connectivity", nullptr, nullptr, "diagnostic");
+    publishDiscovery_("binary_sensor", "health.modules.tof", "Modul: ToF-Sensor", nullptr, "connectivity", nullptr, nullptr, "diagnostic");
+    publishDiscovery_("binary_sensor", "health.modules.rtc", "Modul: Echtzeituhr", nullptr, "connectivity", nullptr, nullptr, "diagnostic");
+    
     publishDiscovery_("sensor", "esp_temp", "Chip Temperatur", "°C", "temperature", "measurement", "mdi:cpu-64-bit", "diagnostic", 1);
     publishDiscovery_("sensor", "rssi", "WLAN Signal", "dBm", "signal_strength", "measurement", nullptr, "diagnostic", 0);
     publishDiscovery_("sensor", "uptime_s", "Laufzeit", "s", "duration", "total_increasing", nullptr, "diagnostic", 0);
@@ -256,5 +319,4 @@ void MqttCtrl::sendDiscovery() {
     publishDiscovery_("sensor", "ssid", "WLAN SSID", nullptr, nullptr, nullptr, "mdi:wifi", "diagnostic");
     publishDiscovery_("binary_sensor", "wifi_connected", "WLAN verbunden", nullptr, "connectivity", nullptr, nullptr, "diagnostic");
     publishDiscovery_("binary_sensor", "internet_ok", "Internet OK", nullptr, "connectivity", nullptr, nullptr, "diagnostic");
-    publishDiscovery_("binary_sensor", "update_available", "Update verfügbar", nullptr, "update", nullptr, nullptr, "diagnostic");
 }

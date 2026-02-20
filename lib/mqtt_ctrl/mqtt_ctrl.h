@@ -54,6 +54,7 @@ private:
     String getBaseTopic_();
     void publishDiscovery_(const char* component, const char* objectId, const char* name, const char* unit, const char* devClass, const char* stateClass = nullptr, const char* icon = nullptr, const char* entCat = nullptr, int precision = -1);
     void publishUpdateDiscovery_(const char* objectId, const char* name);
+    void publishButtonDiscovery_(const char* objectId, const char* name, const char* icon = nullptr, const char* entCat = nullptr, const char* payload = "press", const char* avtyTpl = nullptr);
     void publishSwitchDiscovery_(const char* objectId, const char* name, const char* icon);
     
     void callback_(char* topic, uint8_t* payload, unsigned int length);

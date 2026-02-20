@@ -40,7 +40,7 @@ static const char* GH_REPO  = "LuminaGrowX";
 static const char* GH_ASSET = "LuminaGrowX_Update.tar";
 static const char* UPDATE_MANIFEST_URL = ""; // leer -> aus NVS lesen
 
-WebCtrl::WebCtrl() : targetDacPct_(0.0f), currentDacPct_(0.0f), lastDacFadeMs_(0) {}
+WebCtrl::WebCtrl() : targetDacPct_(0.0f), currentDacPct_(0.0f), lastDacFadeMs_(0), latestKnownTag_(FW_VERSION) {}
 
 bool WebCtrl::loadAppCfg(AppCfg& out) {
   Preferences prefs;
@@ -1468,7 +1468,7 @@ String WebCtrl::makeStatusJson_() {
   
         
   
-        doc["light_on"] = ledPct > 0.5f;
+        doc["light_on"] = health::state().mod.dac_ok && (ledPct > 0.5f);
   
         doc["light_pct"] = round1(ledPct);
   
@@ -1589,12 +1589,26 @@ String WebCtrl::makeStatusJson_() {
   float chipTemp = temperatureRead();
   doc["esp_temp"] = isnan(chipTemp) ? 0.0f : (float)roundf(chipTemp * 10.0f) / 10.0f;
 
-  // Append last known update info (from background daily check)
+  // Update info for UI and HA
   JsonObject upd = doc["update"].to<JsonObject>();
   upd["has_update"] = latestKnownHasUpdate_;
-  upd["latest"] = latestKnownTag_;
+  upd["latest"]     = latestKnownTag_;
+  upd["status"]     = updateJobRunning_ ? "installing" : "idle";
   
-  // MQTT-spezifisches Flat-Flag
+  int progress = 0;
+  if (updatePhase_ == "downloading" && updateDLTotal_ > 0) {
+      progress = (int)((50LL * updateDLSoFar_) / updateDLTotal_);
+  } else if (updatePhase_ == "applying" && updateApplyTotal_ > 0) {
+      progress = 50 + (int)((50LL * updateApplySoFar_) / updateApplyTotal_);
+  } else if (updatePhase_ == "done") {
+      progress = 100;
+  }
+  upd["progress"] = progress;
+
+  // Flat update fields for easier HA discovery (backward compat/simplicity)
+  doc["upd_latest"]   = latestKnownTag_;
+  doc["upd_status"]   = updateJobRunning_ ? "installing" : "idle";
+  doc["upd_progress"] = progress;
   doc["update_available"] = latestKnownHasUpdate_;
 
   // MQTT status
@@ -1899,6 +1913,9 @@ void WebCtrl::updateCheckTaskRun_() {
   if (ok) {
     latestKnownTag_ = latestTag;
     latestKnownHasUpdate_ = (latestTag.length() && latestTag != String(FW_VERSION));
+    Serial.printf("[WEB] Update check: Latest=%s, HasUpdate=%s\n", latestTag.c_str(), latestKnownHasUpdate_?"YES":"NO");
+  } else {
+    Serial.println("[WEB] Update check FAILED (Network or GitHub API issue)");
   }
   // stamp day to avoid repeated checks until next day window
   time_t now = time(nullptr); if (now>0) { struct tm tmL; localtime_r(&now, &tmL); lastUpdateCheckYMD_ = (uint32_t)((tmL.tm_year+1900)*10000 + (tmL.tm_mon+1)*100 + tmL.tm_mday); }
@@ -2035,22 +2052,21 @@ bool WebCtrl::applyPackageFromFile_(const char* tarPath, bool& fwUpdated, int& f
   fwUpdated=false; filesUpdated=0; err="";
   File f = LittleFS.open(tarPath, FILE_READ); if (!f) { err="open failed"; return false; }
   const size_t BLK=512; uint8_t hdr[BLK];
-  // Reset Apply-Progress
-  updateApplyTotal_ = 0;
+  
+  // Reset Apply-Progress to file size for smooth bar
+  updateApplyTotal_ = (int32_t)f.size();
   updateApplySoFar_ = 0;
+  
   updateMsg_ = "apply tar";
   while (true) {
     size_t r = f.read(hdr, BLK); if (r == 0) break; if (r != BLK) { err="bad tar header"; f.close(); return false; }
+    updateApplySoFar_ += (int32_t)r;
+    
     bool allZero=true; for (size_t i=0;i<BLK;i++){ if (hdr[i]!=0){ allZero=false; break; } } if (allZero) break;
     char nameC[101]; memcpy(nameC, hdr+0, 100); nameC[100]='\0'; String name=String(nameC);
     uint32_t size=0; if (!parseOctal_((const char*)(hdr+124), 12, size)) size=0; char typeflag=(char)hdr[156]; if (typeflag=='\0') typeflag='0';
     uint32_t toRead=size; uint32_t pad=(BLK-(size%BLK))%BLK;
-    // ZÃ¤hle Gesamtmenge der anzuwendenden Daten hoch, wenn regulÃ¤re Datei
-    if (typeflag=='0') {
-      if (name=="firmware.bin" || name.startsWith("www/")) {
-        if (updateApplyTotal_ >= 0) updateApplyTotal_ += (int32_t)size;
-      }
-    }
+    
     if (typeflag=='0') {
       if (name=="firmware.bin") {
         if (size==0) { err="empty firmware"; f.close(); return false; }
@@ -2068,27 +2084,37 @@ bool WebCtrl::applyPackageFromFile_(const char* tarPath, bool& fwUpdated, int& f
           updateApplySoFar_ += nr; 
           if (left % 32768 == 0) yield(); 
         }
-        if (!Update.end()) { // changed from true to false to ensure size match
+        if (!Update.end()) {
           err=String("Update.end ")+Update.errorString(); 
           Serial.printf("[UPDATE] Firmware error: %s\n", err.c_str());
           f.close(); return false; 
         }
         Serial.println(F("[UPDATE] Firmware update SUCCESS"));
         fwUpdated=true; 
-        if (pad) f.seek(pad, SeekCur);
+        if (pad) { f.seek(pad, SeekCur); updateApplySoFar_ += pad; }
       } else if (name.startsWith("www/") && isSafeAssetPath_(name.substring(4))) {
         String rel=name.substring(4); String dest=String("/")+rel; String tmp=String("/.u_tmp_")+rel; ensureDir_(dest); int lastSlash=tmp.lastIndexOf('/'); if (lastSlash>0) { LittleFS.mkdir(tmp.substring(0,lastSlash)); }
         File wf=LittleFS.open(tmp, FILE_WRITE); if (!wf) { err=String("open fail ")+tmp; f.close(); return false; }
         const size_t CH=2048; uint8_t buf[CH]; uint32_t left=toRead;
         updateMsg_ = String("apply ")+rel;
-        while (left>0) { size_t n=left>CH?CH:left; int nr=f.read(buf,n); if (nr<=0){ wf.close(); LittleFS.remove(tmp); err="asset read"; f.close(); return false; } if (wf.write(buf,nr)!=(size_t)nr){ wf.close(); LittleFS.remove(tmp); err="asset write"; f.close(); return false; } left-=nr; updateApplySoFar_ += nr; yield(); }
+        while (left>0) { 
+            size_t n=left>CH?CH:left; 
+            int nr=f.read(buf,n); 
+            if (nr<=0){ wf.close(); LittleFS.remove(tmp); err="asset read"; f.close(); return false; } 
+            if (wf.write(buf,nr)!=(size_t)nr){ wf.close(); LittleFS.remove(tmp); err="asset write"; f.close(); return false; } 
+            left-=nr; 
+            updateApplySoFar_ += nr; 
+            yield(); 
+        }
         wf.close(); LittleFS.remove(dest); ensureDir_(dest); if (!LittleFS.rename(tmp, dest)) { File rf=LittleFS.open(tmp, FILE_READ); File df=LittleFS.open(dest, FILE_WRITE); if (rf && df){ uint8_t b[1024]; int n; while ((n=rf.read(b,sizeof(b)))>0){ if (df.write(b,n)!=(size_t)n){ break; } } } if (rf) rf.close(); if (df) df.close(); LittleFS.remove(tmp); }
-        filesUpdated++; if (pad) f.seek(pad, SeekCur);
+        filesUpdated++; if (pad) { f.seek(pad, SeekCur); updateApplySoFar_ += pad; }
       } else {
-        if (toRead) f.seek(toRead, SeekCur); if (pad) f.seek(pad, SeekCur);
+        if (toRead) { f.seek(toRead, SeekCur); updateApplySoFar_ += toRead; }
+        if (pad) { f.seek(pad, SeekCur); updateApplySoFar_ += pad; }
       }
     } else {
-      if (toRead) f.seek(toRead, SeekCur); if (pad) f.seek(pad, SeekCur);
+      if (toRead) { f.seek(toRead, SeekCur); updateApplySoFar_ += toRead; }
+      if (pad) { f.seek(pad, SeekCur); updateApplySoFar_ += pad; }
     }
   }
   f.close(); return true;

@@ -224,6 +224,21 @@
           $('currentVerBadge').textContent = currentFwVer;
           $('buildTime').textContent = j.build || '-';
           preBuild = j.build || null;
+
+          // If background check already found an update, show it
+          if (j.update && j.update.has_update && j.update.latest) {
+            $('updateInfo').style.display = 'block';
+            $('btnRunRemote').style.display = 'inline-block';
+            $('latestVerBadge').textContent = j.update.latest;
+            $('newChangelogText').textContent = 'Prüfe Details...';
+            expectedFw = j.update.latest;
+            
+            // Try to load changelog for the latest version
+            fetch('/api/update/check').then(res => res.json()).then(cj => {
+              if (cj.changelog) $('newChangelogText').textContent = cj.changelog;
+              else $('newChangelogText').textContent = 'Keine Details verfügbar.';
+            }).catch(() => {});
+          }
           
           // Lokales Changelog laden
           fetch('/CHANGELOG.md').then(res => res.text()).then(text => {

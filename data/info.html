@@ -326,7 +326,7 @@
         
         $("valIp").textContent = s.ip || "-";
         $("valSsid").textContent = s.ssid || (s.wifi_connected ? "Verbunden" : "Nicht verbunden");
-        $("valRssi").textContent = (s.rssi != null ? s.rssi : "-") + " dBm";
+        $("valRssi").textContent = (s.rssi != null && s.rssi > -127 ? s.rssi : "-") + " dBm";
         $("valUptime").textContent = formatUptime(s.uptime_s || s.uptime);
         $("valEspTemp").textContent = (s.esp_temp != null ? s.esp_temp.toFixed(1) : "-") + " °C";
         $("valFw").textContent = s.fw || "-";
