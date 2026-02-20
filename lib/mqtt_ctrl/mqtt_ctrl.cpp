@@ -181,20 +181,30 @@ void MqttCtrl::publishUpdateDiscovery_(const char* objectId, const char* name) {
     doc["uniq_id"] = "lumina_" + deviceId_ + "_" + sanId;
     
     String stateTopic = getBaseTopic_() + "/state";
+    
+    // Versions information
     doc["ins_v_t"] = stateTopic;
+    doc["ins_v_tpl"] = "{{ value_json.fw }}";
     doc["lat_v_t"] = stateTopic;
+    doc["lat_v_tpl"] = "{{ value_json.upd_latest }}";
+    
+    // Status (in_progress: true/false)
+    doc["in_pr_t"] = stateTopic;
+    doc["in_pr_tpl"] = "{{ 'true' if value_json.upd_status == 'installing' else 'false' }}";
+    
+    // Availability
     doc["avty_t"] = getBaseTopic_() + "/status";
     
-    // Show progress directly in the update entity
+    // Progress
     doc["pr_t"] = stateTopic;
     doc["pr_tpl"] = "{{ value_json.upd_progress }}";
     
     doc["dev_cla"] = "firmware";
-    doc["ent_cat"] = "diagnostic";
     
-    doc["ins_v_tpl"] = "{{ value_json.fw }}";
-    doc["lat_v_tpl"] = "{{ value_json.upd_latest }}";
+    // Link to GitHub
+    doc["rel_u"] = "https://github.com/SleXx88/LuminaGrowX/releases/latest";
     
+    // Command
     doc["cmd_t"] = getBaseTopic_() + "/update/cmd";
     doc["payload_install"] = "install";
 
